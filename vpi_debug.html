@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html>
+<head><title>VPI Debug</title></head>
+<body style="background:#0d1117;color:#e6edf3;font-family:monospace;padding:20px">
+<h2 style="color:#3fb950">VPI CSV Debug Tool</h2>
+<div id="out"></div>
+<script>
+const CSV_PROD = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRRx7S_rqgygPQifVep4DtnDFK8gGjAPVbrzCq6sCJcTF6omIGXb73iK8mQZoZjOgUq8CnZ9t7fR_2a/pub?gid=2030930278&single=true&output=csv';
+
+const log = msg => {
+  document.getElementById('out').innerHTML += '<div>' + msg + '</div>';
+};
+
+async function test() {
+  log('Testing direct fetch...');
+  try {
+    const r = await fetch(CSV_PROD + '&cb=' + Date.now());
+    log('Direct status: ' + r.status + ' ' + r.statusText);
+    const t = await r.text();
+    log('Direct length: ' + t.length + ' chars');
+    log('First 500 chars:<br><pre style="color:#ffa657;white-space:pre-wrap">' + t.slice(0,500).replace(/</g,'&lt;') + '</pre>');
+  } catch(e) {
+    log('Direct FAILED: ' + e.message);
+    log('Trying proxy...');
+    try {
+      const proxyUrl = 'https://api.allorigins.win/get?url=' + encodeURIComponent(CSV_PROD);
+      const r2 = await fetch(proxyUrl);
+      log('Proxy status: ' + r2.status);
+      const j = await r2.json();
+      log('Proxy contents length: ' + (j.contents||'').length);
+      log('First 500 chars:<br><pre style="color:#ffa657;white-space:pre-wrap">' + (j.contents||'').slice(0,500).replace(/</g,'&lt;') + '</pre>');
+    } catch(e2) {
+      log('Proxy also FAILED: ' + e2.message);
+    }
+  }
+}
+test();
+</script>
+</body>
+</html>
