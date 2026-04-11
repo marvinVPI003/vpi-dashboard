@@ -137,8 +137,20 @@ tr:hover td{background:rgba(255,255,255,.02)}
     <div class="sb-sub">Feed for Life</div>
   </div>
   <div class="sb-user"><b>Marvin Rosario</b>Operations Manager</div>
-  <div class="sb-sec">View</div>
-  <div id="sb-nav"></div>
+  <div class="sb-sec">Site</div>
+  <div style="padding:6px 14px 14px">
+    <select id="site-select" onchange="setSite(this.value)" style="
+      width:100%;padding:8px 10px;
+      background:var(--bg3);color:var(--text);
+      border:1px solid var(--border2);border-radius:var(--r);
+      font-family:'Barlow',sans-serif;font-size:12px;
+      cursor:pointer;outline:none;appearance:none;
+      background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%238b949e' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+      background-repeat:no-repeat;background-position:right 10px center;
+      padding-right:28px;
+    ">
+    </select>
+  </div>
   <div class="sb-footer">
     <div><span class="pulse" id="status-dot"></span> <span id="status-txt">Live</span></div>
     <div id="last-updated" style="margin-top:4px;color:var(--text3)">—</div>
@@ -154,9 +166,20 @@ tr:hover td{background:rgba(255,255,255,.02)}
     <div class="tb-wk" id="tb-wk">—</div>
     <button class="refresh-btn" id="refresh-btn" onclick="manualRefresh()">⟳ Refresh</button>
   </div>
-  <div class="week-strip">
-    <span class="ws-lbl">Week →</span>
-    <div id="wk-btns" style="display:flex;gap:3px"></div>
+  <div class="week-strip" style="gap:12px">
+    <span class="ws-lbl">Week</span>
+    <select id="week-select" onchange="setWeek(parseInt(this.value))" style="
+      padding:5px 28px 5px 10px;
+      background:var(--bg3);color:var(--text);
+      border:1px solid var(--border2);border-radius:var(--r);
+      font-family:'DM Mono',monospace;font-size:11px;
+      cursor:pointer;outline:none;appearance:none;
+      background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%238b949e' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+      background-repeat:no-repeat;background-position:right 8px center;
+      min-width:160px;
+    ">
+    </select>
+    <span id="week-info" style="font-size:10px;color:var(--text3);font-family:'DM Mono',monospace"></span>
   </div>
   <div class="content" id="content"></div>
 </div>
@@ -448,24 +471,36 @@ function getMTD(s, w) {
 // NAV & WEEK BUTTONS
 // ============================================================
 function buildNav() {
-  document.getElementById('sb-nav').innerHTML = SITES.map(s => `
-    <button class="sb-btn${s===activeSite?' active':''}" onclick="setSite('${s}')">
-      <span class="sb-dot" style="${s===activeSite?'background:'+SDOTS[s]:''}"></span>
-      <span>${SLABELS[s]}</span></button>`).join('');
+  const sel = document.getElementById('site-select');
+  if (!sel) return;
+  sel.innerHTML = SITES.map(s =>
+    `<option value="${s}" ${s===activeSite?'selected':''}>${SLABELS[s]}</option>`
+  ).join('');
+  // Update topbar badge color
+  document.getElementById('tb-site').style.background = activeSite==='NATIONAL'?'var(--green-d)':'var(--blue-d)';
+  document.getElementById('tb-site').style.color = SDOTS[activeSite];
+  document.getElementById('tb-site').style.borderColor = SDOTS[activeSite]+'55';
 }
 
 function buildWkBtns() {
   const weeks = getWeeks();
-  let html = '', lastM = '';
-  weeks.forEach(w => {
+  const sel = document.getElementById('week-select');
+  if (!sel) return;
+  sel.innerHTML = weeks.map(w => {
     const m = (getMonthForWeek(w)||'').slice(0,3);
-    if (m !== lastM) { html += `<span class="msep">${m}</span>`; lastM = m; }
-    html += `<button class="wk${w===activeWeek?' active':''}" onclick="setWeek(${w})">W${w}</button>`;
-  });
-  document.getElementById('wk-btns').innerHTML = html;
+    return `<option value="${w}" ${w===activeWeek?'selected':''}>${m} — Week ${w}</option>`;
+  }).join('');
+  // Update week info label
+  const mon = getMonthForWeek(activeWeek) || '';
+  const wkInfo = document.getElementById('week-info');
+  if (wkInfo) wkInfo.textContent = weeks.length + ' weeks · ' + [...new Set(weeks.map(w=>getMonthForWeek(w)))].filter(Boolean).length + ' months';
 }
 
-function setSite(s) { activeSite = s; buildNav(); render(); }
+function setSite(s) { 
+  activeSite = s; 
+  buildNav(); 
+  render(); 
+}
 function setWeek(w) { activeWeek = w; buildWkBtns(); render(); }
 
 // ============================================================
