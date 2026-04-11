@@ -178,7 +178,7 @@ const SLABELS = {NATIONAL:'National',AC:'AC · Bulacan',PFMIS:'PFMIS · Isabela'
 const SDOTS = {NATIONAL:'#3fb950',AC:'#388bfd',PFMIS:'#d29922',HOREB:'#1abc9c',BUKID:'#f85149',ARGAO:'#a371f7',CCPC:'#58a6ff',SOUTH:'#ffa657'};
 const DEMO_CAP  = {AC:5500,PFMIS:4000,HOREB:3500,ARGAO:3500,BUKID:7000,CCPC:500,SOUTH:4000,NATIONAL:28000};
 const DESIGN_CAP= {AC:6500,PFMIS:5000,HOREB:4000,ARGAO:4000,BUKID:8000,CCPC:500,SOUTH:4000,NATIONAL:32000};
-const VALID_PLANTS = new Set(SITES);
+const VALID_PLANTS = new Set([...SITES, ...SITES.map(s=>s.toLowerCase()), 'PFMIS','ARGAO','HOREB','BUKID','SOUTH','CCPC','NATIONAL','AC']);
 
 // ============================================================
 // STATE
@@ -246,23 +246,30 @@ async function fetchProduction() {
   // Find header row (contains "Plant")
   let headerIdx = -1;
   for (let i = 0; i < Math.min(rows.length, 10); i++) {
-    if (rows[i][0] && rows[i][0].trim() === 'Plant') { headerIdx = i; break; }
+    const cell = (rows[i][0] || '').trim().toLowerCase();
+    if (cell === 'plant') { headerIdx = i; break; }
   }
   if (headerIdx < 0) throw new Error('Could not find header row in production CSV');
 
   const data = [];
   for (let i = headerIdx + 1; i < rows.length; i++) {
     const row = rows[i];
-    if (!row[0] || !VALID_PLANTS.has(row[0].trim())) continue;
-    if (!row[1] || !/^\d+$/.test(row[1].trim())) continue;
+    if (!row || row.length < 5) continue;
+    const plant = (row[0] || '').trim().toUpperCase();
+    if (!VALID_PLANTS.has(plant)) continue;
+    const weekStr = (row[1] || '').trim();
+    if (!weekStr || !/^\d+$/.test(weekStr)) continue;
 
-    const totalCols = rows[headerIdx].length;
-    const monthIdx = totalCols - 1;
-    const month = (row[monthIdx] || '').trim();
+    // Month is the last non-empty column
+    let month = '';
+    for (let j = row.length - 1; j >= 0; j--) {
+      const v = (row[j] || '').trim();
+      if (v && isNaN(v) && !v.includes('%') && !v.includes('₱')) { month = v.toUpperCase(); break; }
+    }
 
     data.push({
-      plant: row[0].trim(),
-      week: parseInt(row[1].trim()),
+      plant: plant,
+      week: parseInt(weekStr),
       month,
       plan: gv(row,'AJ'), output: gv(row,'AM'), runRate: gv(row,'BD'),
       demoCap: gv(row,'CO'), designCap: gv(row,'CN'),
@@ -294,7 +301,8 @@ async function fetchDowntime() {
 
   let headerIdx = -1;
   for (let i = 0; i < Math.min(rows.length, 10); i++) {
-    if (rows[i][0] && rows[i][0].trim() === 'Plant') { headerIdx = i; break; }
+    const cell = (rows[i][0] || '').trim().toLowerCase();
+    if (cell === 'plant') { headerIdx = i; break; }
   }
   if (headerIdx < 0) throw new Error('Could not find header row in downtime CSV');
 
@@ -302,8 +310,9 @@ async function fetchDowntime() {
   const agg = {};
   for (let i = headerIdx + 1; i < rows.length; i++) {
     const row = rows[i];
-    if (!row[0] || !VALID_PLANTS.has(row[0].trim())) continue;
-    const plant = row[0].trim();
+    if (!row || row.length < 5) continue;
+    const plant = (row[0] || '').trim().toUpperCase();
+    if (!VALID_PLANTS.has(plant)) continue;
     const week = parseInt(row[3]);
     if (!week) continue;
     const cat = (row[7] || '').trim();
