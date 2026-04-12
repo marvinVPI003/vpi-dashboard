@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html>
+<head><title>Cost CSV Check</title></head>
+<body style="background:#0d1117;color:#e6edf3;font-family:monospace;padding:20px;font-size:12px">
+<h2 style="color:#3fb950">Cost Sheet Inspector</h2>
+<div id="out"></div>
+<script>
+const URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRRx7S_rqgygPQifVep4DtnDFK8gGjAPVbrzCq6sCJcTF6omIGXb73iK8mQZoZjOgUq8CnZ9t7fR_2a/pub?gid=66553768&single=true&output=csv';
+const log = msg => document.getElementById('out').innerHTML += '<div style="margin:4px 0">'+msg+'</div>';
+
+async function check(){
+  log('Fetching cost sheet...');
+  try {
+    const r = await fetch(URL+'&cb='+Date.now());
+    log('Status: '+r.status);
+    const t = await r.text();
+    log('Length: '+t.length+' chars');
+    const lines = t.split('\n').slice(0,10);
+    log('<br><b style="color:#ffa657">First 10 rows:</b>');
+    lines.forEach((line,i)=>{
+      const cols = line.split(',');
+      log(`<div style="color:${i===0?'#3fb950':'#8b949e'};margin:2px 0">
+        Row ${i+1}: ${cols.slice(0,15).map((c,j)=>`<span style="background:#1f2631;padding:1px 4px;margin:1px;border-radius:2px">[${j}]${c.trim().slice(0,20)}</span>`).join('')}
+      </div>`);
+    });
+  } catch(e) {
+    log('Direct failed: '+e.message+' — trying proxy...');
+    try {
+      const p = await fetch('https://api.allorigins.win/get?url='+encodeURIComponent(URL));
+      const j = await p.json();
+      const t = j.contents || '';
+      log('Proxy length: '+t.length);
+      const lines = t.split('\n').slice(0,10);
+      log('<b style="color:#ffa657">First 10 rows (via proxy):</b>');
+      lines.forEach((line,i)=>{
+        const cols = line.split(',');
+        log(`<div style="color:${i===0?'#3fb950':'#8b949e'};margin:2px 0">
+          Row ${i+1}: ${cols.slice(0,15).map((c,j2)=>`<span style="background:#1f2631;padding:1px 4px;margin:1px;border-radius:2px">[${j2}]${c.trim().slice(0,20)}</span>`).join('')}
+        </div>`);
+      });
+    } catch(e2){ log('Both failed: '+e2.message); }
+  }
+}
+check();
+</script>
+</body>
+</html>
