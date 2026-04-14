@@ -1,0 +1,2081 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>VPI Operations Dashboard — Marvin Rosario</title>
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@300;400;500;600;700&family=Barlow+Condensed:wght@400;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+:root{--bg:#07101f;--bg2:#0d1c30;--bg3:#132440;--bg4:#192d50;--border:rgba(56,180,255,0.1);--border2:rgba(56,180,255,0.22);--text:#e2f0ff;--text2:#7aadcc;--text3:#3d6b85;--green:#00e676;--green-b:#00ff88;--green-d:rgba(0,230,118,0.12);--amber:#ffca28;--amber-d:rgba(255,202,40,0.12);--red:#ff5252;--red-d:rgba(255,82,82,0.12);--blue:#40c4ff;--blue-d:rgba(64,196,255,0.12);--teal:#00e5cc;--purple:#e040fb;--orange:#ff6d00;--r:6px;--rl:10px}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:'Barlow',sans-serif;font-size:13px;line-height:1.5;display:flex;min-height:100vh}
+
+/* SIDEBAR */
+.sb{position:fixed;left:0;top:0;bottom:0;width:212px;background:var(--bg2);border-right:1px solid var(--border);display:flex;flex-direction:column;z-index:100;overflow-y:auto}
+.sb-logo{padding:18px 18px 14px;border-bottom:1px solid var(--border)}
+.sb-brand{font-family:'Barlow Condensed',sans-serif;font-size:17px;font-weight:700;color:var(--green-b);letter-spacing:.5px;text-transform:uppercase}
+.sb-sub{font-size:10px;color:var(--text3);letter-spacing:1.5px;text-transform:uppercase;margin-top:2px}
+.sb-user{padding:10px 18px;border-bottom:1px solid var(--border);font-size:11px;color:var(--text3)}
+.sb-user b{display:block;color:var(--text2);font-size:12px;margin-bottom:1px}
+.sb-sec{padding:14px 18px 5px;font-size:10px;font-weight:600;letter-spacing:1.5px;text-transform:uppercase;color:var(--text3)}
+.sb-btn{display:flex;align-items:center;gap:9px;padding:8px 18px;cursor:pointer;border:none;background:none;width:100%;text-align:left;color:var(--text2);font-family:'Barlow',sans-serif;font-size:12px;transition:all .15s}
+.sb-btn:hover{background:rgba(255,255,255,.04);color:var(--text)}
+.sb-btn.active{background:var(--green-d);color:var(--green-b);border-right:2px solid var(--green)}
+.sb-dot{width:6px;height:6px;border-radius:50%;background:var(--text3);flex-shrink:0;transition:background .15s}
+.sb-btn.active .sb-dot{background:var(--green-b)}
+.sb-footer{margin-top:auto;padding:12px 18px;border-top:1px solid var(--border);font-size:10px;color:var(--text3);font-family:'DM Mono',monospace;line-height:1.8}
+.pulse{display:inline-block;width:5px;height:5px;border-radius:50%;background:var(--green-b);animation:pulse 2s infinite;vertical-align:middle}
+@keyframes pulse{0%{box-shadow:0 0 0 0 rgba(63,185,80,.4)}70%{box-shadow:0 0 0 5px rgba(63,185,80,0)}100%{box-shadow:0 0 0 0 rgba(63,185,80,0)}}
+.pulse.fetching{background:var(--amber);animation:none}
+.pulse.error{background:var(--red);animation:none}
+
+/* MAIN */
+.main{flex:1;display:flex;flex-direction:column;min-height:100vh;width:100%}
+.topbar{position:sticky;top:0;background:rgba(13,17,23,.95);backdrop-filter:blur(12px);border-bottom:1px solid var(--border);padding:0 24px;display:flex;align-items:center;gap:10px;height:48px;z-index:50;flex-shrink:0}
+.tb-title{font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;flex:1}
+.tb-badge{font-family:'DM Mono',monospace;font-size:10px;color:var(--green-b);background:var(--green-d);border:1px solid rgba(63,185,80,.3);padding:2px 8px;border-radius:20px}
+.tb-wk{font-size:10px;color:var(--text3);font-family:'DM Mono',monospace}
+.refresh-btn{padding:4px 10px;font-size:10px;font-family:'DM Mono',monospace;border:1px solid var(--border2);border-radius:4px;background:none;color:var(--text2);cursor:pointer;transition:all .15s}
+.refresh-btn:hover{border-color:var(--green);color:var(--green-b)}
+.refresh-btn:disabled{opacity:.4;cursor:not-allowed}
+
+.week-strip{padding:8px 24px;background:var(--bg2);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:4px;overflow-x:auto;flex-shrink:0}
+.week-strip::-webkit-scrollbar{height:2px}.week-strip::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
+.ws-lbl{font-size:9px;color:var(--text3);font-family:'DM Mono',monospace;letter-spacing:1px;text-transform:uppercase;margin-right:6px;white-space:nowrap}
+.wk{padding:3px 9px;font-size:10px;font-family:'DM Mono',monospace;border:1px solid var(--border2);border-radius:4px;background:none;color:var(--text2);cursor:pointer;transition:all .15s;white-space:nowrap}
+.wk:hover{border-color:var(--green);color:var(--green-b)}
+.wk.active{background:var(--green);border-color:var(--green);color:#000;font-weight:600}
+.msep{font-size:9px;color:var(--text3);font-family:'DM Mono',monospace;padding:0 4px;letter-spacing:1px;text-transform:uppercase}
+
+/* LOADING SCREEN */
+.loading-screen{position:fixed;inset:0;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:999;gap:16px}
+.loading-logo{font-family:'Barlow Condensed',sans-serif;font-size:28px;font-weight:700;color:var(--green-b);letter-spacing:1px}
+.loading-sub{font-size:11px;color:var(--text3);font-family:'DM Mono',monospace;letter-spacing:1px}
+.loading-bar-wrap{width:220px;height:3px;background:var(--bg3);border-radius:2px;overflow:hidden}
+.loading-bar{height:100%;background:var(--green);border-radius:2px;animation:loadbar 1.5s ease-in-out infinite}
+@keyframes loadbar{0%{width:0%;margin-left:0}50%{width:60%}100%{width:0%;margin-left:100%}}
+.loading-msg{font-size:11px;color:var(--text2);font-family:'DM Mono',monospace}
+.error-screen{position:fixed;inset:0;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:999;gap:12px}
+.error-icon{font-size:32px;color:var(--red)}
+.error-title{font-family:'Barlow Condensed',sans-serif;font-size:20px;color:var(--red)}
+.error-msg{font-size:11px;color:var(--text2);font-family:'DM Mono',monospace;max-width:400px;text-align:center;line-height:1.8}
+.retry-btn{padding:8px 20px;font-size:11px;font-family:'DM Mono',monospace;border:1px solid var(--red);border-radius:4px;background:none;color:var(--red);cursor:pointer;margin-top:8px}
+.retry-btn:hover{background:var(--red-d)}
+
+/* CONTENT */
+.content{padding:20px 24px 48px;flex:1}
+.sec{margin-bottom:18px}
+.sec-hdr{display:flex;align-items:center;gap:8px;margin-bottom:10px}
+.sec-title{font-family:'Barlow Condensed',sans-serif;font-size:10px;font-weight:600;letter-spacing:2px;text-transform:uppercase;color:var(--text3);white-space:nowrap}
+.sec-line{flex:1;height:1px;background:var(--border)}
+.g2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.g3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.g4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.g5{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px}
+
+/* KPI CARD */
+.kc{background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:12px 14px;position:relative;overflow:hidden}
+.kc::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:var(--kc-color,var(--border2))}
+.kc-lbl{font-size:9px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--text3);margin-bottom:5px}
+.kc-val{font-family:'Barlow Condensed',sans-serif;font-size:26px;font-weight:700;line-height:1;margin-bottom:3px}
+.kc-sub{font-size:11px;color:var(--text2);margin-bottom:5px}
+.cc{background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:14px}
+.cc-title{font-size:9px;font-weight:600;letter-spacing:1.5px;text-transform:uppercase;color:var(--text3);margin-bottom:10px}
+.bdg{display:inline-flex;align-items:center;font-size:9px;font-weight:600;padding:2px 7px;border-radius:20px;font-family:'DM Mono',monospace}
+.g{background:var(--green-d);color:var(--green-b);border:1px solid rgba(63,185,80,.2)}
+.a{background:var(--amber-d);color:var(--amber);border:1px solid rgba(210,153,34,.2)}
+.r{background:var(--red-d);color:var(--red);border:1px solid rgba(248,81,73,.2)}
+.b{background:var(--blue-d);color:var(--blue);border:1px solid rgba(56,139,253,.2)}
+
+/* TABLES */
+table{width:100%;border-collapse:collapse;font-size:11px}
+th{font-size:9px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--text3);padding:6px 8px;text-align:right;border-bottom:1px solid var(--border);white-space:nowrap}
+th:first-child{text-align:left}
+td{padding:7px 8px;text-align:right;border-bottom:1px solid var(--border);font-family:'DM Mono',monospace;font-size:10px;color:var(--text2)}
+td:first-child{text-align:left;font-family:'Barlow',sans-serif;font-size:11px;font-weight:500;color:var(--text)}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:rgba(255,255,255,.02)}
+.tg{color:var(--green-b)!important}.ta{color:var(--amber)!important}.tr{color:var(--red)!important}
+
+/* RING */
+.ring-wrap{position:relative;width:72px;height:72px;margin:0 auto 5px}
+.ring-svg{transform:rotate(-90deg)}
+.ring-center{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:700}
+.ring-lbl{font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--text3);text-align:center}
+
+/* MINI BAR */
+.mbar-row{display:flex;align-items:center;gap:6px;padding:4px 0}
+.mbar-lbl{color:var(--text2);width:58px;flex-shrink:0;font-size:9px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mbar-bg{flex:1;height:4px;background:var(--bg3);border-radius:2px;overflow:hidden}
+.mbar-fill{height:100%;border-radius:2px;transition:width .5s ease}
+.mbar-val{font-family:'DM Mono',monospace;font-size:9px;color:var(--text2);width:36px;text-align:right;flex-shrink:0}
+
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px}
+.fade{animation:fadeIn .2s ease}
+@keyframes fadeIn{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
+.no-data{text-align:center;padding:40px;color:var(--text3);font-family:'DM Mono',monospace;font-size:11px}
+.pg-tab{padding:5px 12px;font-size:10px;font-family:"Barlow Condensed",sans-serif;font-weight:600;letter-spacing:.5px;border:1px solid var(--border2);border-radius:var(--r);background:none;color:var(--text2);cursor:pointer;transition:all .15s;white-space:nowrap}
+.pg-tab:hover{color:var(--text)}
+.active-tab{background:var(--green-d)!important;color:var(--green-b)!important;border-color:rgba(0,230,118,0.3)!important}
+.syncing{opacity:.5;pointer-events:none}
+.page{display:none}.page.active{display:block}
+.cost-table-wrap{overflow-x:auto}
+.cost-table{width:100%;border-collapse:collapse;font-size:11px;min-width:800px}
+.cost-table th{font-size:9px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--text3);padding:6px 8px;text-align:right;border-bottom:1px solid var(--border);background:var(--bg3);white-space:nowrap}
+.cost-table th:first-child{text-align:left}
+.cost-table td{padding:5px 8px;text-align:right;border-bottom:1px solid var(--border);font-family:"DM Mono",monospace;font-size:10px;color:var(--text2)}
+.cost-table td:first-child{text-align:left;font-family:"Barlow",sans-serif;font-size:11px;color:var(--text)}
+.cost-table tr:hover td{background:rgba(255,255,255,.02)}
+.cost-table .nat-row td{border-top:2px solid var(--border2);color:var(--green-b)!important;font-weight:600}
+
+/* TOP NAV LAYOUT */
+body{flex-direction:column}
+.sb{display:none} /* hide old sidebar */
+.main{margin-left:0!important;width:100%}
+
+/* NEW TOP NAV */
+.topnav{position:fixed;top:0;left:0;right:0;height:52px;background:var(--bg2);border-bottom:1px solid var(--border);display:flex;align-items:center;z-index:200;padding:0 20px;gap:0}
+.topnav-brand{font-family:'Barlow Condensed',sans-serif;font-size:16px;font-weight:700;color:var(--green-b);letter-spacing:.5px;text-transform:uppercase;white-space:nowrap;padding-right:16px;border-right:1px solid var(--border);margin-right:16px}
+.topnav-brand span{display:block;font-size:9px;color:var(--text3);letter-spacing:1.5px;font-weight:400}
+.topnav-user{font-size:11px;color:var(--text2);white-space:nowrap;padding-right:16px;border-right:1px solid var(--border);margin-right:12px}
+.topnav-user b{color:var(--text);font-size:12px;display:block}
+
+/* PAGE TABS */
+.page-tabs{display:flex;gap:2px;margin-right:12px}
+.page-tab{padding:6px 14px;font-size:11px;font-family:'Barlow Condensed',sans-serif;font-weight:600;letter-spacing:.5px;text-transform:uppercase;border:1px solid var(--border);border-radius:var(--r);background:none;color:var(--text2);cursor:pointer;transition:all .15s;white-space:nowrap}
+.page-tab:hover{background:rgba(255,255,255,.04);color:var(--text)}
+.page-tab.active{background:var(--green-d);color:var(--green-b);border-color:rgba(63,185,80,.3)}
+
+/* SITE + WEEK SELECTORS in topnav */
+.topnav-selects{display:flex;gap:8px;align-items:center;margin-right:auto}
+.tn-select{padding:5px 24px 5px 8px;background:var(--bg3);color:var(--text);border:1px solid var(--border2);border-radius:var(--r);font-family:'Barlow',sans-serif;font-size:11px;cursor:pointer;outline:none;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 12 12'%3E%3Cpath fill='%238b949e' d='M6 8L1 3h10z'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 7px center;min-width:130px}
+.tn-label{font-size:9px;color:var(--text3);font-family:'DM Mono',monospace;letter-spacing:1px;text-transform:uppercase;white-space:nowrap}
+
+/* STATUS */
+.topnav-status{display:flex;align-items:center;gap:8px;margin-left:8px}
+.tn-refresh{padding:4px 10px;font-size:10px;font-family:'DM Mono',monospace;border:1px solid var(--border2);border-radius:4px;background:none;color:var(--text2);cursor:pointer;transition:all .15s;white-space:nowrap}
+.tn-refresh:hover{border-color:var(--green);color:var(--green-b)}
+.tn-refresh:disabled{opacity:.4;cursor:not-allowed}
+
+/* MAIN CONTENT */
+.main{margin-top:52px!important;width:100%}
+.content{padding:16px 20px 48px}
+
+/* PAGE VISIBILITY */
+.page{display:none}.page.active{display:block}
+
+/* COST PAGE TABLES */
+.cost-table-wrap{overflow-x:auto;margin-bottom:8px}
+.cost-table{width:100%;border-collapse:collapse;font-size:11px;min-width:900px}
+.cost-table th{font-size:9px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--text3);padding:6px 8px;text-align:right;border-bottom:1px solid var(--border);white-space:nowrap;background:var(--bg3)}
+.cost-table th:first-child{text-align:left;position:sticky;left:0;background:var(--bg3);z-index:1}
+.cost-table td{padding:6px 8px;text-align:right;border-bottom:1px solid var(--border);font-family:'DM Mono',monospace;font-size:10px;color:var(--text2)}
+.cost-table td:first-child{text-align:left;font-family:'Barlow',sans-serif;font-size:11px;font-weight:500;color:var(--text);position:sticky;left:0;background:var(--bg2);z-index:1}
+.cost-table tr:hover td{background:rgba(255,255,255,.02)}
+.cost-table tr:hover td:first-child{background:var(--bg3)}
+.cost-table .nat-row td{border-top:1px solid var(--border2);color:var(--green-b)!important;font-weight:600}
+.cost-table .toll-row td{color:var(--amber)!important}
+.section-header-row td{background:var(--bg3)!important;color:var(--text3)!important;font-size:9px!important;font-weight:600!important;letter-spacing:1px!important;text-transform:uppercase!important;padding:4px 8px!important}
+
+/* DT PAGE */
+.dt-filter-bar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;align-items:center}
+.dt-filter-bar select{padding:5px 24px 5px 8px;background:var(--bg3);color:var(--text);border:1px solid var(--border2);border-radius:var(--r);font-family:'Barlow',sans-serif;font-size:11px;cursor:pointer;outline:none;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 12 12'%3E%3Cpath fill='%238b949e' d='M6 8L1 3h10z'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 7px center}
+.cat-pill{display:inline-flex;align-items:center;padding:2px 8px;border-radius:10px;font-size:9px;font-family:'DM Mono',monospace;font-weight:600;white-space:nowrap}
+.cat-mech{background:rgba(248,81,73,.15);color:#f85149}
+.cat-elec{background:rgba(210,153,34,.15);color:#d29922}
+.cat-proc{background:rgba(56,139,253,.15);color:#388bfd}
+.cat-co{background:rgba(163,113,247,.15);color:#a371f7}
+.cat-rm{background:rgba(26,188,156,.15);color:#1abc9c}
+.cat-pwr{background:rgba(255,166,87,.15);color:#ffa657}
+.cat-other{background:rgba(139,148,158,.15);color:#8b949e}
+</style>
+</head>
+<body>
+
+<!-- LOADING SCREEN -->
+<div class="loading-screen" id="loading">
+  <div class="loading-logo">VPI OPS</div>
+  <div class="loading-sub">Feed for Life · Live Dashboard</div>
+  <div class="loading-bar-wrap"><div class="loading-bar"></div></div>
+  <div class="loading-msg" id="loading-msg">Connecting to Google Sheets...</div>
+</div>
+
+<!-- TOP NAVIGATION -->
+<div class="topnav">
+  <div class="topnav-brand">VPI OPS<span>Feed for Life</span></div>
+  <div class="topnav-user"><b>Marvin Rosario</b>Operations Manager</div>
+
+  <!-- PAGE TABS -->
+  <div class="page-tabs">
+    <button class="page-tab active" onclick="setPage('dashboard')">⚡ Weekly Pulse</button>
+    <button class="page-tab" onclick="setPage('cost')">💰 Cost</button>
+    <button class="page-tab" onclick="setPage('downtime')">⚠ Downtime</button>
+  </div>
+
+  <!-- SELECTORS -->
+  <div class="topnav-selects">
+    <span class="tn-label">Site</span>
+    <select id="site-select" class="tn-select" onchange="setSite(this.value)"></select>
+    <span class="tn-label">Week</span>
+    <select id="week-select" class="tn-select" onchange="setWeek(parseInt(this.value))"></select>
+    <span id="week-info" style="font-size:10px;color:var(--text3);font-family:'DM Mono',monospace"></span>
+  </div>
+
+  <!-- STATUS -->
+  <div class="topnav-status">
+    <div style="font-family:'DM Mono',monospace;font-size:10px;color:var(--text3)">
+      <div><span class="pulse" id="status-dot"></span> <span id="status-txt">Live</span></div>
+      <div id="last-updated" style="color:var(--text3)">—</div>
+    </div>
+    <button class="tn-refresh" id="refresh-btn" onclick="manualRefresh()">⟳ Refresh</button>
+  </div>
+</div>
+
+<!-- MAIN -->
+<div class="main">
+  <!-- DASHBOARD PAGE -->
+  <div class="page active" id="page-dashboard">
+    <div class="page active" id="page-dashboard">
+    <div class="content fade" id="content"></div>
+  </div>
+  <div class="page" id="page-cost">
+    <div class="content" id="content-cost"><div style="padding:60px;text-align:center;color:var(--text3)">Click Cost tab to load...</div></div>
+  </div>
+  <div class="page" id="page-downtime">
+    <div class="content" id="content-downtime"><div style="padding:60px;text-align:center;color:var(--text3)">Click Downtime tab to load...</div></div>
+  </div>
+  </div>
+
+  <!-- COST PAGE -->
+  <div class="page" id="page-cost">
+    <div class="content" id="content-cost">
+      <div class="no-data" style="padding:60px">Loading cost data...</div>
+    </div>
+  </div>
+
+  <!-- DOWNTIME PAGE -->
+  <div class="page" id="page-downtime">
+    <div class="content" id="content-downtime">
+      <div class="no-data" style="padding:60px">Loading downtime data...</div>
+    </div>
+  </div>
+</div>et="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>VPI Operations Dashboard — Marvin Rosario</title>
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@300;400;500;600;700&family=Barlow+Condensed:wght@400;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+<style>
+:root{--bg:#0d1117;--bg2:#161b22;--bg3:#1f2631;--bg4:#252d3a;--border:rgba(255,255,255,0.07);--border2:rgba(255,255,255,0.13);--text:#e6edf3;--text2:#8b949e;--text3:#484f58;--green:#2ea043;--green-b:#3fb950;--green-d:rgba(46,160,67,0.15);--amber:#d29922;--amber-d:rgba(210,153,34,0.15);--red:#f85149;--red-d:rgba(248,81,73,0.15);--blue:#388bfd;--blue-d:rgba(56,139,253,0.15);--teal:#1abc9c;--purple:#a371f7;--r:6px;--rl:10px}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:'Barlow',sans-serif;font-size:13px;line-height:1.5;display:flex;min-height:100vh}
+
+/* SIDEBAR */
+.sb{position:fixed;left:0;top:0;bottom:0;width:212px;background:var(--bg2);border-right:1px solid var(--border);display:flex;flex-direction:column;z-index:100;overflow-y:auto}
+.sb-logo{padding:18px 18px 14px;border-bottom:1px solid var(--border)}
+.sb-brand{font-family:'Barlow Condensed',sans-serif;font-size:17px;font-weight:700;color:var(--green-b);letter-spacing:.5px;text-transform:uppercase}
+.sb-sub{font-size:10px;color:var(--text3);letter-spacing:1.5px;text-transform:uppercase;margin-top:2px}
+.sb-user{padding:10px 18px;border-bottom:1px solid var(--border);font-size:11px;color:var(--text3)}
+.sb-user b{display:block;color:var(--text2);font-size:12px;margin-bottom:1px}
+.sb-sec{padding:14px 18px 5px;font-size:10px;font-weight:600;letter-spacing:1.5px;text-transform:uppercase;color:var(--text3)}
+.sb-btn{display:flex;align-items:center;gap:9px;padding:8px 18px;cursor:pointer;border:none;background:none;width:100%;text-align:left;color:var(--text2);font-family:'Barlow',sans-serif;font-size:12px;transition:all .15s}
+.sb-btn:hover{background:rgba(255,255,255,.04);color:var(--text)}
+.sb-btn.active{background:var(--green-d);color:var(--green-b);border-right:2px solid var(--green)}
+.sb-dot{width:6px;height:6px;border-radius:50%;background:var(--text3);flex-shrink:0;transition:background .15s}
+.sb-btn.active .sb-dot{background:var(--green-b)}
+.sb-footer{margin-top:auto;padding:12px 18px;border-top:1px solid var(--border);font-size:10px;color:var(--text3);font-family:'DM Mono',monospace;line-height:1.8}
+.pulse{display:inline-block;width:5px;height:5px;border-radius:50%;background:var(--green-b);animation:pulse 2s infinite;vertical-align:middle}
+@keyframes pulse{0%{box-shadow:0 0 0 0 rgba(63,185,80,.4)}70%{box-shadow:0 0 0 5px rgba(63,185,80,0)}100%{box-shadow:0 0 0 0 rgba(63,185,80,0)}}
+.pulse.fetching{background:var(--amber);animation:none}
+.pulse.error{background:var(--red);animation:none}
+
+/* MAIN */
+.main{flex:1;display:flex;flex-direction:column;min-height:100vh;width:100%}
+.topbar{position:sticky;top:0;background:rgba(13,17,23,.95);backdrop-filter:blur(12px);border-bottom:1px solid var(--border);padding:0 24px;display:flex;align-items:center;gap:10px;height:48px;z-index:50;flex-shrink:0}
+.tb-title{font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;flex:1}
+.tb-badge{font-family:'DM Mono',monospace;font-size:10px;color:var(--green-b);background:var(--green-d);border:1px solid rgba(63,185,80,.3);padding:2px 8px;border-radius:20px}
+.tb-wk{font-size:10px;color:var(--text3);font-family:'DM Mono',monospace}
+.refresh-btn{padding:4px 10px;font-size:10px;font-family:'DM Mono',monospace;border:1px solid var(--border2);border-radius:4px;background:none;color:var(--text2);cursor:pointer;transition:all .15s}
+.refresh-btn:hover{border-color:var(--green);color:var(--green-b)}
+.refresh-btn:disabled{opacity:.4;cursor:not-allowed}
+
+.week-strip{padding:8px 24px;background:var(--bg2);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:4px;overflow-x:auto;flex-shrink:0}
+.week-strip::-webkit-scrollbar{height:2px}.week-strip::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
+.ws-lbl{font-size:9px;color:var(--text3);font-family:'DM Mono',monospace;letter-spacing:1px;text-transform:uppercase;margin-right:6px;white-space:nowrap}
+.wk{padding:3px 9px;font-size:10px;font-family:'DM Mono',monospace;border:1px solid var(--border2);border-radius:4px;background:none;color:var(--text2);cursor:pointer;transition:all .15s;white-space:nowrap}
+.wk:hover{border-color:var(--green);color:var(--green-b)}
+.wk.active{background:var(--green);border-color:var(--green);color:#000;font-weight:600}
+.msep{font-size:9px;color:var(--text3);font-family:'DM Mono',monospace;padding:0 4px;letter-spacing:1px;text-transform:uppercase}
+
+/* LOADING SCREEN */
+.loading-screen{position:fixed;inset:0;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:999;gap:16px}
+.loading-logo{font-family:'Barlow Condensed',sans-serif;font-size:28px;font-weight:700;color:var(--green-b);letter-spacing:1px}
+.loading-sub{font-size:11px;color:var(--text3);font-family:'DM Mono',monospace;letter-spacing:1px}
+.loading-bar-wrap{width:220px;height:3px;background:var(--bg3);border-radius:2px;overflow:hidden}
+.loading-bar{height:100%;background:var(--green);border-radius:2px;animation:loadbar 1.5s ease-in-out infinite}
+@keyframes loadbar{0%{width:0%;margin-left:0}50%{width:60%}100%{width:0%;margin-left:100%}}
+.loading-msg{font-size:11px;color:var(--text2);font-family:'DM Mono',monospace}
+.error-screen{position:fixed;inset:0;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:999;gap:12px}
+.error-icon{font-size:32px;color:var(--red)}
+.error-title{font-family:'Barlow Condensed',sans-serif;font-size:20px;color:var(--red)}
+.error-msg{font-size:11px;color:var(--text2);font-family:'DM Mono',monospace;max-width:400px;text-align:center;line-height:1.8}
+.retry-btn{padding:8px 20px;font-size:11px;font-family:'DM Mono',monospace;border:1px solid var(--red);border-radius:4px;background:none;color:var(--red);cursor:pointer;margin-top:8px}
+.retry-btn:hover{background:var(--red-d)}
+
+/* CONTENT */
+.content{padding:20px 24px 48px;flex:1}
+.sec{margin-bottom:18px}
+.sec-hdr{display:flex;align-items:center;gap:8px;margin-bottom:10px}
+.sec-title{font-family:'Barlow Condensed',sans-serif;font-size:10px;font-weight:600;letter-spacing:2px;text-transform:uppercase;color:var(--text3);white-space:nowrap}
+.sec-line{flex:1;height:1px;background:var(--border)}
+.g2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.g3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.g4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.g5{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px}
+
+/* KPI CARD */
+.kc{background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:12px 14px;position:relative;overflow:hidden}
+.kc::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:var(--kc-color,var(--border2))}
+.kc-lbl{font-size:9px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--text3);margin-bottom:5px}
+.kc-val{font-family:'Barlow Condensed',sans-serif;font-size:26px;font-weight:700;line-height:1;margin-bottom:3px}
+.kc-sub{font-size:11px;color:var(--text2);margin-bottom:5px}
+.cc{background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:14px}
+.cc-title{font-size:9px;font-weight:600;letter-spacing:1.5px;text-transform:uppercase;color:var(--text3);margin-bottom:10px}
+.bdg{display:inline-flex;align-items:center;font-size:9px;font-weight:600;padding:2px 7px;border-radius:20px;font-family:'DM Mono',monospace}
+.g{background:var(--green-d);color:var(--green-b);border:1px solid rgba(63,185,80,.2)}
+.a{background:var(--amber-d);color:var(--amber);border:1px solid rgba(210,153,34,.2)}
+.r{background:var(--red-d);color:var(--red);border:1px solid rgba(248,81,73,.2)}
+.b{background:var(--blue-d);color:var(--blue);border:1px solid rgba(56,139,253,.2)}
+
+/* TABLES */
+table{width:100%;border-collapse:collapse;font-size:11px}
+th{font-size:9px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--text3);padding:6px 8px;text-align:right;border-bottom:1px solid var(--border);white-space:nowrap}
+th:first-child{text-align:left}
+td{padding:7px 8px;text-align:right;border-bottom:1px solid var(--border);font-family:'DM Mono',monospace;font-size:10px;color:var(--text2)}
+td:first-child{text-align:left;font-family:'Barlow',sans-serif;font-size:11px;font-weight:500;color:var(--text)}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:rgba(255,255,255,.02)}
+.tg{color:var(--green-b)!important}.ta{color:var(--amber)!important}.tr{color:var(--red)!important}
+
+/* RING */
+.ring-wrap{position:relative;width:72px;height:72px;margin:0 auto 5px}
+.ring-svg{transform:rotate(-90deg)}
+.ring-center{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:700}
+.ring-lbl{font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--text3);text-align:center}
+
+/* MINI BAR */
+.mbar-row{display:flex;align-items:center;gap:6px;padding:4px 0}
+.mbar-lbl{color:var(--text2);width:58px;flex-shrink:0;font-size:9px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mbar-bg{flex:1;height:4px;background:var(--bg3);border-radius:2px;overflow:hidden}
+.mbar-fill{height:100%;border-radius:2px;transition:width .5s ease}
+.mbar-val{font-family:'DM Mono',monospace;font-size:9px;color:var(--text2);width:36px;text-align:right;flex-shrink:0}
+
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px}
+.fade{animation:fadeIn .2s ease}
+@keyframes fadeIn{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
+.no-data{text-align:center;padding:40px;color:var(--text3);font-family:'DM Mono',monospace;font-size:11px}
+.pg-tab{padding:5px 12px;font-size:10px;font-family:"Barlow Condensed",sans-serif;font-weight:600;letter-spacing:.5px;border:1px solid var(--border2);border-radius:var(--r);background:none;color:var(--text2);cursor:pointer;transition:all .15s;white-space:nowrap}
+.pg-tab:hover{color:var(--text)}
+.active-tab{background:var(--green-d)!important;color:var(--green-b)!important;border-color:rgba(0,230,118,0.3)!important}
+.syncing{opacity:.5;pointer-events:none}
+.page{display:none}.page.active{display:block}
+.cost-table-wrap{overflow-x:auto}
+.cost-table{width:100%;border-collapse:collapse;font-size:11px;min-width:800px}
+.cost-table th{font-size:9px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--text3);padding:6px 8px;text-align:right;border-bottom:1px solid var(--border);background:var(--bg3);white-space:nowrap}
+.cost-table th:first-child{text-align:left}
+.cost-table td{padding:5px 8px;text-align:right;border-bottom:1px solid var(--border);font-family:"DM Mono",monospace;font-size:10px;color:var(--text2)}
+.cost-table td:first-child{text-align:left;font-family:"Barlow",sans-serif;font-size:11px;color:var(--text)}
+.cost-table tr:hover td{background:rgba(255,255,255,.02)}
+.cost-table .nat-row td{border-top:2px solid var(--border2);color:var(--green-b)!important;font-weight:600}
+
+/* TOP NAV LAYOUT */
+body{flex-direction:column}
+.sb{display:none} /* hide old sidebar */
+.main{margin-left:0!important;width:100%}
+
+/* NEW TOP NAV */
+.topnav{position:fixed;top:0;left:0;right:0;height:52px;background:var(--bg2);border-bottom:1px solid var(--border);display:flex;align-items:center;z-index:200;padding:0 20px;gap:0}
+.topnav-brand{font-family:'Barlow Condensed',sans-serif;font-size:16px;font-weight:700;color:var(--green-b);letter-spacing:.5px;text-transform:uppercase;white-space:nowrap;padding-right:16px;border-right:1px solid var(--border);margin-right:16px}
+.topnav-brand span{display:block;font-size:9px;color:var(--text3);letter-spacing:1.5px;font-weight:400}
+.topnav-user{font-size:11px;color:var(--text2);white-space:nowrap;padding-right:16px;border-right:1px solid var(--border);margin-right:12px}
+.topnav-user b{color:var(--text);font-size:12px;display:block}
+
+/* PAGE TABS */
+.page-tabs{display:flex;gap:2px;margin-right:12px}
+.page-tab{padding:6px 14px;font-size:11px;font-family:'Barlow Condensed',sans-serif;font-weight:600;letter-spacing:.5px;text-transform:uppercase;border:1px solid var(--border);border-radius:var(--r);background:none;color:var(--text2);cursor:pointer;transition:all .15s;white-space:nowrap}
+.page-tab:hover{background:rgba(255,255,255,.04);color:var(--text)}
+.page-tab.active{background:var(--green-d);color:var(--green-b);border-color:rgba(63,185,80,.3)}
+
+/* SITE + WEEK SELECTORS in topnav */
+.topnav-selects{display:flex;gap:8px;align-items:center;margin-right:auto}
+.tn-select{padding:5px 24px 5px 8px;background:var(--bg3);color:var(--text);border:1px solid var(--border2);border-radius:var(--r);font-family:'Barlow',sans-serif;font-size:11px;cursor:pointer;outline:none;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 12 12'%3E%3Cpath fill='%238b949e' d='M6 8L1 3h10z'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 7px center;min-width:130px}
+.tn-label{font-size:9px;color:var(--text3);font-family:'DM Mono',monospace;letter-spacing:1px;text-transform:uppercase;white-space:nowrap}
+
+/* STATUS */
+.topnav-status{display:flex;align-items:center;gap:8px;margin-left:8px}
+.tn-refresh{padding:4px 10px;font-size:10px;font-family:'DM Mono',monospace;border:1px solid var(--border2);border-radius:4px;background:none;color:var(--text2);cursor:pointer;transition:all .15s;white-space:nowrap}
+.tn-refresh:hover{border-color:var(--green);color:var(--green-b)}
+.tn-refresh:disabled{opacity:.4;cursor:not-allowed}
+
+/* MAIN CONTENT */
+.main{margin-top:52px!important;width:100%}
+.content{padding:16px 20px 48px}
+
+/* PAGE VISIBILITY */
+.page{display:none}.page.active{display:block}
+
+/* COST PAGE TABLES */
+.cost-table-wrap{overflow-x:auto;margin-bottom:8px}
+.cost-table{width:100%;border-collapse:collapse;font-size:11px;min-width:900px}
+.cost-table th{font-size:9px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--text3);padding:6px 8px;text-align:right;border-bottom:1px solid var(--border);white-space:nowrap;background:var(--bg3)}
+.cost-table th:first-child{text-align:left;position:sticky;left:0;background:var(--bg3);z-index:1}
+.cost-table td{padding:6px 8px;text-align:right;border-bottom:1px solid var(--border);font-family:'DM Mono',monospace;font-size:10px;color:var(--text2)}
+.cost-table td:first-child{text-align:left;font-family:'Barlow',sans-serif;font-size:11px;font-weight:500;color:var(--text);position:sticky;left:0;background:var(--bg2);z-index:1}
+.cost-table tr:hover td{background:rgba(255,255,255,.02)}
+.cost-table tr:hover td:first-child{background:var(--bg3)}
+.cost-table .nat-row td{border-top:1px solid var(--border2);color:var(--green-b)!important;font-weight:600}
+.cost-table .toll-row td{color:var(--amber)!important}
+.section-header-row td{background:var(--bg3)!important;color:var(--text3)!important;font-size:9px!important;font-weight:600!important;letter-spacing:1px!important;text-transform:uppercase!important;padding:4px 8px!important}
+
+/* DT PAGE */
+.dt-filter-bar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;align-items:center}
+.dt-filter-bar select{padding:5px 24px 5px 8px;background:var(--bg3);color:var(--text);border:1px solid var(--border2);border-radius:var(--r);font-family:'Barlow',sans-serif;font-size:11px;cursor:pointer;outline:none;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 12 12'%3E%3Cpath fill='%238b949e' d='M6 8L1 3h10z'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 7px center}
+.cat-pill{display:inline-flex;align-items:center;padding:2px 8px;border-radius:10px;font-size:9px;font-family:'DM Mono',monospace;font-weight:600;white-space:nowrap}
+.cat-mech{background:rgba(248,81,73,.15);color:#f85149}
+.cat-elec{background:rgba(210,153,34,.15);color:#d29922}
+.cat-proc{background:rgba(56,139,253,.15);color:#388bfd}
+.cat-co{background:rgba(163,113,247,.15);color:#a371f7}
+.cat-rm{background:rgba(26,188,156,.15);color:#1abc9c}
+.cat-pwr{background:rgba(255,166,87,.15);color:#ffa657}
+.cat-other{background:rgba(139,148,158,.15);color:#8b949e}
+</style>
+</head>
+<body>
+
+<!-- LOADING SCREEN -->
+<div class="loading-screen" id="loading">
+  <div class="loading-logo">VPI OPS</div>
+  <div class="loading-sub">Feed for Life · Live Dashboard</div>
+  <div class="loading-bar-wrap"><div class="loading-bar"></div></div>
+  <div class="loading-msg" id="loading-msg">Connecting to Google Sheets...</div>
+</div>
+
+<!-- SIDEBAR -->
+
+
+<!-- MAIN -->
+<div class="main">
+  
+    <div class="tb-badge" id="tb-site">NATIONAL</div>
+    <div class="tb-wk" id="tb-wk">—</div>
+    <button class="refresh-btn" id="refresh-btn" onclick="manualRefresh()">⟳ Refresh</button>
+  </div>
+
+  <div class="content" id="content"></div>
+</div>
+
+<script>
+
+// ============================================================
+// CONFIG — Google Sheets published CSV URLs
+// ============================================================
+const GAS_URL = 'https://script.google.com/macros/s/AKfycbzDC9enCdzUFP240Pngnrw4gHLvrNg5qZ-nWpnpqL0Hm1qwwhKpF2VXaInNLSkEOmGi-g/exec';
+const CSV_PROD = GAS_URL + '?sheet=prod';
+const CSV_COST = GAS_URL + '?sheet=cost';
+const CSV_DT   = GAS_URL + '?sheet=dt';
+const REFRESH_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
+
+// ============================================================
+// CONSTANTS
+// ============================================================
+const SITES = ['NATIONAL','AC','PFMIS','HOREB','BUKID','ARGAO','CCPC','SOUTH'];
+const PROD_SITES = ['AC','PFMIS','HOREB','BUKID','ARGAO','CCPC','SOUTH'];
+const SLABELS = {NATIONAL:'National',AC:'AC · Bulacan',PFMIS:'PFMIS · Isabela',HOREB:'Horeb · Cebu',BUKID:'Bukidnon',ARGAO:'Argao · Cebu',CCPC:'CCPC · CDO',SOUTH:'South · Davao'};
+const SDOTS = {NATIONAL:'#3fb950',AC:'#388bfd',PFMIS:'#d29922',HOREB:'#1abc9c',BUKID:'#f85149',ARGAO:'#a371f7',CCPC:'#58a6ff',SOUTH:'#ffa657'};
+const WEEKLY_COMMIT = {AC:1375,PFMIS:1000,HOREB:875,ARGAO:875,BUKID:1750,CCPC:125,SOUTH:1000,NATIONAL:7000};
+const DEMO_CAP  = {AC:5500,PFMIS:4000,HOREB:3500,ARGAO:3500,BUKID:7000,CCPC:500,SOUTH:4000,NATIONAL:28000};
+const DESIGN_CAP= {AC:6500,PFMIS:5000,HOREB:4000,ARGAO:4000,BUKID:8000,CCPC:500,SOUTH:4000,NATIONAL:32000};
+const VALID_PLANTS = new Set([...SITES, ...SITES.map(s=>s.toLowerCase()), 'PFMIS','ARGAO','HOREB','BUKID','SOUTH','CCPC','NATIONAL','AC']);
+
+// ============================================================
+// STATE
+// ============================================================
+let PROD = [], DT_AGG = {}, COST_DATA = [];
+let activeSite = 'NATIONAL', activeWeek = 1;
+let charts = {}, refreshTimer = null, countdown = null, nextRefreshAt = null;
+
+// ============================================================
+// CSV PARSER (handles quoted fields with commas)
+// ============================================================
+function parseCSV(text) {
+  const lines = text.replace(/\r\n/g,'\n').replace(/\r/g,'\n').split('\n');
+  return lines.map(line => {
+    const cols = []; let cur = '', inQ = false;
+    for (let i = 0; i < line.length; i++) {
+      const c = line[i];
+      if (c === '"') { inQ = !inQ; }
+      else if (c === ',' && !inQ) { cols.push(cur.trim()); cur = ''; }
+      else { cur += c; }
+    }
+    cols.push(cur.trim());
+    return cols;
+  });
+}
+
+function colIdx(letter) {
+  letter = letter.toUpperCase();
+  let r = 0;
+  for (const c of letter) r = r * 26 + (c.charCodeAt(0) - 64);
+  return r - 1;
+}
+
+function gv(row, col, def = 0) {
+  try {
+    const v = row[colIdx(col)];
+    if (!v) return def;
+    const n = parseFloat(v.replace(/,/g,'').replace('%',''));
+    return isNaN(n) ? def : n;
+  } catch { return def; }
+}
+
+// ============================================================
+// FETCH & PARSE PRODUCTION DATA
+// ============================================================
+async function fetchWithProxy(url) {
+  // Simple fetch - Apps Script handles CORS
+  try {
+    const r = await fetch(url);
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const text = await r.text();
+    if (text && text.length > 5) {
+      console.log('Fetched OK, len:', text.length);
+      return text;
+    }
+    throw new Error('Empty response');
+  } catch(e) {
+    throw new Error('Fetch error: ' + e.message);
+  }
+}
+
+
+async function fetchProduction() {
+  const text = await fetchWithProxy(CSV_PROD);
+  console.log('Production CSV length:', text.length);
+  console.log('First 300 chars:', text.slice(0,300));
+  const rows = parseCSV(text);
+  console.log('Total rows parsed:', rows.length);
+  console.log('Row 0:', rows[0]);
+  console.log('Row 1:', rows[1]);
+
+  // Find header row - look for "Plant" anywhere in first 10 rows
+  let headerIdx = -1;
+  for (let i = 0; i < Math.min(rows.length, 10); i++) {
+    for (let j = 0; j < Math.min(rows[i].length, 5); j++) {
+      if ((rows[i][j]||'').trim().toLowerCase() === 'plant') {
+        headerIdx = i;
+        break;
+      }
+    }
+    if (headerIdx >= 0) break;
+  }
+  console.log('Header row index:', headerIdx);
+  if (headerIdx < 0) throw new Error('Could not find Plant header in CSV. First row: ' + (rows[0]||[]).join('|'));
+
+  const KNOWN_MONTHS = new Set(['JANUARY','FEBRUARY','MARCH','APRIL','MAY','JUNE','JULY','AUGUST','SEPTEMBER','OCTOBER','NOVEMBER','DECEMBER']);
+  const PLANT_NAMES = new Set(['AC','PFMIS','HOREB','BUKID','ARGAO','CCPC','SOUTH','NATIONAL']);
+
+  const data = [];
+  for (let i = headerIdx + 1; i < rows.length; i++) {
+    const row = rows[i];
+    if (!row || row.length < 3) continue;
+    const plant = (row[0] || '').trim().toUpperCase();
+    if (!PLANT_NAMES.has(plant)) continue;
+    const weekStr = (row[1] || '').trim();
+    if (!weekStr || !/^\d+$/.test(weekStr)) continue;
+
+    // Month: find any cell that matches a month name
+    let month = '';
+    for (let j = row.length - 1; j >= 0; j--) {
+      const v = (row[j] || '').trim().toUpperCase();
+      if (KNOWN_MONTHS.has(v)) { month = v; break; }
+    }
+    if (!month) month = 'UNKNOWN';
+    console.log('Parsed row:', plant, weekStr, month);
+
+    data.push({
+      plant: plant,
+      week: parseInt(weekStr),
+      month,
+      plan: gv(row,'AJ'), output: gv(row,'AM'), runRate: gv(row,'BD'),
+      demoCap: gv(row,'CO'), designCap: gv(row,'CN'),
+      plantUtil: gv(row,'CP'), capUtil: gv(row,'CQ'),
+      oee: gv(row,'CR')*100, performance: gv(row,'CW')*100, quality: gv(row,'CX')*100, availability: gv(row,'CY')*100,
+      outrightRejectMt: gv(row,'BL'), outrightRejectPct: gv(row,'BM'),
+      otherRejectMt: gv(row,'BO'), otherRejectPct: gv(row,'BP'),
+      shrinkageMt: gv(row,'BR'), shrinkagePct: gv(row,'BS'),
+      rmVarQty: gv(row,'CD'), rmVarPct: gv(row,'CE'),
+      rmVarWoSacksQty: gv(row,'CK'), rmVarWoSacksPct: gv(row,'CL'),
+      totalKwh: gv(row,'BU'), kwhTon: gv(row,'BV'),
+      totalFuel: gv(row,'BW'), liTon: gv(row,'BX'),
+      totalCoal: gv(row,'BY'), coalTon: gv(row,'BZ'),
+      fuelPrice: gv(row,'CA'), fuelCost: gv(row,'CB'), sapPosting: gv(row,'CC'),
+      workingHours: gv(row,'E'), unscheduledDT: gv(row,'H'), scheduledDT: gv(row,'G'),
+      totalDT: gv(row,'W'), dtRate: gv(row,'X'),
+    });
+  }
+  if (data.length === 0) throw new Error('No valid rows parsed from production CSV');
+  return data;
+}
+
+// ============================================================
+// FETCH & PARSE DOWNTIME DATA
+// ============================================================
+async function fetchDowntime() {
+  const text = await fetchWithProxy(CSV_DT);
+  const rows = parseCSV(text);
+
+  let headerIdx = -1;
+  for (let i = 0; i < Math.min(rows.length, 10); i++) {
+    const cell = (rows[i][0] || '').trim().toLowerCase();
+    if (cell === 'plant') { headerIdx = i; break; }
+  }
+  if (headerIdx < 0) throw new Error('Could not find header row in downtime CSV');
+
+  // Pre-aggregate by plant|week
+  const agg = {};
+  for (let i = headerIdx + 1; i < rows.length; i++) {
+    const row = rows[i];
+    if (!row || row.length < 5) continue;
+    const plant = (row[0] || '').trim().toUpperCase();
+    if (!VALID_PLANTS.has(plant)) continue;
+    const week = parseInt(row[3]);
+    if (!week) continue;
+    const cat = (row[7] || '').trim();
+    const sub = (row[8] || '').trim();
+    const rsn = (row[9] || '').trim().slice(0,70);
+    const udt = parseFloat(row[10]) || 0;
+    const sdt = parseFloat(row[11]) || 0;
+    const key = plant + '|' + week;
+    if (!agg[key]) agg[key] = { udt: {}, sdt: {}, top: [] };
+    if (udt > 0) {
+      agg[key].udt[cat] = (agg[key].udt[cat] || 0) + udt;
+      agg[key].top.push({ cat, sub, rsn, udt, plant });
+    }
+    if (sdt > 0) agg[key].sdt[cat] = (agg[key].sdt[cat] || 0) + sdt;
+  }
+  // Sort top per key
+  for (const k in agg) agg[k].top.sort((a,b) => b.udt - a.udt).splice(10);
+  return agg;
+}
+
+// ============================================================
+// FETCH & PARSE COST DATA
+// ============================================================
+async function fetchCost() {
+  const text = await fetchWithProxy(CSV_COST);
+  const rows = parseCSV(text);
+  // Find header row
+  let headerIdx = -1;
+  for (let i = 0; i < Math.min(rows.length, 5); i++) {
+    if ((rows[i][0]||'').trim().toUpperCase() === 'YEAR') { headerIdx = i; break; }
+  }
+  if (headerIdx < 0) return [];
+  const data = [];
+  for (let i = headerIdx + 1; i < rows.length; i++) {
+    const r = rows[i];
+    if (!r[0] || !r[1]) continue;
+    const plant = (r[1]||'').trim().toUpperCase();
+    const month = (r[2]||'').trim().toUpperCase();
+    if (!plant || !month) continue;
+    const gv = (idx) => { try { const v=parseFloat((r[idx]||'').replace(/,/g,'')); return isNaN(v)?0:v; } catch{return 0;} };
+    data.push({
+      year: r[0], plant, month,
+      volumeKg: gv(3),
+      rental: gv(4),
+      spareParts: gv(5),
+      manpowerDirect: gv(6),
+      diesel: gv(7),
+      electricity: gv(8),
+      manpowerAgency: gv(9),
+      others: gv(10),
+      thirdParty: gv(11),
+      cessDepreciation: gv(12),
+      spDepreciation: gv(13),
+      insurance: gv(14),
+      water: gv(15),
+      thread: gv(16),
+      tollingFee: gv(17),
+      totalCost: gv(18),
+      costPerKg: gv(19),
+      fixedCost: gv(21),
+      variableCost: gv(22),
+    });
+  }
+  return data;
+}
+
+// ============================================================
+// LOAD ALL DATA
+// ============================================================
+async function loadData(isRefresh = false) {
+  setStatus('fetching');
+  setLoadingMsg(isRefresh ? 'Syncing live data...' : 'Fetching production data...');
+  if (!isRefresh) document.getElementById('loading').style.display = 'flex';
+
+  try {
+    // Load production and downtime first (required)
+    // Cost loads separately and won't block the dashboard
+    setLoadingMsg('Loading data from Google Sheets...');
+    const [prod, dt] = await Promise.all([fetchProduction(), fetchDowntime()]);
+    PROD = prod;
+    DT_AGG = dt;
+    
+    // Set active week to latest BEFORE rendering
+    const weeks = [...new Set(PROD.map(r => r.week))].sort((a,b) => a-b);
+    if (!isRefresh) {
+      activeWeek = weeks[weeks.length-1];
+      const latestRow = PROD.find(r=>r.plant==='NATIONAL'&&r.week===activeWeek);
+      if (latestRow) activeMonth = latestRow.month;
+    }
+
+    // Show dashboard immediately
+    setStatus('live');
+    document.getElementById('last-updated').textContent = 'Updated: ' + new Date().toLocaleTimeString('en-PH',{hour:'2-digit',minute:'2-digit'});
+    // Forcefully remove loading screen
+    const loadingEl = document.getElementById('loading');
+    document.body.classList.add('loaded');
+    if (loadingEl) loadingEl.parentNode.removeChild(loadingEl);
+    buildNav(); buildWkBtns();
+    // Make sure dashboard page is visible
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    const dashPage = document.getElementById('page-dashboard');
+    if (dashPage) dashPage.classList.add('active');
+    try {
+      render();
+    } catch(renderErr) {
+      console.error('RENDER ERROR:', renderErr);
+      document.getElementById('loading').style.display = 'none';
+      document.getElementById('content').innerHTML = '<div class="no-data" style="padding:40px;color:var(--red)"><div style="font-size:16px;margin-bottom:8px">⚠ Render Error</div><div style="font-size:11px;font-family:DM Mono,monospace;color:var(--text2)">' + renderErr.message + '</div><div style="font-size:10px;margin-top:8px;color:var(--text3)">' + (renderErr.stack||'').slice(0,200) + '</div></div>';
+    }
+    scheduleRefresh();
+
+    // Load cost data in background (non-blocking)
+    // Load cost data in background
+    fetch('https://docs.google.com/spreadsheets/d/e/2PACX-1vRRx7S_rqgygPQifVep4DtnDFK8gGjAPVbrzCq6sCJcTF6omIGXb73iK8mQZoZjOgUq8CnZ9t7fR_2a/pub?gid=66553768&single=true&output=csv')
+      .then(r=>r.text()).then(text=>{
+        COST_DATA = parseCostCSV(text);
+        console.log('Cost loaded:', COST_DATA.length, 'rows');
+      }).catch(e=>console.warn('Cost failed:',e.message));
+    return;
+
+  } catch (err) {
+    console.error(err);
+    setStatus('error');
+    if (!isRefresh) {
+      document.getElementById('loading').innerHTML = `
+        <div class="error-icon">✕</div>
+        <div class="error-title">Connection Failed</div>
+        <div class="error-msg">Could not fetch live data from Google Sheets.<br>${err.message}<br><br>Make sure the sheet is published to the web and your network allows the request.</div>
+        <button class="retry-btn" onclick="loadData(false)">⟳ Retry</button>`;
+    } else {
+      document.getElementById('last-updated').textContent = 'Sync failed — ' + new Date().toLocaleTimeString('en-PH',{hour:'2-digit',minute:'2-digit'});
+    }
+  }
+}
+
+function setStatus(state) {
+  const dot = document.getElementById('status-dot');
+  const txt = document.getElementById('status-txt');
+  const btn = document.getElementById('refresh-btn');
+  if (state === 'fetching') { dot.className='pulse fetching'; txt.textContent='Syncing...'; if(btn) btn.disabled=true; }
+  else if (state === 'live')  { dot.className='pulse'; txt.textContent='Live'; if(btn) btn.disabled=false; }
+  else if (state === 'error') { dot.className='pulse error'; txt.textContent='Error'; if(btn) btn.disabled=false; }
+}
+
+function setLoadingMsg(msg) {
+  const el = document.getElementById('loading-msg');
+  if (el) el.textContent = msg;
+}
+
+function scheduleRefresh() {
+  if (refreshTimer) clearInterval(refreshTimer);
+  if (countdown) clearInterval(countdown);
+  nextRefreshAt = Date.now() + REFRESH_INTERVAL_MS;
+  refreshTimer = setInterval(() => loadData(true), REFRESH_INTERVAL_MS);
+  countdown = setInterval(() => {
+    const rem = Math.max(0, Math.round((nextRefreshAt - Date.now()) / 1000));
+    const el = document.getElementById('next-refresh-txt');
+    if (el) el.textContent = 'Next sync: ' + rem + 's';
+    if (rem === 0) clearInterval(countdown);
+  }, 1000);
+}
+
+function manualRefresh() { nextRefreshAt = Date.now() + REFRESH_INTERVAL_MS; loadData(true); }
+
+// ============================================================
+// HELPERS
+// ============================================================
+const get = (s,w) => PROD.find(r => r.plant === s && r.week === w);
+const hist = s => PROD.filter(r => r.plant === s).sort((a,b) => a.week - b.week);
+const fv = (n,d=1) => (n == null || isNaN(n) || n === 0) ? '—' : Number(n).toFixed(d);
+const fvs = (n,d=1) => n === 0 ? '—' : (n > 0 ? '+' : '') + Number(n).toFixed(d);
+const fK = n => !n || n === 0 ? '—' : n >= 1000 ? (n/1000).toFixed(1)+'k' : n.toFixed(0);
+const fKK = n => !n || n === 0 ? '—' : n >= 1000000 ? (n/1000000).toFixed(2)+'M' : n >= 1000 ? (n/1000).toFixed(1)+'k' : n.toFixed(0);
+const clamp = (v,a,b) => Math.max(a, Math.min(b, v));
+const bsc = (v,g,ok) => v >= g ? 'g' : v >= ok ? 'a' : 'r';
+const dtAgg = (s,w) => DT_AGG[s+'|'+w] || {udt:{},sdt:{},top:[]};
+const totalUDT = (s,w) => Object.values(dtAgg(s,w).udt).reduce((a,b)=>a+b,0);
+const totalSDT = (s,w) => Object.values(dtAgg(s,w).sdt).reduce((a,b)=>a+b,0);
+
+function getWeeks() { return [...new Set(PROD.map(r=>r.week))].sort((a,b)=>a-b); }
+function getMonthForWeek(w) { const d = PROD.find(r=>r.plant==='NATIONAL'&&r.week===w); return d?d.month:''; }
+
+function getDaysInMonth(monthName, year) {
+  const months = {JANUARY:1,FEBRUARY:2,MARCH:3,APRIL:4,MAY:5,JUNE:6,JULY:7,AUGUST:8,SEPTEMBER:9,OCTOBER:10,NOVEMBER:11,DECEMBER:12};
+  const m = months[monthName.toUpperCase()] || 1;
+  return new Date(year, m, 0).getDate();
+}
+
+function getRemainingDays(monthName) {
+  const today = new Date();
+  const year = today.getFullYear();
+  const months = {JANUARY:0,FEBRUARY:1,MARCH:2,APRIL:3,MAY:4,JUNE:5,JULY:6,AUGUST:7,SEPTEMBER:8,OCTOBER:9,NOVEMBER:10,DECEMBER:11};
+  const mIdx = months[monthName.toUpperCase()];
+  if (mIdx === undefined) return 0;
+  const lastDay = new Date(year, mIdx + 1, 0);
+  const todayDate = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  const diff = Math.floor((lastDay - todayDate) / (1000*60*60*24));
+  return Math.max(0, diff);
+}
+
+function getMTD(s, w) {
+  const d = get(s, w); if (!d) return {mtd:0, remaining:0, proj:0, avgDaily:0};
+  const mon = d.month;
+  const siteWks = PROD.filter(r => r.plant === s && r.month === mon && r.week <= w);
+  const mtd = siteWks.reduce((a,r) => a + r.output, 0);
+  // Count elapsed working days (weeks * 7 days per week as approximation)
+  const elapsedDays = siteWks.length * 7;
+  const avgDaily = elapsedDays > 0 ? mtd / elapsedDays : 0;
+  // Remaining = actual calendar days left in month from today
+  const remaining = getRemainingDays(mon);
+  const proj = mtd + avgDaily * remaining;
+  return {mtd, remaining, proj, avgDaily};
+}
+
+// ============================================================
+// NAV & WEEK BUTTONS
+// ============================================================
+let activeMonth = null;
+
+function buildNav() {
+  // Site select
+  const sSel = document.getElementById('site-select');
+  if (sSel) sSel.innerHTML = SITES.map(s=>`<option value="${s}" ${s===activeSite?'selected':''}>${SLABELS[s]}</option>`).join('');
+  // Month select
+  const months = [...new Set(PROD.filter(r=>r.plant==='NATIONAL').map(r=>r.month))].sort((a,b)=>MONTHS_ORDER.indexOf(a)-MONTHS_ORDER.indexOf(b));
+  const mSel = document.getElementById('month-select');
+  if (mSel) mSel.innerHTML = months.map(m=>`<option value="${m}" ${m===activeMonth?'selected':''}>${m.slice(0,3)}</option>`).join('');
+}
+
+function setMonthFilter(m) {
+  activeMonth = m;
+  const wks = PROD.filter(r=>r.plant==='NATIONAL'&&r.month===m).map(r=>r.week).sort((a,b)=>a-b);
+  if (wks.length>0) activeWeek = wks[wks.length-1];
+  buildWkBtns();
+  render();
+}
+
+function setPage(page) {
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.getElementById('page-'+page).classList.add('active');
+  document.querySelectorAll('.pg-tab').forEach(t=>t.classList.remove('active-tab'));
+  const tab = document.getElementById('tab-'+page);
+  if (tab) tab.classList.add('active-tab');
+  if (page==='cost') renderCost();
+  if (page==='downtime') renderDTPage();
+}
+
+function buildWkBtns() {
+  const weeks = getWeeks();
+  const wSel = document.getElementById('week-select');
+  if (wSel) wSel.innerHTML = weeks.map(w=>{
+    const m=(getMonthForWeek(w)||'').slice(0,3);
+    return `<option value="${w}" ${w===activeWeek?'selected':''}>${m} — Wk ${w}</option>`;
+  }).join('');
+  // Keep month select in sync
+  const mSel = document.getElementById('month-select');
+  if (mSel && activeMonth) mSel.value = activeMonth;
+}
+
+function setSite(s) { activeSite=s; buildNav(); render(); }
+function setWeek(w) {
+  activeWeek=w;
+  const d=PROD.find(r=>r.plant==='NATIONAL'&&r.week===w);
+  if(d) activeMonth=d.month;
+  buildWkBtns(); render();
+}
+
+// ============================================================
+// RING CHART
+// ============================================================
+function ring(pct, color, size=72) {
+  const r = size/2-6, cx=size/2, cy=size/2;
+  const circ = 2*Math.PI*r, filled = clamp(pct/100,0,1)*circ;
+  return `<svg class="ring-svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
+    <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="6"/>
+    <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${color}" stroke-width="6"
+      stroke-dasharray="${filled.toFixed(2)} ${circ.toFixed(2)}" stroke-linecap="round"/></svg>`;
+}
+
+// ============================================================
+// CHART HELPERS
+// ============================================================
+function destroyCharts() { Object.values(charts).forEach(c => { try { c.destroy(); } catch(e){} }); charts = {}; }
+
+function mkChart(id, type, labels, datasets, extra = {}) {
+  const cv = document.getElementById(id); if (!cv) return;
+  const gc = 'rgba(255,255,255,0.04)';
+  const tp = { backgroundColor:'#1f2631', borderColor:'rgba(255,255,255,0.1)', borderWidth:1,
+    titleColor:'#e6edf3', bodyColor:'#8b949e',
+    titleFont:{family:"'Barlow Condensed',sans-serif",size:12},
+    bodyFont:{family:"'DM Mono',monospace",size:10} };
+  const bs = { x:{grid:{color:gc},ticks:{color:'#484f58',font:{size:9,family:"'DM Mono',monospace"}}},
+               y:{grid:{color:gc},ticks:{color:'#484f58',font:{size:9,family:"'DM Mono',monospace"}}} };
+  charts[id] = new Chart(cv.getContext('2d'), {
+    type, data:{labels,datasets},
+    options:{responsive:true,maintainAspectRatio:false,animation:{duration:300},
+      plugins:{legend:{display:false},tooltip:tp},scales:bs,...extra}
+  });
+}
+
+// ============================================================
+// MAIN RENDER
+// ============================================================
+function render() {
+  destroyCharts();
+  const d = get(activeSite, activeWeek);
+  const mon = d ? d.month : getMonthForWeek(activeWeek);
+  const hd = hist(activeSite);
+  const wkL = hd.map(r => 'W'+r.week);
+
+  // site shown in select
+  // week shown in select
+
+  const ct = document.getElementById('content');
+  if (!d) { ct.innerHTML = `<div class="no-data">No data — ${SLABELS[activeSite]} Week ${activeWeek}</div>`; return; }
+
+  const planPct = d.plan > 0 ? (d.output / d.plan * 100) : 0;
+  const pC = planPct >= 100 ? 'var(--green-b)' : planPct >= 85 ? 'var(--amber)' : 'var(--red)';
+  const oC = d.oee >= 85 ? 'var(--green-b)' : d.oee >= 70 ? 'var(--amber)' : 'var(--red)';
+  const aC = d.availability >= 90 ? 'var(--green-b)' : d.availability >= 75 ? 'var(--amber)' : 'var(--red)';
+  const qC = d.quality >= 98 ? 'var(--green-b)' : d.quality >= 95 ? 'var(--amber)' : 'var(--red)';
+  const udtTotal = activeSite==='NATIONAL'
+    ? PROD_SITES.reduce((a,s)=>{const r=get(s,activeWeek);return a+(r?r.unscheduledDT:0);},0)
+    : (d?d.unscheduledDT:0);
+  const sdtTotal = activeSite==='NATIONAL'
+    ? PROD_SITES.reduce((a,s)=>{const r=get(s,activeWeek);return a+(r?r.scheduledDT:0);},0)
+    : (d?d.scheduledDT:0);
+
+  // ---- MTD PROJECTION TABLE ----
+  const remDays = getRemainingDays(mon);
+  const mtdRows = PROD_SITES.map(s => {
+    const sd = get(s, activeWeek);
+    const {mtd, remaining, proj, avgDaily} = getMTD(s, activeWeek);
+    const rem = remaining;
+    const dc = DEMO_CAP[s], dsc = DESIGN_CAP[s];
+    const cPct = dc > 0 ? (proj/dc*100) : 0;
+    const uPct = dsc > 0 ? (proj/dsc*100) : 0;
+    const dotSpan = `<span style="display:inline-block;width:5px;height:5px;border-radius:50%;background:${SDOTS[s]};margin-right:5px;vertical-align:middle"></span>`;
+    return `<tr>
+      <td>${dotSpan}${SLABELS[s].split('·')[0].trim()}</td>
+      <td>${sd&&sd.output>0?fv(mtd,1):'—'}</td>
+      <td>${fv(avgDaily,2)}</td>
+      <td>${rem}</td>
+      <td>${proj>0?fv(proj,1):'—'}</td>
+      <td>${dc.toLocaleString()}</td>
+      <td class="${cPct>=90?'tg':cPct>=70?'ta':'tr'}">${proj>0?cPct.toFixed(1)+'%':'—'}</td>
+      <td>${dsc.toLocaleString()}</td>
+      <td class="${uPct>=70?'tg':uPct>=50?'ta':'tr'}">${proj>0?uPct.toFixed(1)+'%':'—'}</td>
+    </tr>`;
+  });
+  const {mtd:nMtd,proj:nProj,avgDaily:nAvg} = getMTD('NATIONAL', activeWeek);
+  const nDC=DEMO_CAP.NATIONAL, nDSC=DESIGN_CAP.NATIONAL;
+  const nCP=nDC>0?(nProj/nDC*100):0, nUP=nDSC>0?(nProj/nDSC*100):0;
+  mtdRows.push(`<tr style="border-top:1px solid var(--border2)">
+    <td style="color:var(--green-b);font-weight:600">NATIONAL TOTAL</td>
+    <td style="color:var(--text)">${fv(nMtd,1)}</td>
+    <td style="color:var(--text)">${fv(nAvg,2)}</td>
+    <td>${remDays}</td>
+    <td style="color:var(--text)">${fv(nProj,1)}</td>
+    <td>${nDC.toLocaleString()}</td>
+    <td class="${nCP>=90?'tg':nCP>=70?'ta':'tr'}">${nCP.toFixed(1)}%</td>
+    <td>${nDSC.toLocaleString()}</td>
+    <td class="${nUP>=70?'tg':nUP>=50?'ta':'tr'}">${nUP.toFixed(1)}%</td>
+  </tr>`);
+
+  // ---- REJECT TABLE ----
+  // National totals for rejection
+  const natRej = PROD_SITES.reduce((acc,s)=>{
+    const sd=get(s,activeWeek);
+    if(sd&&sd.output>0){acc.out+=sd.outrightRejectMt;acc.other+=sd.otherRejectMt;acc.outPct+=sd.outrightRejectPct;acc.otherPct+=sd.otherRejectPct;acc.count++;}
+    return acc;
+  },{out:0,other:0,outPct:0,otherPct:0,count:0});
+
+  const rejRows = PROD_SITES.map(s => {
+    const sd = get(s, activeWeek);
+    const dot = `<span style="display:inline-block;width:5px;height:5px;border-radius:50%;background:${SDOTS[s]};margin-right:5px;vertical-align:middle"></span>`;
+    if (!sd || (sd.outrightRejectMt === 0 && sd.otherRejectMt === 0 && sd.output === 0))
+      return `<tr><td>${dot}${SLABELS[s].split('·')[0].trim()}</td>${'<td>—</td>'.repeat(6)}</tr>`;
+    const tc = sd.outrightRejectPct > 1 ? 'tr' : sd.outrightRejectPct > 0.5 ? 'ta' : '';
+    const oc = sd.otherRejectPct > 2 ? 'tr' : sd.otherRejectPct > 1 ? 'ta' : '';
+    const tot = sd.outrightRejectMt + sd.otherRejectMt;
+    return `<tr>
+      <td>${dot}${SLABELS[s].split('·')[0].trim()}</td>
+      <td class="${tc}">${fv(sd.outrightRejectMt,2)}</td><td class="${tc}">${fv(sd.outrightRejectPct,2)}%</td>
+      <td class="${oc}">${fv(sd.otherRejectMt,2)}</td><td class="${oc}">${fv(sd.otherRejectPct,2)}%</td>
+      <td>${fv(tot,2)}</td>
+      <td class="${(sd.outrightRejectPct+sd.otherRejectPct)>2?'tr':''}">${fv(sd.outrightRejectPct+sd.otherRejectPct,2)}%</td>
+    </tr>`;
+  });
+
+  // ---- PROCESS LOSS ----
+  const lossRows = PROD_SITES.map(s => {
+    const sd = get(s, activeWeek);
+    const dot = `<span style="display:inline-block;width:5px;height:5px;border-radius:50%;background:${SDOTS[s]};margin-right:5px;vertical-align:middle"></span>`;
+    if (!sd || sd.output === 0) return `<tr><td>${dot}${SLABELS[s].split('·')[0].trim()}</td>${'<td>—</td>'.repeat(3)}</tr>`;
+    const cls = sd.shrinkageMt < 0 ? 'tr' : 'tg';
+    return `<tr>
+      <td>${dot}${SLABELS[s].split('·')[0].trim()}</td>
+      <td class="${cls}">${sd.shrinkageMt >= 0 ? '+' : ''}${fv(sd.shrinkageMt,2)} mt</td>
+      <td class="${cls}">${sd.shrinkagePct >= 0 ? '+' : ''}${fv(sd.shrinkagePct,2)}%</td>
+      <td><span class="bdg ${sd.shrinkageMt < 0 ? 'r' : 'g'}">${sd.shrinkageMt < 0 ? 'Loss' : 'Gain'}</span></td>
+    </tr>`;
+  });
+
+  // ---- VARIANCE ----
+  const varRows = PROD_SITES.map(s => {
+    const sd = get(s, activeWeek);
+    const dot = `<span style="display:inline-block;width:5px;height:5px;border-radius:50%;background:${SDOTS[s]};margin-right:5px;vertical-align:middle"></span>`;
+    if (!sd || sd.output === 0) return `<tr><td>${dot}${SLABELS[s].split('·')[0].trim()}</td>${'<td>—</td>'.repeat(4)}</tr>`;
+    const c1 = sd.rmVarQty > 0 ? 'tg' : sd.rmVarQty < 0 ? 'tr' : '';
+    const c2 = sd.rmVarWoSacksQty > 0 ? 'tg' : sd.rmVarWoSacksQty < 0 ? 'tr' : '';
+    return `<tr>
+      <td>${dot}${SLABELS[s].split('·')[0].trim()}</td>
+      <td class="${c1}">${fvs(sd.rmVarQty,2)} mt</td><td class="${c1}">${fvs(sd.rmVarPct,3)}%</td>
+      <td class="${c2}">${fvs(sd.rmVarWoSacksQty,2)} mt</td><td class="${c2}">${fvs(sd.rmVarWoSacksPct,3)}%</td>
+    </tr>`;
+  });
+
+  // ---- DOWNTIME TABLE ----
+  const dtRows = PROD_SITES.map(s => {
+    const da = dtAgg(s, activeWeek);
+    const udt = totalUDT(s, activeWeek);
+    const sdt = totalSDT(s, activeWeek);
+    const mech = (da.udt['Mechanical']||0)+(da.udt['Electrical']||0)+(da.udt['PLC']||0);
+    const proc = (da.udt['Process']||0)+(da.udt['Warehouse']||0)+(da.udt['Raw Materials']||0);
+    const co   = (da.udt['Change Over']||0)+(da.udt['Change Die']||0)+(da.udt['Change Screen']||0);
+    const pwr  = da.udt['Power Interruption']||0;
+    const dot  = `<span style="display:inline-block;width:5px;height:5px;border-radius:50%;background:${SDOTS[s]};margin-right:5px;vertical-align:middle"></span>`;
+    return `<tr>
+      <td>${dot}${SLABELS[s].split('·')[0].trim()}</td>
+      <td class="${udt>20?'tr':udt>10?'ta':''}">${udt>0?udt.toFixed(2):'—'}</td>
+      <td>${sdt>0?sdt.toFixed(2):'—'}</td>
+      <td>${mech>0?mech.toFixed(2):'—'}</td>
+      <td>${proc>0?proc.toFixed(2):'—'}</td>
+      <td>${co>0?co.toFixed(2):'—'}</td>
+      <td class="${pwr>0?'tr':''}">${pwr>0?pwr.toFixed(2):'—'}</td>
+    </tr>`;
+  });
+
+  // ---- TOP DT REASONS ----
+  let topDtList = [];
+  if (activeSite === 'NATIONAL') {
+    PROD_SITES.forEach(s => { const da=dtAgg(s,activeWeek); (da.top||[]).forEach(t=>topDtList.push({...t,plant:s})); });
+  } else {
+    topDtList = (dtAgg(activeSite,activeWeek).top||[]).map(t=>({...t,plant:activeSite}));
+  }
+  topDtList.sort((a,b)=>b.udt-a.udt);
+  const topDtRows = topDtList.length > 0
+    ? topDtList.slice(0,10).map((t,i)=>`<tr>
+        <td style="text-align:center">${i+1}</td>
+        <td><span style="display:inline-block;width:5px;height:5px;border-radius:50%;background:${SDOTS[t.plant]};margin-right:4px;vertical-align:middle"></span>${t.plant}</td>
+        <td style="text-align:left">${t.cat}</td>
+        <td style="text-align:left">${t.sub}</td>
+        <td style="text-align:left;max-width:180px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--text2)">${t.rsn}</td>
+        <td class="tr">${t.udt.toFixed(2)}</td>
+      </tr>`).join('')
+    : `<tr><td colspan="6" style="text-align:center;color:var(--text3);padding:16px">No unscheduled downtime recorded this week</td></tr>`;
+
+  // ---- COST TABLE ----
+  const costRows = PROD_SITES.map(s => {
+    const sd = get(s, activeWeek);
+    const dot = `<span style="display:inline-block;width:5px;height:5px;border-radius:50%;background:${SDOTS[s]};margin-right:5px;vertical-align:middle"></span>`;
+    if (!sd || sd.output === 0) return `<tr><td>${dot}${SLABELS[s].split('·')[0].trim()}</td>${'<td>—</td>'.repeat(5)}</tr>`;
+    return `<tr>
+      <td>${dot}${SLABELS[s].split('·')[0].trim()}</td>
+      <td>${sd.kwhTon>0?fv(sd.kwhTon,2):'—'}</td>
+      <td>${sd.liTon>0?fv(sd.liTon,2):'—'}</td>
+      <td>${sd.coalTon>0?fv(sd.coalTon,2):'—'}</td>
+      <td>${sd.fuelCost>0&&sd.output>0?'₱'+fKK(sd.fuelCost/sd.output):'—'}</td>
+      <td>${sd.sapPosting>0?'₱'+fv(sd.sapPosting,2):'—'}</td>
+    </tr>`;
+  });
+
+  // ============================================================
+  // BUILD HTML
+  // ============================================================
+  ct.innerHTML = `
+<!-- SCORECARD HEADER -->
+${activeSite==='NATIONAL'?`
+<div class="sec" style="margin-bottom:10px">
+  <div class="sec-hdr"><div class="sec-title">National Scorecard — Week ${activeWeek} · ${mon}</div><div class="sec-line"></div></div>
+  <div style="display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px">
+    ${PROD_SITES.map(s=>{
+      const sd=get(s,activeWeek);
+      const pp=sd&&sd.plan>0?(sd.output/sd.plan*100):0;
+      const dot=`<span style="display:inline-block;width:5px;height:5px;border-radius:50%;background:${SDOTS[s]};margin-bottom:4px"></span>`;
+      const sudt=totalUDT(s,activeWeek);
+      return `<div style="background:var(--bg2);border:1px solid var(--border);border-top:2px solid ${pp>=100?'var(--green)':pp>=85?'var(--amber)':'var(--red)'};border-radius:var(--rl);padding:10px 10px 8px;text-align:center">
+        <div>${dot}</div>
+        <div style="font-size:9px;font-weight:600;color:var(--text3);letter-spacing:.5px;margin-bottom:5px">${SLABELS[s].split('·')[0].trim()}</div>
+        <div style="font-family:'Barlow Condensed',sans-serif;font-size:18px;font-weight:700;color:${pp>=100?'var(--green-b)':pp>=85?'var(--amber)':'var(--red)'};line-height:1">${sd&&sd.output>0?fv(sd.output,1):'—'}</div>
+        <div style="font-size:9px;color:var(--text3);margin:2px 0">mt · ${pp>0?pp.toFixed(0)+'%':'-'}</div>
+        <div style="font-size:9px;color:var(--text2);margin-top:4px;border-top:1px solid var(--border);padding-top:4px">
+          OEE: <span style="color:${sd&&sd.oee>=85?'var(--green-b)':sd&&sd.oee>=70?'var(--amber)':'var(--red)'}">${sd&&sd.oee>0?sd.oee.toFixed(0)+'%':'—'}</span>
+        </div>
+        <div style="font-size:9px;color:${sudt>10?'var(--red)':sudt>5?'var(--amber)':'var(--text3)'}">UDT: ${sudt>0?sudt.toFixed(1)+'h':'—'}</div>
+      </div>`;
+    }).join('')}
+  </div>
+</div>`:''}
+
+<!-- TOP KPIs -->
+<div class="sec">
+  <div class="sec-hdr"><div class="sec-title">${SLABELS[activeSite]} · Week ${activeWeek} · ${mon}</div><div class="sec-line"></div></div>
+  <div class="g5">
+    <div class="kc" style="--kc-color:${pC}">
+      <div class="kc-lbl">Output</div>
+      <div class="kc-val" style="color:${pC}">${fv(d.output,1)}<span style="font-size:12px;color:var(--text2)"> mt</span></div>
+      <div class="kc-sub">Commit: ${(wkCommit||0).toLocaleString()} mt</div>
+      <span class="bdg ${bsc(planPct,100,85)}">${planPct.toFixed(1)}% of commit</span>
+    </div>
+    
+    <div class="kc" style="--kc-color:var(--teal)">
+      <div class="kc-lbl">Run rate (col BD)</div>
+      <div class="kc-val">${d.runRate>0?fv(d.runRate,2):'—'}<span style="font-size:12px;color:var(--text2)"> t/hr</span></div>
+      <div class="kc-sub">Net of downtime</div>
+    </div>
+    <div class="kc" style="--kc-color:${udtTotal>20?'var(--red)':udtTotal>10?'var(--amber)':'var(--border2)'}">
+      <div class="kc-lbl">Downtime this week</div>
+      <div style="display:flex;gap:6px;margin-bottom:6px">
+        <div style="flex:1;background:rgba(255,82,82,0.12);border-radius:4px;padding:5px;text-align:center">
+          <div style="font-size:9px;color:var(--red);font-weight:700;letter-spacing:1px">UDT</div>
+          <div style="font-family:'Barlow Condensed',sans-serif;font-size:19px;font-weight:700;color:${udtTotal>20?'var(--red)':udtTotal>10?'var(--amber)':'var(--green-b)'}">${fv(udtTotal,2)}<span style="font-size:9px;color:var(--text2)"> hr</span></div>
+          <div style="font-size:10px;color:var(--text3)">${d&&d.dtRate>0?(d.dtRate*100).toFixed(1)+'%':'—'}</div>
+        </div>
+        <div style="flex:1;background:rgba(64,196,255,0.12);border-radius:4px;padding:5px;text-align:center">
+          <div style="font-size:9px;color:var(--blue);font-weight:700;letter-spacing:1px">SDT</div>
+          <div style="font-family:'Barlow Condensed',sans-serif;font-size:19px;font-weight:700;color:var(--blue)">${fv(sdtTotal,2)}<span style="font-size:9px;color:var(--text2)"> hr</span></div>
+          <div style="font-size:10px;color:var(--text3)">${d&&d.scheduledDT>0&&d.workingHours>0?fv(d.scheduledDT/d.workingHours*100,1)+'%':'—'}</div>
+        </div>
+      </div>
+      <div style="font-size:10px;color:var(--text3)">Total: ${fv(udtTotal+sdtTotal,2)} hr</div>
+    </div>
+    <div class="kc" style="--kc-color:${oC}">
+      <div class="kc-lbl">OEE (col CR)</div>
+      <div class="kc-val" style="color:${oC}">${d.oee>0?fv(d.oee,1):'N/A'}<span style="font-size:12px;color:var(--text2)">${d.oee>0?'%':''}</span></div>
+      <div class="kc-sub">P:${d.performance>0?fv(d.performance,1)+'%':'—'} Q:${d.quality>0?fv(d.quality,1)+'%':'—'} A:${d.availability>0?fv(d.availability,1)+'%':'—'}</div>
+      <span class="bdg ${d.oee>=85?'g':d.oee>=70?'a':d.oee>0?'r':'b'}">${d.oee>=85?'World class':d.oee>=70?'Acceptable':d.oee>0?'Needs attn':'N/A'}</span>
+    </div>
+  </div>
+</div>
+
+<!-- OEE RINGS + MTD TABLE -->
+<div class="g2 sec">
+  <div class="cc">
+    <div class="cc-title">OEE breakdown — col CR / CW / CX / CY</div>
+    <div style="display:flex;align-items:center;gap:16px;justify-content:center;margin-bottom:12px">
+      <div style="text-align:center;flex-shrink:0">
+        <div style="position:relative;width:110px;height:110px;margin:0 auto 6px">
+          ${ring(clamp(d.oee,0,120),d.oee>=85?'#3fb950':d.oee>=70?'#d29922':'#f85149',110)}
+          <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:700;color:${oC}">${d.oee>0?d.oee.toFixed(1)+'%':'N/A'}</div>
+        </div>
+        <div style="font-size:11px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--text2)">OEE</div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <div style="display:flex;align-items:center;gap:10px">
+          <div style="position:relative;width:54px;height:54px;flex-shrink:0">
+            ${ring(clamp(d.performance,0,120),d.performance>=90?'#388bfd':'#d29922',54)}
+            <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:700;color:${d.performance>=90?'var(--blue)':'var(--amber)'}">${d.performance>0?d.performance.toFixed(0)+'%':'—'}</div>
+          </div>
+          <div>
+            <div style="font-size:9px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--text3)">Performance</div>
+            <div style="font-size:13px;font-weight:600;color:${d.performance>=90?'var(--blue)':'var(--amber)'}">${d.performance>0?d.performance.toFixed(1)+'%':'—'}</div>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px">
+          <div style="position:relative;width:54px;height:54px;flex-shrink:0">
+            ${ring(clamp(d.quality,0,100),'#1abc9c',54)}
+            <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:700;color:${qC}">${d.quality>0?d.quality.toFixed(0)+'%':'—'}</div>
+          </div>
+          <div>
+            <div style="font-size:9px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--text3)">Quality</div>
+            <div style="font-size:13px;font-weight:600;color:${qC}">${d.quality>0?d.quality.toFixed(1)+'%':'—'}</div>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px">
+          <div style="position:relative;width:54px;height:54px;flex-shrink:0">
+            ${ring(clamp(d.availability,0,100),d.availability>=90?'#3fb950':'#f85149',54)}
+            <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:700;color:${aC}">${d.availability>0?d.availability.toFixed(0)+'%':'—'}</div>
+          </div>
+          <div>
+            <div style="font-size:9px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--text3)">Availability</div>
+            <div style="font-size:13px;font-weight:600;color:${aC}">${d.availability>0?d.availability.toFixed(1)+'%':'—'}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div style="position:relative;height:120px"><canvas id="c-oee"></canvas></div>
+  </div>
+  <div class="cc">
+    <div class="cc-title">MTD output projection — ${mon}</div>
+    <div style="overflow-x:auto">
+    <table>
+      <thead><tr><th>Site</th><th>MTD (mt)</th><th>Avg/day</th><th>Days Left</th><th>Projected</th><th>Demo Cap</th><th>Commit%</th><th>Design Cap</th><th>Util%</th></tr></thead>
+      <tbody>${mtdRows.join('')}</tbody>
+    </table></div>
+  </div>
+</div>
+
+<!-- QUALITY SECTION -->
+<div class="sec">
+  <div class="sec-hdr"><div class="sec-title">Quality, Loss &amp; RM Variance</div><div class="sec-line"></div></div>
+  <div class="g3">
+    <div class="cc">
+      <div class="cc-title">Rejection per site — qty &amp; %</div>
+      <div style="overflow-x:auto">
+      <table>
+        <thead><tr><th>Site</th><th>Outright mt</th><th>%</th><th>Other mt</th><th>%</th><th>Total mt</th><th>Total%</th></tr></thead>
+        <tbody>${rejRows.join('')}
+          <tr style="border-top:1px solid var(--border2)">
+            <td style="color:var(--green-b);font-weight:600">NATIONAL</td>
+            <td class="${natRej.out>10?'tr':''}">${fv(natRej.out,2)}</td>
+            <td class="${natRej.outPct>1?'tr':''}">${fv(natRej.outPct,2)}%</td>
+            <td class="${natRej.other>20?'tr':''}">${fv(natRej.other,2)}</td>
+            <td class="${natRej.otherPct>1?'tr':''}">${fv(natRej.otherPct,2)}%</td>
+            <td>${fv(natRej.out+natRej.other,2)}</td>
+            <td class="${(natRej.outPct+natRej.otherPct)>2?'tr':''}">${fv(natRej.outPct+natRej.otherPct,2)}%</td>
+          </tr>
+        </tbody>
+      </table></div>
+    </div>
+    <div class="cc">
+      <div class="cc-title">Process loss / gain per site</div>
+      <table>
+        <thead><tr><th>Site</th><th>Qty (mt)</th><th>%</th><th>Status</th></tr></thead>
+        <tbody>${lossRows.join('')}
+          ${(()=>{const ns=PROD_SITES.reduce((a,s)=>{const sd=get(s,activeWeek);if(sd&&sd.output>0){a.mt+=sd.shrinkageMt;a.pct+=sd.shrinkagePct;}return a;},{mt:0,pct:0});
+          const cls=ns.mt<0?'tr':'tg';
+          return `<tr style="border-top:1px solid var(--border2)"><td style="color:var(--green-b);font-weight:600">NATIONAL</td><td class="${cls}">${ns.mt>=0?'+':''}${fv(ns.mt,2)} mt</td><td class="${cls}">${ns.pct>=0?'+':''}${fv(ns.pct,2)}%</td><td><span class="bdg ${ns.mt<0?'r':'g'}">${ns.mt<0?'Loss':'Gain'}</span></td></tr>`;})()}
+        </tbody>
+      </table>
+    </div>
+    <div class="cc">
+      <div class="cc-title">RM variance — with &amp; w/o sacks</div>
+      <table>
+        <thead><tr><th>Site</th><th>Var Qty</th><th>Var%</th><th>w/o Sacks</th><th>%</th></tr></thead>
+        <tbody>${varRows.join('')}
+          ${(()=>{const nv=PROD_SITES.reduce((a,s)=>{const sd=get(s,activeWeek);if(sd&&sd.output>0){a.qty+=sd.rmVarQty;a.pct+=sd.rmVarPct;a.woQty+=sd.rmVarWoSacksQty;a.woPct+=sd.rmVarWoSacksPct;}return a;},{qty:0,pct:0,woQty:0,woPct:0});
+          const c1=nv.qty>0?'tg':nv.qty<0?'tr':'';const c2=nv.woQty>0?'tg':nv.woQty<0?'tr':'';
+          return `<tr style="border-top:1px solid var(--border2)"><td style="color:var(--green-b);font-weight:600">NATIONAL</td><td class="${c1}">${fvs(nv.qty,2)} mt</td><td class="${c1}">${fvs(nv.pct,3)}%</td><td class="${c2}">${fvs(nv.woQty,2)} mt</td><td class="${c2}">${fvs(nv.woPct,3)}%</td></tr>`;})()}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ENERGY & COST -->
+<div class="sec">
+  <div class="sec-hdr"><div class="sec-title">Energy, Fuel &amp; Cost per Ton</div><div class="sec-line"></div></div>
+  <div class="g4" style="margin-bottom:8px">
+    <div class="kc" style="--kc-color:var(--purple)">
+      <div class="kc-lbl">Electricity (BU/BV)</div>
+      <div class="kc-val" style="font-size:20px;color:var(--purple)">${fK(d.totalKwh)}</div>
+      <div class="kc-sub">kWh consumed</div>
+      <div style="font-family:'DM Mono',monospace;font-size:12px;color:var(--purple);margin-top:4px">${fv(d.kwhTon,2)} <span style="font-size:9px;color:var(--text3)">kWh/ton</span></div>
+    </div>
+    <div class="kc" style="--kc-color:var(--amber)">
+      <div class="kc-lbl">Diesel (BW/BX)</div>
+      <div class="kc-val" style="font-size:20px;color:var(--amber)">${fK(d.totalFuel)}</div>
+      <div class="kc-sub">liters</div>
+      <div style="font-family:'DM Mono',monospace;font-size:12px;color:var(--amber);margin-top:4px">${fv(d.liTon,2)} <span style="font-size:9px;color:var(--text3)">L/ton</span></div>
+    </div>
+    <div class="kc" style="--kc-color:var(--text3)">
+      <div class="kc-lbl">Coal (BY/BZ)</div>
+      <div class="kc-val" style="font-size:20px">${fK(d.totalCoal)}</div>
+      <div class="kc-sub">kg</div>
+      <div style="font-family:'DM Mono',monospace;font-size:12px;color:var(--text2);margin-top:4px">${d.coalTon>0?fv(d.coalTon,2):'—'} <span style="font-size:9px;color:var(--text3)">kg/ton</span></div>
+    </div>
+    <div class="kc" style="--kc-color:var(--green)">
+      <div class="kc-lbl">Total fuel cost</div>
+      <div class="kc-val" style="font-size:18px;color:var(--green-b)">₱${fKK(d.fuelCost)}</div>
+      <div class="kc-sub">Price: ₱${fv(d.fuelPrice,2)}/L</div>
+      <div style="font-family:'DM Mono',monospace;font-size:11px;color:var(--text2);margin-top:4px">₱${d.output>0&&d.fuelCost>0?fv(d.fuelCost/d.output,2):'—'} <span style="font-size:9px;color:var(--text3)">/ton</span></div>
+    </div>
+  </div>
+  <div class="cc">
+    <div class="cc-title">Cost per ton breakdown by site — Week ${activeWeek}</div>
+    <div style="overflow-x:auto">
+    <table>
+      <thead><tr><th>Site</th><th>kWh/ton</th><th>L/ton diesel</th><th>kg/ton coal</th><th>Fuel cost/ton</th><th>SAP posting</th></tr></thead>
+      <tbody>${costRows.join('')}</tbody>
+    </table></div>
+  </div>
+</div>
+
+<!-- ENERGY TRENDS -->
+<div class="sec">
+  <div class="sec-hdr"><div class="sec-title">Trends — all weeks</div><div class="sec-line"></div></div>
+  <div class="g3">
+    <div class="cc"><div class="cc-title">kWh/ton trend</div><div style="position:relative;height:130px"><canvas id="c-kwh"></canvas></div></div>
+    <div class="cc"><div class="cc-title">Diesel L/ton trend</div><div style="position:relative;height:130px"><canvas id="c-fuel"></canvas></div></div>
+    <div class="cc"><div class="cc-title">Output vs plan (mt)</div><div style="position:relative;height:130px"><canvas id="c-out"></canvas></div></div>
+  </div>
+</div>
+
+<!-- DOWNTIME -->
+<div class="sec">
+  <div class="sec-hdr"><div class="sec-title">Downtime — UDT &amp; SDT</div><div class="sec-line"></div></div>
+  <div class="cc" style="margin-bottom:8px">
+    <div class="cc-title">Downtime summary per site — Week ${activeWeek}</div>
+    <div style="overflow-x:auto">
+    <table>
+      <thead><tr><th>Site</th><th>UDT hr</th><th>SDT hr</th><th>Mech/Elec/PLC</th><th>Process/WH/RM</th><th>Change Over/Die/Screen</th><th>Power Interrupt</th></tr></thead>
+      <tbody>${dtRows.join('')}</tbody>
+    </table></div>
+  </div>
+  <div class="g2">
+    <div class="cc">
+      <div class="cc-title">UDT trend — ${SLABELS[activeSite]}</div>
+      <div style="position:relative;height:140px"><canvas id="c-dt"></canvas></div>
+    </div>
+    <div class="cc">
+      <div class="cc-title">Top 10 UDT reasons — Week ${activeWeek} · ${activeSite==='NATIONAL'?'All Sites':SLABELS[activeSite]}</div>
+      <div style="overflow-x:auto">
+      <table>
+        <thead><tr><th style="text-align:center">#</th><th style="text-align:left">Plant</th><th style="text-align:left">Category</th><th style="text-align:left">Sub-cat</th><th style="text-align:left">Reason</th><th>UDT hr</th></tr></thead>
+        <tbody>${topDtRows}</tbody>
+      </table></div>
+    </div>
+  </div>
+</div>
+
+${activeSite === 'NATIONAL' ? `
+<!-- SITE COMPARISON -->
+<div class="sec">
+  <div class="sec-hdr"><div class="sec-title">Site Comparison — Week ${activeWeek}</div><div class="sec-line"></div></div>
+  <div class="g2" style="margin-bottom:8px">
+    <div class="cc"><div class="cc-title">Output vs plan by site (mt)</div><div style="position:relative;height:160px"><canvas id="c-sout"></canvas></div></div>
+    <div class="cc"><div class="cc-title">OEE % by site</div><div style="position:relative;height:160px"><canvas id="c-soee"></canvas></div></div>
+  </div>
+  <div class="g3">
+    <div class="cc"><div class="cc-title">Capacity utilization %</div>
+      ${PROD_SITES.map(s=>{const sd=get(s,activeWeek);const v=sd?sd.capUtil:0;return `<div class="mbar-row"><div class="mbar-lbl">${s}</div><div class="mbar-bg"><div class="mbar-fill" style="width:${clamp(v,0,100)}%;background:${SDOTS[s]}"></div></div><div class="mbar-val" style="color:${SDOTS[s]}">${v>0?v.toFixed(0)+'%':'—'}</div></div>`;}).join('')}
+    </div>
+    <div class="cc"><div class="cc-title">UDT hours this week</div>
+      ${PROD_SITES.map(s=>{const v=totalUDT(s,activeWeek);const max=Math.max(...PROD_SITES.map(x=>totalUDT(x,activeWeek)),1);return `<div class="mbar-row"><div class="mbar-lbl">${s}</div><div class="mbar-bg"><div class="mbar-fill" style="width:${(v/max*100).toFixed(0)}%;background:${v>20?'#f85149':v>10?'#d29922':SDOTS[s]}"></div></div><div class="mbar-val" style="color:${v>20?'var(--red)':v>10?'var(--amber)':'var(--text2)'}">${v>0?v.toFixed(1):'—'}</div></div>`;}).join('')}
+    </div>
+    <div class="cc"><div class="cc-title">kWh/ton</div>
+      ${PROD_SITES.map(s=>{const sd=get(s,activeWeek);const v=sd?sd.kwhTon:0;const max=Math.max(...PROD_SITES.map(x=>get(x,activeWeek)?.kwhTon||0),1);return `<div class="mbar-row"><div class="mbar-lbl">${s}</div><div class="mbar-bg"><div class="mbar-fill" style="width:${max>0?(v/max*100).toFixed(0):0}%;background:${SDOTS[s]}"></div></div><div class="mbar-val" style="color:${SDOTS[s]}">${v>0?v.toFixed(1):'—'}</div></div>`;}).join('')}
+    </div>
+  </div>
+</div>` : ''}
+`;
+
+  ct.className = 'content fade';
+
+  // ---- CHARTS ----
+  const gc = 'rgba(255,255,255,0.04)';
+  const bs = { x:{grid:{color:gc},ticks:{color:'#484f58',font:{size:9,family:"'DM Mono',monospace"}}},
+               y:{grid:{color:gc},ticks:{color:'#484f58',font:{size:9,family:"'DM Mono',monospace"}}} };
+
+  mkChart('c-oee','line',wkL,[
+    {label:'OEE',data:hd.map(r=>r.oee>0?+r.oee.toFixed(1):null),borderColor:'#3fb950',backgroundColor:'rgba(63,185,80,0.08)',fill:true,tension:.3,pointRadius:3,spanGaps:true},
+    {label:'Perf',data:hd.map(r=>r.performance>0?+r.performance.toFixed(1):null),borderColor:'#388bfd',fill:false,tension:.3,pointRadius:2,borderDash:[3,3],spanGaps:true},
+    {label:'Avail',data:hd.map(r=>r.availability>0?+r.availability.toFixed(1):null),borderColor:'#d29922',fill:false,tension:.3,pointRadius:2,borderDash:[2,4],spanGaps:true}
+  ],{plugins:{legend:{display:true,labels:{color:'#8b949e',font:{size:9},boxWidth:8}},tooltip:{backgroundColor:'#1f2631',borderColor:'rgba(255,255,255,.1)',borderWidth:1,bodyFont:{family:"'DM Mono',monospace",size:10}}},scales:{...bs,y:{...bs.y,min:0,max:120}}});
+
+  mkChart('c-kwh','line',wkL,[{data:hd.map(r=>r.kwhTon>0?+r.kwhTon.toFixed(2):null),borderColor:'#a371f7',backgroundColor:'rgba(163,113,247,0.08)',fill:true,tension:.3,pointRadius:3,spanGaps:true}],{plugins:{legend:{display:false},tooltip:{backgroundColor:'#1f2631',borderColor:'rgba(255,255,255,.1)',borderWidth:1,bodyFont:{family:"'DM Mono',monospace",size:10}}},scales:bs});
+
+  mkChart('c-fuel','line',wkL,[{data:hd.map(r=>r.liTon>0?+r.liTon.toFixed(2):null),borderColor:'#d29922',backgroundColor:'rgba(210,153,34,0.08)',fill:true,tension:.3,pointRadius:3,spanGaps:true}],{plugins:{legend:{display:false},tooltip:{backgroundColor:'#1f2631',borderColor:'rgba(255,255,255,.1)',borderWidth:1,bodyFont:{family:"'DM Mono',monospace",size:10}}},scales:bs});
+
+  mkChart('c-out','bar',wkL,[
+    {label:'Plan',data:hd.map(r=>+r.plan.toFixed(1)),backgroundColor:'rgba(255,255,255,0.07)',borderRadius:2},
+    {label:'Actual',data:hd.map(r=>+r.output.toFixed(1)),backgroundColor:'#388bfd',borderRadius:2}
+  ],{plugins:{legend:{display:true,labels:{color:'#8b949e',font:{size:9},boxWidth:8}},tooltip:{backgroundColor:'#1f2631',borderColor:'rgba(255,255,255,.1)',borderWidth:1,bodyFont:{family:"'DM Mono',monospace",size:10}}},scales:bs});
+
+  const udtByWk = hd.map(r => +totalUDT(r.plant, r.week).toFixed(2));
+  const sdtByWk = hd.map(r => +totalSDT(r.plant, r.week).toFixed(2));
+  mkChart('c-dt','bar',wkL,[
+    {label:'UDT',data:udtByWk,backgroundColor:udtByWk.map(v=>v>20?'#f85149':v>10?'#d29922':'#388bfd'),borderRadius:2},
+    {label:'SDT',data:sdtByWk,backgroundColor:'rgba(255,255,255,0.07)',borderRadius:2}
+  ],{plugins:{legend:{display:true,labels:{color:'#8b949e',font:{size:9},boxWidth:8}},tooltip:{backgroundColor:'#1f2631',borderColor:'rgba(255,255,255,.1)',borderWidth:1,bodyFont:{family:"'DM Mono',monospace",size:10}}},scales:bs});
+
+  if (activeSite === 'NATIONAL') {
+    const sn = PROD_SITES.map(s => SLABELS[s].split('·')[0].trim());
+    const so = PROD_SITES.map(s => { const sd=get(s,activeWeek); return sd?+sd.output.toFixed(1):0; });
+    const sp = PROD_SITES.map(s => { const sd=get(s,activeWeek); return sd?+sd.plan.toFixed(1):0; });
+    const soee = PROD_SITES.map(s => { const sd=get(s,activeWeek); return sd&&sd.oee>0?+sd.oee.toFixed(1):0; });
+    mkChart('c-sout','bar',sn,[
+      {label:'Plan',data:sp,backgroundColor:'rgba(255,255,255,0.07)',borderRadius:3},
+      {label:'Actual',data:so,backgroundColor:PROD_SITES.map(s=>SDOTS[s]),borderRadius:3}
+    ],{plugins:{legend:{display:true,labels:{color:'#8b949e',font:{size:9},boxWidth:8}},tooltip:{backgroundColor:'#1f2631',borderColor:'rgba(255,255,255,.1)',borderWidth:1,bodyFont:{family:"'DM Mono',monospace",size:10}}},scales:bs});
+    mkChart('c-soee','bar',sn,[
+      {label:'OEE%',data:soee,backgroundColor:soee.map(v=>v>=85?'#3fb950':v>=70?'#d29922':v>0?'#f85149':'#484f58'),borderRadius:3}
+    ],{plugins:{legend:{display:false},tooltip:{backgroundColor:'#1f2631',borderColor:'rgba(255,255,255,.1)',borderWidth:1,bodyFont:{family:"'DM Mono',monospace",size:10}}},scales:{...bs,y:{...bs.y,min:0,max:120}}});
+  }
+}
+
+// ============================================================
+// BOOT
+setTimeout(()=>{
+  const l=document.getElementById('loading');
+  if(l)l.parentNode.removeChild(l);
+  if(PROD.length>0&&document.getElementById('content').innerHTML===''){buildNav();buildWkBtns();render();}
+},35000);
+loadData(false);
+
+
+// ============================================================
+// PAGE NAVIGATION
+// ============================================================
+let activePage = 'dashboard';
+
+function setPage(page) {
+  activePage = page;
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.page-tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('page-' + page).classList.add('active');
+  document.querySelectorAll('.page-tab').forEach(t => {
+    if (t.textContent.toLowerCase().includes(page)) t.classList.add('active');
+  });
+  if (page === 'cost') renderCost();
+  if (page === 'downtime') renderDowntime();
+}
+
+// ============================================================
+// COST PAGE RENDER
+// ============================================================
+const MONTHS_ORDER = ['JANUARY','FEBRUARY','MARCH','APRIL','MAY','JUNE','JULY','AUGUST','SEPTEMBER','OCTOBER','NOVEMBER','DECEMBER'];
+const COST_SITES = ['AC','PFMIS','HOREB','BUKID','ARGAO'];
+const TOLL_SITES = ['CCPC','SOUTH'];
+// Plant name mapping from cost sheet to standard names
+const COST_PLANT_MAP = {'AC':'AC','PFMIS':'PFMIS','HOREB':'HOREB','BUKID':'BUKID','CAG':'CCPC','ARGAO':'ARGAO','SOUTH':'SOUTH','CCPC':'CCPC'};
+
+function getCostRow(plant, month) {
+  // Map plant name
+  const mapped = COST_PLANT_MAP[plant] || plant;
+  return COST_DATA.find(r => {
+    const rPlant = COST_PLANT_MAP[r.plant] || r.plant;
+    return rPlant === mapped && r.month === month;
+  }) || null;
+}
+
+function renderCost() {
+  const ct = document.getElementById('content-cost');
+  if (!ct) return;
+
+  // Get available months from cost data
+  const costMonths = [...new Set(COST_DATA.map(r=>r.month))].filter(Boolean).sort((a,b)=>MONTHS_ORDER.indexOf(a)-MONTHS_ORDER.indexOf(b));
+  const prodMonths = [...new Set(PROD.filter(r=>r.plant==='NATIONAL').map(r=>r.month))].filter(Boolean).sort((a,b)=>MONTHS_ORDER.indexOf(a)-MONTHS_ORDER.indexOf(b));
+  const months = costMonths.length > 0 ? costMonths : prodMonths;
+
+  const selMonth = window.costMonth || months[months.length-1];
+  window.costMonth = selMonth;
+
+  const fP = (n) => n > 0 ? '₱' + (n/1000).toFixed(1) + 'k' : '—';
+  const fPM = (n) => n > 0 ? '₱' + (n/1000000).toFixed(3) + 'M' : '—';
+  const fPt = (n,d=2) => n > 0 ? '₱' + n.toFixed(d) : '—';
+  const fV = (n,d=1) => n > 0 ? n.toFixed(d) : '—';
+  const fMT = (kg) => kg > 0 ? (kg/1000).toFixed(1) : '—';
+
+  const monthTabs = months.map(m=>
+    `<button onclick="window.costMonth='${m}';renderCost()" style="padding:4px 12px;font-size:10px;font-family:'DM Mono',monospace;border:1px solid var(--border2);border-radius:4px;background:${m===selMonth?'var(--green)':'none'};color:${m===selMonth?'#000':'var(--text2)'};cursor:pointer;font-weight:${m===selMonth?'600':'400'}">${m.slice(0,3)}</button>`
+  ).join('');
+
+  // Build main cost table row for a site
+  function buildRow(plantCode, isNat=false, isToll=false) {
+    const cr = getCostRow(plantCode, selMonth);
+    const dot = isNat ? '' : `<span style="display:inline-block;width:5px;height:5px;border-radius:50%;background:${SDOTS[COST_PLANT_MAP[plantCode]||plantCode]||'#8b949e'};margin-right:5px;vertical-align:middle"></span>`;
+    const lbl = isNat ? plantCode : (SLABELS[COST_PLANT_MAP[plantCode]||plantCode]||plantCode).split('·')[0].trim();
+    if (!cr) return `<tr><td>${dot}${lbl}</td>${'<td>—</td>'.repeat(14)}</tr>`;
+    const volMT = cr.volumeKg / 1000;
+    const tot = cr.totalCost;
+    const cpt = cr.costPerKg * 1000; // convert to per MT
+    const rowStyle = isNat ? 'style="border-top:2px solid var(--border2)"' : '';
+    const valStyle = isNat ? 'style="color:var(--green-b);font-weight:600"' : '';
+    return `<tr ${rowStyle}>
+      <td ${valStyle}>${dot}${lbl}</td>
+      <td ${valStyle}>${fMT(cr.volumeKg)}</td>
+      <td>${fPM(cr.rental)}</td>
+      <td>${fPM(cr.spareParts)}</td>
+      <td>${fPM(cr.manpowerDirect)}</td>
+      <td>${fPM(cr.manpowerAgency)}</td>
+      <td>${fPM(cr.diesel)}</td>
+      <td>${fPM(cr.electricity)}</td>
+      <td>${fPM(cr.thirdParty)}</td>
+      <td>${fPM(cr.others + cr.water + cr.thread)}</td>
+      <td>${cr.tollingFee>0?fPM(cr.tollingFee):'—'}</td>
+      <td>${fPM(cr.cessDepreciation + cr.spDepreciation)}</td>
+      <td ${valStyle}>${fPM(tot)}</td>
+      <td class="${cpt>2?'tr':cpt>1.5?'ta':'tg'}" ${valStyle}>₱${cpt.toFixed(2)}</td>
+    </tr>`;
+  }
+
+  // National totals
+  function buildNatTotals(sites, label) {
+    const rows = sites.map(s=>getCostRow(s,selMonth)).filter(Boolean);
+    if (rows.length===0) return `<tr><td style="color:var(--green-b);font-weight:600">${label}</td>${'<td>—</td>'.repeat(13)}</tr>`;
+    const sum = (field) => rows.reduce((a,r)=>a+(r[field]||0),0);
+    const totVol = sum('volumeKg');
+    const totCost = sum('totalCost');
+    const cpt = totVol > 0 ? totCost/totVol*1000 : 0;
+    return `<tr style="border-top:2px solid var(--border2)">
+      <td style="color:var(--green-b);font-weight:600">${label}</td>
+      <td style="color:var(--green-b);font-weight:600">${fMT(totVol)}</td>
+      <td>${fPM(sum('rental'))}</td>
+      <td>${fPM(sum('spareParts'))}</td>
+      <td>${fPM(sum('manpowerDirect'))}</td>
+      <td>${fPM(sum('manpowerAgency'))}</td>
+      <td>${fPM(sum('diesel'))}</td>
+      <td>${fPM(sum('electricity'))}</td>
+      <td>${fPM(sum('thirdParty'))}</td>
+      <td>${fPM(rows.reduce((a,r)=>a+r.others+r.water+r.thread,0))}</td>
+      <td>${fPM(sum('tollingFee'))}</td>
+      <td>${fPM(rows.reduce((a,r)=>a+r.cessDepreciation+r.spDepreciation,0))}</td>
+      <td style="color:var(--green-b);font-weight:600">${fPM(totCost)}</td>
+      <td class="${cpt>2?'tr':cpt>1.5?'ta':'tg'}" style="font-weight:600">₱${cpt.toFixed(2)}</td>
+    </tr>`;
+  }
+
+  // Cost per ton breakdown
+  function buildCptRow(plantCode) {
+    const cr = getCostRow(plantCode, selMonth);
+    const dot = `<span style="display:inline-block;width:5px;height:5px;border-radius:50%;background:${SDOTS[COST_PLANT_MAP[plantCode]||plantCode]||'#8b949e'};margin-right:5px;vertical-align:middle"></span>`;
+    const lbl = (SLABELS[COST_PLANT_MAP[plantCode]||plantCode]||plantCode).split('·')[0].trim();
+    if (!cr || cr.volumeKg===0) return `<tr><td>${dot}${lbl}</td>${'<td>—</td>'.repeat(10)}</tr>`;
+    const v = cr.volumeKg;
+    const perT = (val) => val>0 ? '₱'+(val/v*1000).toFixed(2) : '—';
+    const tot = cr.totalCost;
+    const fc = cr.fixedCost;
+    const vc = cr.variableCost;
+    return `<tr>
+      <td>${dot}${lbl}</td>
+      <td>${fMT(v)}</td>
+      <td>${fPM(fc)}</td><td>${perT(fc)}</td>
+      <td>${fPM(vc)}</td><td>${perT(vc)}</td>
+      <td>${perT(cr.diesel)}</td>
+      <td>${perT(cr.electricity)}</td>
+      <td>${perT(cr.manpowerDirect)}</td>
+      <td>${perT(cr.rental)}</td>
+      <td>${perT(cr.spareParts)}</td>
+      <td>${perT(cr.manpowerAgency)}</td>
+      <td style="color:var(--green-b);font-weight:600">₱${(tot/v*1000).toFixed(2)}</td>
+    </tr>`;
+  }
+
+  // KPI cards for selected month
+  const allCostRows = [...COST_SITES,...TOLL_SITES].map(s=>getCostRow(s,selMonth)).filter(Boolean);
+  const totCostAll = allCostRows.reduce((a,r)=>a+r.totalCost,0);
+  const totVolAll = allCostRows.reduce((a,r)=>a+r.volumeKg,0);
+  const totDiesel = allCostRows.reduce((a,r)=>a+r.diesel,0);
+  const totElec = allCostRows.reduce((a,r)=>a+r.electricity,0);
+
+  ct.innerHTML = `
+<div class="sec">
+  <div class="sec-hdr"><div class="sec-title">Production Cost — ${selMonth}</div><div class="sec-line"></div></div>
+  <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px">${monthTabs}</div>
+
+  <!-- KPI CARDS -->
+  <div class="g4" style="margin-bottom:12px">
+    <div class="kc" style="--kc-color:var(--green)">
+      <div class="kc-lbl">Total Cost</div>
+      <div class="kc-val" style="font-size:20px;color:var(--green-b)">${fPM(totCostAll)}</div>
+      <div class="kc-sub">${selMonth} · All plants</div>
+    </div>
+    <div class="kc" style="--kc-color:var(--blue)">
+      <div class="kc-lbl">Total Volume</div>
+      <div class="kc-val" style="font-size:20px">${fMT(totVolAll)}<span style="font-size:12px;color:var(--text2)"> mt</span></div>
+      <div class="kc-sub">Production output</div>
+    </div>
+    <div class="kc" style="--kc-color:var(--amber)">
+      <div class="kc-lbl">Diesel Cost</div>
+      <div class="kc-val" style="font-size:20px;color:var(--amber)">${fPM(totDiesel)}</div>
+      <div class="kc-sub">${totVolAll>0?'₱'+(totDiesel/totVolAll*1000).toFixed(2)+'/mt':''}</div>
+    </div>
+    <div class="kc" style="--kc-color:var(--purple)">
+      <div class="kc-lbl">Electricity Cost</div>
+      <div class="kc-val" style="font-size:20px;color:var(--purple)">${fPM(totElec)}</div>
+      <div class="kc-sub">${totVolAll>0?'₱'+(totElec/totVolAll*1000).toFixed(2)+'/mt':''}</div>
+    </div>
+  </div>
+
+  <!-- OPERATING PLANTS TABLE -->
+  <div class="cc" style="margin-bottom:10px">
+    <div class="cc-title">Operating Plants — ${selMonth} (amounts in ₱ millions)</div>
+    <div class="cost-table-wrap">
+    <table class="cost-table">
+      <thead><tr>
+        <th>Site</th><th>Volume (mt)</th><th>Rental/Amor</th><th>Spare Parts</th>
+        <th>Manpower Dir</th><th>Manpower Agn</th>
+        <th>Diesel</th><th>Electricity</th>
+        <th>3rd Party</th><th>Others</th>
+        <th>Tolling Fee</th><th>Depreciation</th>
+        <th>Total Cost</th><th>Cost/mt</th>
+      </tr></thead>
+      <tbody>
+        ${COST_SITES.map(s=>buildRow(s)).join('')}
+        ${buildNatTotals(COST_SITES,'OPERATING TOTAL')}
+      </tbody>
+    </table></div>
+  </div>
+
+  <!-- TOLLING PLANTS TABLE -->
+  <div class="cc" style="margin-bottom:10px">
+    <div class="cc-title">Tolling Plants (CCPC · CAG & South) — ${selMonth}</div>
+    <div class="cost-table-wrap">
+    <table class="cost-table">
+      <thead><tr>
+        <th>Site</th><th>Volume (mt)</th><th>Rental/Amor</th><th>Spare Parts</th>
+        <th>Manpower Dir</th><th>Manpower Agn</th>
+        <th>Diesel</th><th>Electricity</th>
+        <th>3rd Party</th><th>Others</th>
+        <th>Tolling Fee</th><th>Depreciation</th>
+        <th>Total Cost</th><th>Cost/mt</th>
+      </tr></thead>
+      <tbody>
+        ${TOLL_SITES.map(s=>buildRow(s,false,true)).join('')}
+        ${buildNatTotals(TOLL_SITES,'TOLLING TOTAL')}
+      </tbody>
+    </table></div>
+  </div>
+
+  <!-- GRAND NATIONAL TOTAL -->
+  <div class="cc" style="margin-bottom:10px">
+    <div class="cc-title">National Total — All Plants — ${selMonth}</div>
+    <div class="cost-table-wrap">
+    <table class="cost-table">
+      <thead><tr>
+        <th>Site</th><th>Volume (mt)</th><th>Rental/Amor</th><th>Spare Parts</th>
+        <th>Manpower Dir</th><th>Manpower Agn</th>
+        <th>Diesel</th><th>Electricity</th>
+        <th>3rd Party</th><th>Others</th>
+        <th>Tolling Fee</th><th>Depreciation</th>
+        <th>Total Cost</th><th>Cost/mt</th>
+      </tr></thead>
+      <tbody>${buildNatTotals([...COST_SITES,...TOLL_SITES],'NATIONAL TOTAL')}</tbody>
+    </table></div>
+  </div>
+
+  <!-- COST PER TON BREAKDOWN -->
+  <div class="cc">
+    <div class="cc-title">Cost per Ton Breakdown — ${selMonth}</div>
+    <div class="cost-table-wrap">
+    <table class="cost-table">
+      <thead><tr>
+        <th>Site</th><th>Volume (mt)</th>
+        <th>Fixed Cost</th><th>Fixed/mt</th>
+        <th>Variable Cost</th><th>Variable/mt</th>
+        <th>Diesel/mt</th><th>Elec/mt</th>
+        <th>Manpower Dir/mt</th>
+        <th>Rental/mt</th>
+        <th>Spare Parts/mt</th>
+        <th>Agency/mt</th>
+        <th>Total Cost/mt</th>
+      </tr></thead>
+      <tbody>
+        ${[...COST_SITES,...TOLL_SITES].map(s=>buildCptRow(s)).join('')}
+      </tbody>
+    </table></div>
+  </div>
+</div>`;
+}
+
+// ============================================================
+// DOWNTIME PAGE RENDER// ============================================================
+// DOWNTIME PAGE RENDER
+// ============================================================
+const DT_CATS = {
+  'Mechanical':'cat-mech','Electrical':'cat-elec','PLC':'cat-elec',
+  'Process':'cat-proc','Warehouse':'cat-proc','Raw Materials':'cat-rm',
+  'Change Over':'cat-co','Change Die':'cat-co','Change Screen':'cat-co',
+  'Power Interruption':'cat-pwr','Plant Shutdown':'cat-other',
+  'Planned Production Stop':'cat-other','No Production Schedule':'cat-other'
+};
+
+function getCatClass(cat) { return DT_CATS[cat] || 'cat-other'; }
+
+function renderDowntime() {
+  const ct = document.getElementById('content-downtime');
+  const months = [...new Set(Object.keys(DT_AGG).map(k => {
+    const plant = k.split('|')[0];
+    const week = parseInt(k.split('|')[1]);
+    const d = PROD.find(r => r.plant === plant && r.week === week);
+    return d ? d.month : null;
+  }).filter(Boolean))].sort((a,b)=>MONTHS_ORDER.indexOf(a)-MONTHS_ORDER.indexOf(b));
+
+  const selMonth = window.dtMonth || months[months.length-1];
+  window.dtMonth = selMonth;
+  const selSite = window.dtSite || 'ALL';
+  window.dtSite = selSite;
+
+  // Get weeks for this month
+  const monthWeeks = PROD.filter(r=>r.plant==='NATIONAL'&&r.month===selMonth).map(r=>r.week);
+
+  // Build aggregated data per site per month
+  const allSites = ['AC','PFMIS','HOREB','BUKID','ARGAO','CCPC','SOUTH'];
+  const siteDT = {};
+  allSites.forEach(s => {
+    siteDT[s] = {udt:0, sdt:0, cats:{}, reasons:[]};
+    monthWeeks.forEach(w => {
+      const da = DT_AGG[s+'|'+w] || {udt:{},sdt:{},top:[]};
+      Object.entries(da.udt).forEach(([cat,val]) => {
+        siteDT[s].udt += val;
+        siteDT[s].cats[cat] = (siteDT[s].cats[cat]||0) + val;
+      });
+      Object.values(da.sdt).forEach(val => siteDT[s].sdt += val);
+      (da.top||[]).forEach(t => siteDT[s].reasons.push({...t, week:w}));
+    });
+    siteDT[s].reasons.sort((a,b)=>b.udt-a.udt);
+  });
+
+  // National totals
+  const natUDT = allSites.reduce((a,s)=>a+siteDT[s].udt,0);
+  const natSDT = allSites.reduce((a,s)=>a+siteDT[s].sdt,0);
+  const natCats = {};
+  allSites.forEach(s=>Object.entries(siteDT[s].cats).forEach(([c,v])=>natCats[c]=(natCats[c]||0)+v));
+
+  const monthTabs = months.map(m=>
+    `<button onclick="window.dtMonth='${m}';renderDowntime()" style="padding:4px 12px;font-size:10px;font-family:'DM Mono',monospace;border:1px solid var(--border2);border-radius:4px;background:${m===selMonth?'var(--green)':'none'};color:${m===selMonth?'#000':'var(--text2)'};cursor:pointer;font-weight:${m===selMonth?'600':'400'}">${m.slice(0,3)}</button>`
+  ).join('');
+
+  const siteFilter = ['ALL',...allSites].map(s=>
+    `<button onclick="window.dtSite='${s}';renderDowntime()" style="padding:4px 10px;font-size:10px;font-family:'DM Mono',monospace;border:1px solid ${s===selSite?SDOTS[s]||'var(--green)':'var(--border2)'};border-radius:4px;background:${s===selSite?'rgba(255,255,255,0.08)':'none'};color:${s===selSite?SDOTS[s]||'var(--green-b)':'var(--text2)'};cursor:pointer">${s==='ALL'?'All Sites':s}</button>`
+  ).join('');
+
+  // Summary table rows
+  const summaryRows = allSites.map(s => {
+    const dt = siteDT[s];
+    const topCat = Object.entries(dt.cats).sort((a,b)=>b[1]-a[1])[0];
+    const dot = `<span style="display:inline-block;width:5px;height:5px;border-radius:50%;background:${SDOTS[s]};margin-right:5px;vertical-align:middle"></span>`;
+    return `<tr>
+      <td>${dot}${SLABELS[s].split('·')[0].trim()}</td>
+      <td class="${dt.udt>40?'tr':dt.udt>20?'ta':''}">${dt.udt>0?dt.udt.toFixed(2):'—'}</td>
+      <td>${dt.sdt>0?dt.sdt.toFixed(2):'—'}</td>
+      <td>${dt.udt+dt.sdt>0?(dt.udt+dt.sdt).toFixed(2):'—'}</td>
+      <td>${dt.cats['Mechanical']>0?dt.cats['Mechanical'].toFixed(2):'—'}</td>
+      <td>${(dt.cats['Electrical']||0)+(dt.cats['PLC']||0)>0?((dt.cats['Electrical']||0)+(dt.cats['PLC']||0)).toFixed(2):'—'}</td>
+      <td>${dt.cats['Process']>0?dt.cats['Process'].toFixed(2):'—'}</td>
+      <td>${(dt.cats['Change Over']||0)+(dt.cats['Change Die']||0)+(dt.cats['Change Screen']||0)>0?((dt.cats['Change Over']||0)+(dt.cats['Change Die']||0)+(dt.cats['Change Screen']||0)).toFixed(2):'—'}</td>
+      <td>${dt.cats['Raw Materials']>0?dt.cats['Raw Materials'].toFixed(2):'—'}</td>
+      <td>${dt.cats['Power Interruption']>0?dt.cats['Power Interruption'].toFixed(2):'—'}</td>
+      <td>${topCat?`<span class="cat-pill ${getCatClass(topCat[0])}">${topCat[0]} (${topCat[1].toFixed(1)}h)</span>`:'—'}</td>
+    </tr>`;
+  }).join('');
+
+  // Top reasons for selected site/all
+  const showSites = selSite==='ALL'?allSites:[selSite];
+  let allReasons = [];
+  showSites.forEach(s => siteDT[s].reasons.forEach(r => allReasons.push({...r,plant:s})));
+  allReasons.sort((a,b)=>b.udt-a.udt);
+
+  const detailRows = allReasons.slice(0,50).map((r,i)=>`<tr>
+    <td style="text-align:center">${i+1}</td>
+    <td><span style="display:inline-block;width:5px;height:5px;border-radius:50%;background:${SDOTS[r.plant]};margin-right:4px;vertical-align:middle"></span>${r.plant}</td>
+    <td>Wk ${r.week}</td>
+    <td><span class="cat-pill ${getCatClass(r.cat)}">${r.cat}</span></td>
+    <td style="text-align:left;color:var(--text2)">${r.sub}</td>
+    <td style="text-align:left;max-width:220px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--text3)">${r.rsn}</td>
+    <td class="tr">${r.udt.toFixed(2)}</td>
+  </tr>`).join('');
+
+  ct.innerHTML = `
+<div class="sec">
+  <div class="sec-hdr"><div class="sec-title">Downtime Analysis</div><div class="sec-line"></div></div>
+
+  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;align-items:center">
+    <span style="font-size:9px;color:var(--text3);font-family:'DM Mono',monospace;letter-spacing:1px;text-transform:uppercase">Month</span>
+    ${monthTabs}
+    <div style="width:1px;height:20px;background:var(--border);margin:0 4px"></div>
+    <span style="font-size:9px;color:var(--text3);font-family:'DM Mono',monospace;letter-spacing:1px;text-transform:uppercase">Site</span>
+    ${siteFilter}
+  </div>
+
+  <!-- KPI STRIP -->
+  <div class="g4" style="margin-bottom:12px">
+    <div class="kc" style="--kc-color:var(--red)">
+      <div class="kc-lbl">Total UDT</div>
+      <div class="kc-val" style="color:var(--red)">${natUDT.toFixed(1)}<span style="font-size:12px;color:var(--text2)"> hr</span></div>
+      <div class="kc-sub">${selMonth} · All sites</div>
+    </div>
+    <div class="kc" style="--kc-color:var(--text3)">
+      <div class="kc-lbl">Total SDT</div>
+      <div class="kc-val">${natSDT.toFixed(1)}<span style="font-size:12px;color:var(--text2)"> hr</span></div>
+      <div class="kc-sub">${selMonth} · All sites</div>
+    </div>
+    <div class="kc" style="--kc-color:var(--amber)">
+      <div class="kc-lbl">Top UDT Category</div>
+      <div class="kc-val" style="font-size:16px">${Object.entries(natCats).sort((a,b)=>b[1]-a[1])[0]?Object.entries(natCats).sort((a,b)=>b[1]-a[1])[0][0]:'—'}</div>
+      <div class="kc-sub">${Object.entries(natCats).sort((a,b)=>b[1]-a[1])[0]?Object.entries(natCats).sort((a,b)=>b[1]-a[1])[0][1].toFixed(1)+' hr':''}</div>
+    </div>
+    <div class="kc" style="--kc-color:var(--blue)">
+      <div class="kc-lbl">Total DT</div>
+      <div class="kc-val" style="color:var(--blue)">${(natUDT+natSDT).toFixed(1)}<span style="font-size:12px;color:var(--text2)"> hr</span></div>
+      <div class="kc-sub">UDT + SDT combined</div>
+    </div>
+  </div>
+
+  <!-- SUMMARY TABLE -->
+  <div class="cc" style="margin-bottom:10px">
+    <div class="cc-title">Monthly Downtime Summary — ${selMonth}</div>
+    <div class="cost-table-wrap">
+    <table class="cost-table">
+      <thead><tr>
+        <th>Site</th><th>UDT (hr)</th><th>SDT (hr)</th><th>Total (hr)</th>
+        <th>Mechanical</th><th>Elec/PLC</th><th>Process</th>
+        <th>Change Over</th><th>Raw Mat</th><th>Power</th><th>Top Issue</th>
+      </tr></thead>
+      <tbody>
+        ${summaryRows}
+        <tr class="nat-row">
+          <td>NATIONAL TOTAL</td>
+          <td class="tr">${natUDT.toFixed(2)}</td>
+          <td>${natSDT.toFixed(2)}</td>
+          <td>${(natUDT+natSDT).toFixed(2)}</td>
+          ${['Mechanical','Electrical','Process','Change Over','Raw Materials','Power Interruption'].map(cat=>`<td>${natCats[cat]>0?natCats[cat].toFixed(2):'—'}</td>`).join('')}
+          <td>—</td>
+        </tr>
+      </tbody>
+    </table></div>
+  </div>
+
+  <!-- DETAIL TABLE -->
+  <div class="cc">
+    <div class="cc-title">Downtime Detail — ${selMonth} · ${selSite==='ALL'?'All Sites':SLABELS[selSite]||selSite} (Top 50 by UDT hours)</div>
+    <div class="cost-table-wrap">
+    <table class="cost-table">
+      <thead><tr>
+        <th style="text-align:center">#</th>
+        <th style="text-align:left">Plant</th>
+        <th style="text-align:left">Week</th>
+        <th style="text-align:left">Category</th>
+        <th style="text-align:left">Sub-Category</th>
+        <th style="text-align:left">Reason</th>
+        <th>UDT (hr)</th>
+      </tr></thead>
+      <tbody>${detailRows||'<tr><td colspan="7" style="text-align:center;color:var(--text3);padding:20px">No UDT recorded for this selection</td></tr>'}</tbody>
+    </table></div>
+  </div>
+</div>`;
+}
+
+</script>
+
+
+
+<script>
+// ============================================================
+// PARSE COST CSV (direct fetch - gid=66553768)
+// ============================================================
+function parseCostCSV(text) {
+  const rows = parseCSV(text);
+  let hi=-1;
+  for (let i=0;i<Math.min(rows.length,5);i++) {
+    if ((rows[i][0]||'').trim().toUpperCase()==='PLANT'){hi=i;break;}
+  }
+  if (hi<0) return [];
+  const MLIST=['JANUARY','FEBRUARY','MARCH','APRIL','MAY','JUNE','JULY','AUGUST','SEPTEMBER','OCTOBER','NOVEMBER','DECEMBER'];
+  const data=[];
+  for (let i=hi+1;i<rows.length;i++) {
+    const r=rows[i];
+    if (!r[0]||!r[1]||!r[2]) continue;
+    const plant=(r[0]||'').trim().toUpperCase();
+    const month=(r[1]||'').trim().toUpperCase();
+    const year=parseInt(r[2])||0;
+    if (!plant||!month||!year||plant.includes('ACCTG')||plant.includes('NATIONAL')) continue;
+    if (!MLIST.includes(month)) continue;
+    const gn=(idx)=>{const v=parseFloat((r[idx]||'').toString().replace(/,/g,''));return isNaN(v)?0:v;};
+    data.push({plant,month,year,
+      volumeKg:gn(3),rental:gn(4),spareParts:gn(5),
+      manpowerDirect:gn(6),diesel:gn(7),electricity:gn(8),
+      manpowerAgency:gn(9),others:gn(10),thirdParty:gn(11),
+      cessDepreciation:gn(12),spDepreciation:gn(13),
+      insurance:gn(14),water:gn(15),thread:gn(16),
+      tollingFee:gn(17),totalCost:gn(18),costPerKg:gn(19),
+      fixedCost:gn(20),variableCost:gn(21),
+    });
+  }
+  return data;
+}
+
+// ============================================================
+// RENDER COST PAGE
+// ============================================================
+function renderCost() {
+  const ct=document.getElementById('content-cost');
+  if (!ct) return;
+  if (!COST_DATA||COST_DATA.length===0) {
+    ct.innerHTML='<div style="padding:40px;text-align:center;color:var(--text3)">Loading cost data... please wait a moment and click Cost again.</div>';
+    setTimeout(()=>{ if(COST_DATA&&COST_DATA.length>0) renderCost(); },2000);
+    return;
+  }
+  const MLIST=['JANUARY','FEBRUARY','MARCH','APRIL','MAY','JUNE','JULY','AUGUST','SEPTEMBER','OCTOBER','NOVEMBER','DECEMBER'];
+  const years=[...new Set(COST_DATA.map(r=>r.year))].filter(Boolean).sort();
+  const selYear=window.costYear||(years.length?years[years.length-1]:2026);
+  window.costYear=parseInt(selYear);
+  const costMonths=[...new Set(COST_DATA.filter(r=>r.year===window.costYear).map(r=>r.month))].filter(m=>MLIST.includes(m)).sort((a,b)=>MLIST.indexOf(a)-MLIST.indexOf(b));
+  const months=costMonths.length?costMonths:MLIST.slice(0,4);
+  const selMonth=window.costMonth&&months.includes(window.costMonth)?window.costMonth:months[months.length-1];
+  window.costMonth=selMonth;
+
+  const fPM=n=>n>0?'₱'+(n/1000000).toFixed(3)+'M':'—';
+  const fMT=kg=>kg>0?(kg/1000).toFixed(1):'—';
+
+  function getCR(plant) {
+    return COST_DATA.find(r=>r.plant.toUpperCase()===plant.toUpperCase()&&r.month===selMonth&&r.year===window.costYear)||null;
+  }
+
+  function buildRow(plant,color) {
+    const cr=getCR(plant);
+    const dot=`<span style="display:inline-block;width:5px;height:5px;border-radius:50%;background:${color||'#8b949e'};margin-right:5px;vertical-align:middle"></span>`;
+    if (!cr||cr.volumeKg===0) return `<tr><td>${dot}${plant}</td>${'<td>—</td>'.repeat(13)}</tr>`;
+    const vol=cr.volumeKg/1000;
+    const cpt=vol>0?cr.totalCost/vol:0;
+    return `<tr>
+      <td>${dot}${plant}</td><td>${fMT(cr.volumeKg)}</td>
+      <td>${fPM(cr.rental)}</td><td>${fPM(cr.spareParts)}</td>
+      <td>${fPM(cr.manpowerDirect)}</td><td>${fPM(cr.manpowerAgency)}</td>
+      <td>${fPM(cr.diesel)}</td><td>${fPM(cr.electricity)}</td>
+      <td>${fPM(cr.thirdParty)}</td>
+      <td>${fPM(cr.others+cr.water+cr.thread)}</td>
+      <td>${cr.tollingFee>0?fPM(cr.tollingFee):'—'}</td>
+      <td>${fPM(cr.cessDepreciation+cr.spDepreciation)}</td>
+      <td>${fPM(cr.totalCost)}</td>
+      <td class="${cpt>2000?'tr':cpt>1500?'ta':'tg'}">₱${cpt.toFixed(2)}</td>
+    </tr>`;
+  }
+
+  function buildTotal(plants,label) {
+    const rows=plants.map(getCR).filter(Boolean);
+    if (!rows.length) return `<tr class="nat-row"><td>${label}</td>${'<td>—</td>'.repeat(13)}</tr>`;
+    const s=f=>rows.reduce((a,r)=>a+(r[f]||0),0);
+    const vol=s('volumeKg'),cost=s('totalCost'),cpt=vol>0?cost/vol*1000:0;
+    return `<tr class="nat-row">
+      <td>${label}</td><td>${fMT(vol)}</td>
+      <td>${fPM(s('rental'))}</td><td>${fPM(s('spareParts'))}</td>
+      <td>${fPM(s('manpowerDirect'))}</td><td>${fPM(s('manpowerAgency'))}</td>
+      <td>${fPM(s('diesel'))}</td><td>${fPM(s('electricity'))}</td>
+      <td>${fPM(s('thirdParty'))}</td>
+      <td>${fPM(rows.reduce((a,r)=>a+r.others+r.water+r.thread,0))}</td>
+      <td>${fPM(s('tollingFee'))}</td>
+      <td>${fPM(rows.reduce((a,r)=>a+r.cessDepreciation+r.spDepreciation,0))}</td>
+      <td>${fPM(cost)}</td>
+      <td class="${cpt>2000?'tr':cpt>1500?'ta':'tg'}">₱${cpt.toFixed(2)}</td>
+    </tr>`;
+  }
+
+  const OPS=['AC','PFMIS','HOREB','BUKID','ARGAO'];
+  const TOLL=['CCPC','SOUTH'];
+  const MG=['HOREB MG','AC MG'];
+  const COLORS={AC:'#00ff88',PFMIS:'#ffca28',HOREB:'#00e5cc',BUKID:'#ff5252',ARGAO:'#e040fb',CCPC:'#40c4ff',SOUTH:'#ff6d00'};
+
+  const allR=[...OPS,...TOLL,...MG].map(getCR).filter(Boolean);
+  const natCost=allR.reduce((a,r)=>a+r.totalCost,0);
+  const natVol=allR.reduce((a,r)=>a+r.volumeKg,0);
+  const natCPT=natVol>0?natCost/natVol*1000:0;
+  const natFixed=allR.reduce((a,r)=>a+r.fixedCost,0);
+  const natVar=allR.reduce((a,r)=>a+r.variableCost,0);
+
+  const yearBtns=years.map(y=>`<button onclick="window.costYear=${y};window.costMonth=null;renderCost()" style="padding:4px 12px;font-size:10px;font-family:'DM Mono',monospace;border:1px solid ${y===window.costYear?'var(--green)':'var(--border2)'};border-radius:4px;background:${y===window.costYear?'var(--green)':'none'};color:${y===window.costYear?'#000':'var(--text2)'};cursor:pointer">${y}</button>`).join('');
+  const monthBtns=months.map(m=>`<button onclick="window.costMonth='${m}';renderCost()" style="padding:4px 10px;font-size:10px;font-family:'DM Mono',monospace;border:1px solid var(--border2);border-radius:4px;background:${m===selMonth?'var(--blue)':'none'};color:${m===selMonth?'#000':'var(--text2)'};cursor:pointer">${m.slice(0,3)}</button>`).join('');
+  const TH=`<thead><tr><th>Site</th><th>Vol (mt)</th><th>Rental</th><th>Spare Parts</th><th>Manpower Dir</th><th>Manpower Agn</th><th>Diesel</th><th>Electricity</th><th>3rd Party</th><th>Others</th><th>Tolling Fee</th><th>Depreciation</th><th>Total Cost</th><th>Cost/mt</th></tr></thead>`;
+
+  ct.innerHTML=`
+<div class="sec">
+  <div class="sec-hdr"><div class="sec-title">Production Cost — ${selMonth} ${window.costYear}</div><div class="sec-line"></div></div>
+  <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;align-items:center">
+    <span style="font-size:9px;color:var(--text3);font-family:'DM Mono',monospace;letter-spacing:1px">YEAR</span>${yearBtns}
+    <div style="width:1px;height:18px;background:var(--border);margin:0 4px"></div>
+    <span style="font-size:9px;color:var(--text3);font-family:'DM Mono',monospace;letter-spacing:1px">MONTH</span>${monthBtns}
+  </div>
+  <div class="g4" style="margin-bottom:12px">
+    <div class="kc" style="--kc-color:var(--green)">
+      <div class="kc-lbl">National Total Cost</div>
+      <div class="kc-val" style="color:var(--green-b);font-size:20px">₱${(natCost/1000000).toFixed(3)}M</div>
+      <div class="kc-sub">${selMonth} ${window.costYear}</div>
+    </div>
+    <div class="kc" style="--kc-color:var(--blue)">
+      <div class="kc-lbl">National Cost/mt</div>
+      <div class="kc-val" style="font-size:20px">₱${natCPT.toFixed(2)}</div>
+      <div class="kc-sub">per metric ton</div>
+    </div>
+    <div class="kc" style="--kc-color:var(--amber)">
+      <div class="kc-lbl">Fixed Cost</div>
+      <div class="kc-val" style="color:var(--amber);font-size:20px">₱${(natFixed/1000000).toFixed(3)}M</div>
+      <div class="kc-sub">₱${natVol>0?(natFixed/natVol*1000).toFixed(2):'—'}/mt</div>
+    </div>
+    <div class="kc" style="--kc-color:var(--purple)">
+      <div class="kc-lbl">Variable Cost</div>
+      <div class="kc-val" style="color:var(--purple);font-size:20px">₱${(natVar/1000000).toFixed(3)}M</div>
+      <div class="kc-sub">₱${natVol>0?(natVar/natVol*1000).toFixed(2):'—'}/mt</div>
+    </div>
+  </div>
+  <div class="cc" style="margin-bottom:10px">
+    <div class="cc-title">Operating Plants — ${selMonth} ${window.costYear}</div>
+    <div class="cost-table-wrap"><table class="cost-table">${TH}<tbody>
+      ${OPS.map(s=>buildRow(s,COLORS[s])).join('')}${buildTotal(OPS,'OPERATING TOTAL')}
+    </tbody></table></div>
+  </div>
+  <div class="cc" style="margin-bottom:10px">
+    <div class="cc-title">Tolling Plants — ${selMonth} ${window.costYear}</div>
+    <div class="cost-table-wrap"><table class="cost-table">${TH}<tbody>
+      ${TOLL.map(s=>buildRow(s,COLORS[s])).join('')}${buildTotal(TOLL,'TOLLING TOTAL')}
+    </tbody></table></div>
+  </div>
+  <div class="cc" style="margin-bottom:10px">
+    <div class="cc-title">Mix Grain (HOREB MG & AC MG) — ${selMonth} ${window.costYear}</div>
+    <div class="cost-table-wrap"><table class="cost-table">${TH}<tbody>
+      ${MG.map(s=>buildRow(s,'#00e5cc')).join('')}${buildTotal(MG,'MG TOTAL')}
+    </tbody></table></div>
+  </div>
+  <div class="cc">
+    <div class="cc-title">National Total — All Plants</div>
+    <div class="cost-table-wrap"><table class="cost-table">${TH}<tbody>
+      ${buildTotal([...OPS,...TOLL,...MG],'NATIONAL TOTAL')}
+    </tbody></table></div>
+  </div>
+</div>`;
+}
+
+// ============================================================
+// RENDER DOWNTIME PAGE (separate from main downtime section)
+// ============================================================
+function renderDTPage() {
+  const ct = document.getElementById('content-downtime');
+  if (!ct || !Object.keys(DT_AGG).length) {
+    ct.innerHTML = '<div style="padding:40px;text-align:center;color:var(--text3)">No downtime data available.</div>';
+    return;
+  }
+  // Reuse existing renderDowntime logic
+  renderDowntime();
+  // Move content to the downtime page div
+  const dtContent = document.getElementById('content-downtime');
+  // renderDowntime writes to content-downtime directly via the existing function
+}
+</script>
+</body>
+</html>
