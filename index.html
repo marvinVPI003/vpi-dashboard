@@ -275,8 +275,10 @@ function parseCSV(text){
     if(c==='"'){if(inQ&&chars[i+1]==='"'){cur+='"';i++;}else inQ=!inQ;}
     else if(c===','&&!inQ){row.push(cur.trim());cur='';}
     else if((c==='
-'||c==='')&&!inQ){
-      if(c===''&&chars[i+1]==='
+'||c==='
+')&&!inQ){
+      if(c==='
+'&&chars[i+1]==='
 ')i++;
       row.push(cur.trim());rows.push(row);row=[];cur='';
     }else cur+=c;
