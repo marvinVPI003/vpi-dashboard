@@ -1,0 +1,1305 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>VPI Operations Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+:root{
+  --bg:#0a1628;--bg2:#0f2040;--bg3:#152a52;--bg4:#1a3360;
+  --card:#0f2040;--card2:#152a52;
+  --border:#1e3a6e;--border2:#2a4f8a;
+  --text:#e8f4ff;--text2:#90b8e0;--text3:#4a7aaa;
+  --green:#00d26a;--green-b:#00ff85;--green-d:rgba(0,210,106,0.12);
+  --amber:#ffb700;--amber-d:rgba(255,183,0,0.12);
+  --red:#ff4757;--red-d:rgba(255,71,87,0.12);
+  --blue:#2196f3;--blue-b:#64b5f6;--blue-d:rgba(33,150,243,0.12);
+  --teal:#00bcd4;--purple:#9c27b0;--orange:#ff6d00;
+  --r:6px;--rl:10px;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;font-size:13px;line-height:1.5;min-height:100vh}
+
+/* TOP NAV */
+.topnav{position:fixed;top:0;left:0;right:0;height:56px;background:var(--bg2);border-bottom:2px solid var(--border2);display:flex;align-items:center;padding:0 16px;gap:8px;z-index:100;box-shadow:0 2px 12px rgba(0,0,0,0.4)}
+.nav-brand{font-size:18px;font-weight:700;color:#fff;letter-spacing:1px;margin-right:8px;white-space:nowrap}
+.nav-brand span{display:block;font-size:9px;color:var(--text3);letter-spacing:2px;font-weight:400}
+.nav-divider{width:1px;height:28px;background:var(--border2);margin:0 4px;flex-shrink:0}
+.nav-user{font-size:11px;color:var(--text2);white-space:nowrap;margin-right:4px}
+.nav-user b{display:block;color:var(--text);font-size:12px}
+
+/* PAGE TABS */
+.page-tabs{display:flex;gap:2px;margin-right:auto}
+.ptab{padding:6px 14px;font-size:11px;font-weight:600;letter-spacing:.3px;border:1px solid var(--border2);border-radius:var(--r);background:none;color:var(--text2);cursor:pointer;transition:all .15s;white-space:nowrap}
+.ptab:hover{background:var(--bg3);color:var(--text)}
+.ptab.active{background:var(--blue);color:#fff;border-color:var(--blue)}
+
+/* FILTERS */
+.nav-filters{display:flex;align-items:center;gap:6px}
+.flbl{font-size:9px;color:var(--text3);font-family:'JetBrains Mono',monospace;letter-spacing:1px;text-transform:uppercase;white-space:nowrap}
+.fsel{padding:5px 24px 5px 8px;background:var(--bg3);color:var(--text);border:1px solid var(--border2);border-radius:var(--r);font-family:'Inter',sans-serif;font-size:11px;cursor:pointer;outline:none;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 12 12'%3E%3Cpath fill='%2390b8e0' d='M6 8L1 3h10z'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 7px center}
+
+/* STATUS */
+.nav-status{font-size:10px;font-family:'JetBrains Mono',monospace;color:var(--text3);white-space:nowrap;margin-left:4px}
+.dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--green-b);margin-right:4px;vertical-align:middle}
+.dot.err{background:var(--red)}
+.refresh-btn{padding:5px 10px;font-size:10px;font-family:'JetBrains Mono',monospace;border:1px solid var(--border2);border-radius:var(--r);background:none;color:var(--text2);cursor:pointer}
+.refresh-btn:hover{border-color:var(--blue-b);color:var(--blue-b)}
+
+/* MAIN */
+.main{margin-top:56px;min-height:calc(100vh - 56px)}
+.page{display:none}.page.active{display:block}
+.content{padding:16px 20px 40px}
+
+/* LOADING */
+.loading-screen{position:fixed;inset:0;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:999;gap:16px}
+.loading-logo{font-size:32px;font-weight:700;color:#fff;letter-spacing:2px}
+.loading-sub{font-size:11px;color:var(--text3);font-family:'JetBrains Mono',monospace;letter-spacing:2px}
+.loading-bar-wrap{width:240px;height:3px;background:var(--bg3);border-radius:2px;overflow:hidden}
+.loading-bar{height:100%;background:var(--blue);border-radius:2px;animation:loadbar 1.5s ease-in-out infinite}
+@keyframes loadbar{0%{width:0%;margin-left:0}50%{width:60%}100%{width:0%;margin-left:100%}}
+.loading-msg{font-size:11px;color:var(--text3);font-family:'JetBrains Mono',monospace}
+
+/* CARDS */
+.kpi-row{display:grid;gap:10px;margin-bottom:12px}
+.g4{grid-template-columns:repeat(4,minmax(0,1fr))}
+.g5{grid-template-columns:repeat(5,minmax(0,1fr))}
+.kc{background:var(--card);border:1px solid var(--border);border-top:2px solid var(--kc-color,var(--border2));border-radius:var(--rl);padding:12px 14px}
+.kc-lbl{font-size:9px;font-weight:600;letter-spacing:1.5px;text-transform:uppercase;color:var(--text3);margin-bottom:6px}
+.kc-val{font-size:24px;font-weight:700;line-height:1.1;margin-bottom:4px}
+.kc-sub{font-size:10px;color:var(--text3);font-family:'JetBrains Mono',monospace}
+.bdg{display:inline-block;padding:2px 8px;border-radius:10px;font-size:9px;font-weight:600;margin-top:4px}
+.bdg.g{background:rgba(0,210,106,.15);color:var(--green-b)}
+.bdg.a{background:rgba(255,183,0,.15);color:var(--amber)}
+.bdg.r{background:rgba(255,71,87,.15);color:var(--red)}
+.bdg.b{background:rgba(33,150,243,.15);color:var(--blue-b)}
+
+/* SECTION */
+.sec{margin-bottom:14px}
+.sec-hdr{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.sec-title{font-size:11px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--text2);white-space:nowrap}
+.sec-line{flex:1;height:1px;background:var(--border)}
+
+/* CARDS GRID */
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.cc{background:var(--card);border:1px solid var(--border);border-radius:var(--rl);padding:14px}
+.cc-title{font-size:10px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--text3);margin-bottom:10px}
+
+/* TABLES */
+.tbl-wrap{overflow-x:auto}
+table.dt{width:100%;border-collapse:collapse;font-size:11px}
+table.dt th{font-size:9px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--text3);padding:6px 8px;border-bottom:1px solid var(--border);text-align:right;background:var(--bg3);white-space:nowrap}
+table.dt th:first-child{text-align:left}
+table.dt td{padding:6px 8px;border-bottom:1px solid var(--border);text-align:right;font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text2)}
+table.dt td:first-child{text-align:left;font-family:'Inter',sans-serif;font-size:11px;color:var(--text)}
+table.dt tr:hover td{background:rgba(255,255,255,.02)}
+table.dt .tot td{border-top:2px solid var(--border2);color:var(--green-b)!important;font-weight:600}
+.tg{color:var(--green-b)!important}
+.ta{color:var(--amber)!important}
+.tr{color:var(--red)!important}
+
+/* SCORECARD STRIP */
+.sc-strip{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:8px;margin-bottom:12px}
+.sc-card{background:var(--card);border:1px solid var(--border);border-top:2px solid var(--sc-color,var(--border2));border-radius:var(--rl);padding:10px;text-align:center}
+.sc-site{font-size:9px;color:var(--text3);font-weight:600;letter-spacing:.5px;margin-bottom:4px}
+.sc-out{font-size:18px;font-weight:700;line-height:1}
+.sc-pct{font-size:10px;color:var(--text3);margin-top:2px}
+.sc-oee{font-size:10px;margin-top:4px;padding-top:4px;border-top:1px solid var(--border)}
+.sc-udt{font-size:9px;color:var(--text3)}
+
+/* OEE RINGS */
+.ring-wrap{position:relative;display:inline-block}
+.ring-center{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:'Inter',sans-serif;font-weight:700}
+.ring-lbl{font-size:9px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--text3);text-align:center;margin-top:4px}
+
+/* NO DATA */
+.no-data{padding:60px;text-align:center;color:var(--text3);font-size:13px}
+
+/* QUARTER BTNS */
+.qbtns{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:10px;align-items:center}
+.qbtn{padding:3px 10px;font-size:10px;font-family:'JetBrains Mono',monospace;border:1px solid var(--border2);border-radius:4px;background:none;color:var(--text2);cursor:pointer}
+.qbtn.active{background:var(--blue);color:#fff;border-color:var(--blue)}
+.qsep{width:1px;height:16px;background:var(--border2);margin:0 4px}
+
+/* COST TABLE */
+.cost-table{width:100%;border-collapse:collapse;font-size:11px;min-width:900px}
+.cost-table th{font-size:9px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--text3);padding:6px 8px;border-bottom:1px solid var(--border);text-align:right;background:var(--bg3);white-space:nowrap}
+.cost-table th:first-child{text-align:left}
+.cost-table td{padding:6px 8px;border-bottom:1px solid var(--border);text-align:right;font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text2)}
+.cost-table td:first-child{text-align:left;font-family:'Inter',sans-serif;font-size:11px;color:var(--text)}
+.cost-table .tot td{border-top:2px solid var(--border2);font-weight:600;color:var(--green-b)!important}
+</style>
+</head>
+<body>
+
+<!-- LOADING -->
+<div class="loading-screen" id="loading">
+  <div class="loading-logo">VPI OPS</div>
+  <div class="loading-sub">Feed for Life · Operations Dashboard</div>
+  <div class="loading-bar-wrap"><div class="loading-bar"></div></div>
+  <div class="loading-msg" id="loading-msg">Connecting to Google Sheets...</div>
+</div>
+
+<!-- TOP NAV -->
+<div class="topnav">
+  <div class="nav-brand">VPI OPS<span>FEED FOR LIFE</span></div>
+  <div class="nav-divider"></div>
+  <div class="nav-user"><b>Marvin Rosario</b>Operations Manager</div>
+  <div class="nav-divider"></div>
+
+  <!-- PAGE TABS -->
+  <div class="page-tabs">
+    <button class="ptab active" id="tab-weekly" onclick="setPage('weekly')">⚡ Weekly Pulse</button>
+    <button class="ptab" id="tab-monthly" onclick="setPage('monthly')">📅 Monthly</button>
+    <button class="ptab" id="tab-cost" onclick="setPage('cost')">💰 Cost</button>
+    <button class="ptab" id="tab-downtime" onclick="setPage('downtime')">⚠ Downtime</button>
+  </div>
+
+  <!-- FILTERS -->
+  <div class="nav-filters">
+    <span class="flbl">Site</span>
+    <select id="sel-site" class="fsel" onchange="setSite(this.value)" style="min-width:130px"></select>
+    <span class="flbl">Year</span>
+    <select id="sel-year" class="fsel" style="min-width:75px" onchange="setYear(this.value)">
+      <option value="2026">2026</option><option value="2025">2025</option>
+    </select>
+    <span class="flbl">Qtr</span>
+    <select id="sel-qtr" class="fsel" style="min-width:60px" onchange="setQtr(this.value)">
+      <option value="">All</option><option value="Q1">Q1</option><option value="Q2">Q2</option><option value="Q3">Q3</option><option value="Q4">Q4</option>
+    </select>
+    <span class="flbl">Month</span>
+    <select id="sel-month" class="fsel" style="min-width:100px" onchange="setMonth(this.value)"></select>
+    <span class="flbl">Week</span>
+    <select id="sel-week" class="fsel" style="min-width:130px" onchange="setWeek(parseInt(this.value))"></select>
+  </div>
+
+  <div class="nav-status">
+    <span class="dot" id="status-dot"></span>
+    <span id="status-txt">Loading...</span>
+  </div>
+  <button class="refresh-btn" onclick="manualRefresh()">⟳ Refresh</button>
+</div>
+
+<!-- PAGES -->
+<div class="main">
+  <div class="page active" id="page-weekly">
+    <div class="content" id="content-weekly"></div>
+  </div>
+  <div class="page" id="page-monthly">
+    <div class="content" id="content-monthly"><div class="no-data">Click Monthly tab to load</div></div>
+  </div>
+  <div class="page" id="page-cost">
+    <div class="content" id="content-cost"><div class="no-data">Click Cost tab to load</div></div>
+  </div>
+  <div class="page" id="page-downtime">
+    <div class="content" id="content-downtime"><div class="no-data">Click Downtime tab to load</div></div>
+  </div>
+</div>
+
+<script>
+// ============================================================
+// CONSTANTS
+// ============================================================
+const GAS_URL =  + GAS + ;
+const COST_URL =  + COST_URL + ;
+const MONTHLY_URL =  + MONTHLY_URL + ;
+
+const SITES = ['NATIONAL','AC','PFMIS','HOREB','BUKID','ARGAO','CCPC','SOUTH'];
+const PROD_SITES = ['AC','PFMIS','HOREB','BUKID','ARGAO','CCPC','SOUTH'];
+const SLABELS = {NATIONAL:'National',AC:'AC · Bulacan',PFMIS:'PFMIS · Isabela',HOREB:'Horeb · Cebu',BUKID:'Bukidnon',ARGAO:'Argao · Cebu',CCPC:'CCPC · CDO',SOUTH:'South · Davao'};
+const SDOTS = {NATIONAL:'#2196f3',AC:'#00ff85',PFMIS:'#ffca28',HOREB:'#00e5cc',BUKID:'#ff5252',ARGAO:'#e040fb',CCPC:'#40c4ff',SOUTH:'#ff6d00'};
+const DEMO_CAP = {AC:5500,PFMIS:4000,HOREB:3500,ARGAO:3500,BUKID:7000,CCPC:500,SOUTH:4000,NATIONAL:28000};
+const DESIGN_CAP = {AC:6500,PFMIS:5000,HOREB:4000,ARGAO:4000,BUKID:8000,CCPC:500,SOUTH:4000,NATIONAL:32000};
+const WEEKLY_COMMIT = {AC:1375,PFMIS:1000,HOREB:875,ARGAO:875,BUKID:1750,CCPC:125,SOUTH:1000,NATIONAL:7000};
+const MONTHS_ORDER = ['JANUARY','FEBRUARY','MARCH','APRIL','MAY','JUNE','JULY','AUGUST','SEPTEMBER','OCTOBER','NOVEMBER','DECEMBER'];
+const QTR_MONTHS = {Q1:['JANUARY','FEBRUARY','MARCH'],Q2:['APRIL','MAY','JUNE'],Q3:['JULY','AUGUST','SEPTEMBER'],Q4:['OCTOBER','NOVEMBER','DECEMBER']};
+
+// ============================================================
+// STATE
+// ============================================================
+let PROD = [], DT_AGG = {}, COST_DATA = [], MONTHLY_DATA = [];
+let activeSite = 'NATIONAL', activeWeek = null, activeMonth = null, activeQtr = '', activePage = 'weekly';
+let charts = {}, refreshTimer = null;
+
+// ============================================================
+// HELPERS
+// ============================================================
+const fv = (n,d=1) => (n||0)!==0 ? n.toFixed(d) : '—';
+const fvs = (n,d=2) => n!==0 ? ((n>0?'+':'')+n.toFixed(d)) : '—';
+const fPM = n => n>0 ? '₱'+(n/1000000).toFixed(3)+'M' : '—';
+const fMT = kg => kg>0 ? (kg/1000).toFixed(1) : '—';
+function dot(s){return `<span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:${SDOTS[s]||'#8b949e'};margin-right:5px;vertical-align:middle"></span>`;}
+function bsc(v,hi,mid){return v>=hi?'g':v>=mid?'a':'r';}
+function clamp(v,mn,mx){return Math.min(mx,Math.max(mn,v));}
+
+function colIdx(col){
+  col=col.toUpperCase();let r=0;
+  for(const c of col) r=r*26+(c.charCodeAt(0)-64);
+  return r-1;
+}
+function gv(row,col,def=0){
+  try{
+    const v=row[colIdx(col)];
+    if(v===undefined||v===null||v==='') return def;
+    const n=parseFloat(String(v).replace(/,/g,'').replace('%',''));
+    return isNaN(n)?def:n;
+  }catch{return def;}
+}
+
+function ring(pct,color,size=72){
+  const r=(size-8)/2,circ=2*Math.PI*r,dash=circ*clamp(pct,0,100)/100;
+  return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
+    <circle cx="${size/2}" cy="${size/2}" r="${r}" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="6"/>
+    <circle cx="${size/2}" cy="${size/2}" r="${r}" fill="none" stroke="${color}" stroke-width="6"
+      stroke-dasharray="${dash} ${circ}" stroke-dashoffset="${circ*0.25}" stroke-linecap="round"/>
+  </svg>`;
+}
+
+function destroyCharts(){Object.values(charts).forEach(c=>{try{c.destroy();}catch{}});charts={};}
+function mkChart(id,type,labels,datasets,opts={}){
+  const el=document.getElementById(id);if(!el)return;
+  if(charts[id])charts[id].destroy();
+  charts[id]=new Chart(el,{type,data:{labels,datasets},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:'#90b8e0',font:{size:10}}}},scales:{x:{ticks:{color:'#4a7aaa',font:{size:9}},grid:{color:'rgba(255,255,255,0.04)'}},y:{ticks:{color:'#4a7aaa',font:{size:9}},grid:{color:'rgba(255,255,255,0.06)'}}},...opts.scales},...opts}});
+}
+
+// ============================================================
+// CSV PARSER
+// ============================================================
+function parseCSV(text){
+  const rows=[];let cur='',inQ=false;const chars=[...text];
+  let row=[];
+  for(let i=0;i<chars.length;i++){
+    const c=chars[i];
+    if(c==='"'){if(inQ&&chars[i+1]==='"'){cur+='"';i++;}else inQ=!inQ;}
+    else if(c===','&&!inQ){row.push(cur.trim());cur='';}
+    else if((c==='
+'||c==='
+')&&!inQ){
+      if(c==='
+'&&chars[i+1]==='
+')i++;
+      row.push(cur.trim());rows.push(row);row=[];cur='';
+    }else cur+=c;
+  }
+  if(cur||row.length)row.push(cur.trim()),rows.push(row);
+  return rows.filter(r=>r.some(c=>c!==''));
+}
+
+// ============================================================
+// FETCH PRODUCTION DATA
+// ============================================================
+async function fetchProduction(){
+  // Try GAS first, fallback to direct CSV
+  let text = '';
+  const DIRECT_PROD = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRRx7S_rqgygPQifVep4DtnDFK8gGjAPVbrzCq6sCJcTF6omIGXb73iK8mQZoZjOgUq8CnZ9t7fR_2a/pub?gid=1593513492&single=true&output=csv';
+  try {
+    const r = await fetch(GAS_URL+'?sheet=prod');
+    text = await r.text();
+    if (!text || text.length < 10) throw new Error('Empty GAS response');
+    console.log('PROD via GAS, len:', text.length);
+  } catch(e) {
+    console.warn('GAS failed, trying direct CSV:', e.message);
+    const r2 = await fetch(DIRECT_PROD);
+    text = await r2.text();
+    console.log('PROD via direct CSV, len:', text.length);
+  }
+  const rows = parseCSV(text);
+  let hi=-1;
+  for(let i=0;i<Math.min(rows.length,5);i++){
+    if((rows[i][0]||'').trim().toLowerCase()==='plant'){hi=i;break;}
+  }
+  if(hi<0) throw new Error('No Plant header in production CSV');
+  const VALID = new Set(SITES);
+  const data=[];
+  for(let i=hi+1;i<rows.length;i++){
+    const r=rows[i];
+    if(!r||r.length<5) continue;
+    const plant=(r[0]||'').trim().toUpperCase();
+    if(!VALID.has(plant)) continue;
+    const week=parseInt(r[1]);
+    if(!week||isNaN(week)) continue;
+    // Find month (last non-numeric cell)
+    let month='';
+    for(let j=r.length-1;j>=0;j--){
+      const v=(r[j]||'').trim().toUpperCase();
+      if(MONTHS_ORDER.includes(v)){month=v;break;}
+    }
+    if(!month) continue;
+    data.push({
+      plant,week,month,
+      plan: gv(r,'AJ'), output: gv(r,'AM'),
+      workingHours: gv(r,'E'),
+      scheduledDT: gv(r,'G'), unscheduledDT: gv(r,'H'), dtRate: gv(r,'X'),
+      totalDT: gv(r,'W'),
+      runRate: gv(r,'BD'),
+      oee: gv(r,'CR')*100, performance: gv(r,'CW')*100,
+      quality: gv(r,'CX')*100, availability: gv(r,'CY')*100,
+      capUtil: gv(r,'CQ'),
+      outrightRejectMt: gv(r,'BL'), outrightRejectPct: gv(r,'BM'),
+      otherRejectMt: gv(r,'BO'), otherRejectPct: gv(r,'BP'),
+      shrinkageMt: gv(r,'BR'), shrinkagePct: gv(r,'BS'),
+      rmVarQty: gv(r,'CD'), rmVarPct: gv(r,'CE'),
+      rmVarWoSacksQty: gv(r,'CK'), rmVarWoSacksPct: gv(r,'CL'),
+      totalKwh: gv(r,'BU'), kwhTon: gv(r,'BV'),
+      totalFuel: gv(r,'BW'), liTon: gv(r,'BX'),
+      totalCoal: gv(r,'BY'), coalTon: gv(r,'BZ'),
+      fuelPrice: gv(r,'CA'), fuelCost: gv(r,'CB'),
+      mechDT: gv(r,'L'), elecDT: gv(r,'K'), processDT: gv(r,'P'),
+      warehouseDT: gv(r,'S'), rmDT: gv(r,'T'), changeOverDT: gv(r,'V'),
+      powerDT: gv(r,'Z'),
+    });
+  }
+  console.log('PROD rows:', data.length, 'plants:', [...new Set(data.map(r=>r.plant))]);
+  return data;
+}
+
+// ============================================================
+// FETCH DOWNTIME DATA
+// ============================================================
+async function fetchDowntime(){
+  const DIRECT_DT = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRRx7S_rqgygPQifVep4DtnDFK8gGjAPVbrzCq6sCJcTF6omIGXb73iK8mQZoZjOgUq8CnZ9t7fR_2a/pub?gid=2030930278&single=true&output=csv';
+  let text = '';
+  try {
+    const r = await fetch(GAS_URL+'?sheet=dt');
+    text = await r.text();
+    if (!text || text.length < 10) throw new Error('Empty GAS response');
+    console.log('DT via GAS, len:', text.length);
+  } catch(e) {
+    console.warn('GAS DT failed, trying direct:', e.message);
+    const r2 = await fetch(DIRECT_DT);
+    text = await r2.text();
+    console.log('DT via direct CSV, len:', text.length);
+  }
+  const rows = parseCSV(text);
+  let hi=-1;
+  for(let i=0;i<Math.min(rows.length,5);i++){
+    if((rows[i][0]||'').trim().toLowerCase()==='plant'){hi=i;break;}
+  }
+  if(hi<0) return {};
+  const agg={};
+  const VALID=new Set(SITES);
+  for(let i=hi+1;i<rows.length;i++){
+    const r=rows[i];
+    if(!r||r.length<6) continue;
+    const plant=(r[0]||'').trim().toUpperCase();
+    if(!VALID.has(plant)) continue;
+    const week=parseInt(r[3]);
+    if(!week||isNaN(week)) continue;
+    const key=plant+'|'+week;
+    if(!agg[key]) agg[key]={udt:{},sdt:{},details:[],sdtDetails:[]};
+    const cat=(r[7]||'').trim();
+    const sub=(r[8]||'').trim();
+    const rsn=(r[9]||'').trim();
+    const udt=parseFloat(r[10])||0;
+    const sdt=parseFloat(r[11])||0;
+    if(udt>0){
+      agg[key].udt[cat]=(agg[key].udt[cat]||0)+udt;
+      agg[key].details.push({cat,sub,rsn,hrs:udt,type:'UDT'});
+    }
+    if(sdt>0){
+      agg[key].sdt[cat]=(agg[key].sdt[cat]||0)+sdt;
+      agg[key].sdtDetails.push({cat,sub,rsn,hrs:sdt,type:'SDT'});
+    }
+  }
+  return agg;
+}
+
+// ============================================================
+// DATA ACCESS HELPERS
+// ============================================================
+function get(site,week){return PROD.find(r=>r.plant===site&&r.week===week)||null;}
+function getWeeks(){return [...new Set(PROD.filter(r=>r.plant==='NATIONAL').map(r=>r.week))].sort((a,b)=>a-b);}
+function getMonthForWeek(w){const d=PROD.find(r=>r.plant==='NATIONAL'&&r.week===w);return d?d.month:null;}
+function hist(site){return PROD.filter(r=>r.plant===site).sort((a,b)=>a.week-b.week);}
+function totalUDT(site,week){const da=DT_AGG[site+'|'+week]||{};return Object.values(da.udt||{}).reduce((a,b)=>a+b,0);}
+function totalSDT(site,week){const da=DT_AGG[site+'|'+week]||{};return Object.values(da.sdt||{}).reduce((a,b)=>a+b,0);}
+
+// ============================================================
+// NAVIGATION
+// ============================================================
+function setPage(page){
+  activePage=page;
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.getElementById('page-'+page).classList.add('active');
+  document.querySelectorAll('.ptab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('tab-'+page).classList.add('active');
+  if(page==='weekly') renderWeekly();
+  if(page==='monthly') renderMonthly();
+  if(page==='cost') renderCost();
+  if(page==='downtime') renderDowntime();
+}
+
+function setSite(s){activeSite=s;renderCurrentPage();}
+function setYear(y){window.filterYear=parseInt(y);renderCurrentPage();}
+function setQtr(q){activeQtr=q;if(q){const ms=QTR_MONTHS[q];if(ms){activeMonth=ms[ms.length-1];const wks=PROD.filter(r=>r.plant==='NATIONAL'&&ms.includes(r.month)).map(r=>r.week).sort((a,b)=>a-b);if(wks.length)activeWeek=wks[wks.length-1];buildSelects();}}renderCurrentPage();}
+function setMonth(m){activeMonth=m;const wks=PROD.filter(r=>r.plant==='NATIONAL'&&r.month===m).map(r=>r.week).sort((a,b)=>a-b);if(wks.length)activeWeek=wks[wks.length-1];buildSelects();renderCurrentPage();}
+function setWeek(w){activeWeek=w;const d=PROD.find(r=>r.plant==='NATIONAL'&&r.week===w);if(d)activeMonth=d.month;buildSelects();renderCurrentPage();}
+function renderCurrentPage(){if(activePage==='weekly')renderWeekly();else if(activePage==='monthly')renderMonthly();else if(activePage==='cost')renderCost();else if(activePage==='downtime')renderDowntime();}
+function manualRefresh(){loadData(true);}
+
+function buildSelects(){
+  // Site
+  const ss=document.getElementById('sel-site');
+  if(ss) ss.innerHTML=SITES.map(s=>`<option value="${s}" ${s===activeSite?'selected':''}>${SLABELS[s]}</option>`).join('');
+  // Month
+  const months=[...new Set(PROD.filter(r=>r.plant==='NATIONAL').map(r=>r.month))].sort((a,b)=>MONTHS_ORDER.indexOf(a)-MONTHS_ORDER.indexOf(b));
+  const ms=document.getElementById('sel-month');
+  if(ms) ms.innerHTML=months.map(m=>`<option value="${m}" ${m===activeMonth?'selected':''}>${m.slice(0,3)}</option>`).join('');
+  // Week
+  const weeks=getWeeks();
+  const ws=document.getElementById('sel-week');
+  if(ws) ws.innerHTML=weeks.map(w=>{const m=(getMonthForWeek(w)||'').slice(0,3);return `<option value="${w}" ${w===activeWeek?'selected':''}>${m} — Wk ${w}</option>`;}).join('');
+}
+
+// ============================================================
+// LOAD DATA
+// ============================================================
+async function loadData(isRefresh=false){
+  if(!isRefresh){
+    document.getElementById('loading').style.display='flex';
+    document.getElementById('status-txt').textContent='Loading...';
+  }
+  document.getElementById('loading-msg').textContent='Fetching production data...';
+  // Safety timeout - never stay on loading screen more than 15s
+  const safetyTimer = !isRefresh ? setTimeout(()=>{
+    const el=document.getElementById('loading');
+    if(el) el.innerHTML=`
+      <div style="color:var(--amber);font-size:18px;margin-bottom:8px">⏱ Taking too long...</div>
+      <div style="color:var(--text3);font-size:12px;margin-bottom:16px">Google Sheets may be slow. Open F12 Console for details.</div>
+      <button onclick="loadData(false)" style="padding:8px 20px;border:1px solid var(--blue);border-radius:4px;background:var(--blue-d);color:var(--blue-b);cursor:pointer">⟳ Retry</button>`;
+  }, 15000) : null;
+  try{
+    const [prod,dt]=await Promise.all([fetchProduction(),fetchDowntime()]);
+    PROD=prod; DT_AGG=dt;
+    const weeks=getWeeks();
+    if(!isRefresh){
+      activeWeek=weeks[weeks.length-1];
+      const lr=PROD.find(r=>r.plant==='NATIONAL'&&r.week===activeWeek);
+      if(lr) activeMonth=lr.month;
+    }
+    buildSelects();
+    // Remove loading screen
+    const el=document.getElementById('loading');
+    if(el) el.parentNode.removeChild(el);
+    document.getElementById('status-dot').className='dot';
+    document.getElementById('status-txt').textContent='Live · '+new Date().toLocaleTimeString('en-PH',{hour:'2-digit',minute:'2-digit'});
+    if(safetyTimer) clearTimeout(safetyTimer);
+    renderWeekly();
+    // Load cost and monthly in background
+    fetch(COST_URL).then(r=>r.text()).then(t=>{COST_DATA=parseCostCSV(t);console.log('Cost:',COST_DATA.length,'rows');}).catch(e=>console.warn('Cost:',e));
+    fetch(MONTHLY_URL).then(r=>r.text()).then(t=>{MONTHLY_DATA=parseMonthlyCSV(t);console.log('Monthly:',MONTHLY_DATA.length,'rows');}).catch(e=>console.warn('Monthly:',e));
+    // Auto-refresh every 5 minutes
+    if(refreshTimer) clearInterval(refreshTimer);
+    refreshTimer=setInterval(()=>loadData(true),5*60*1000);
+  }catch(err){
+    console.error('loadData error:', err);
+    document.getElementById('status-dot').className='dot err';
+    document.getElementById('status-txt').textContent='Error - '+err.message;
+    const el=document.getElementById('loading');
+    if(el) el.innerHTML=`
+      <div style="color:var(--red);font-size:18px;margin-bottom:8px">⚠ Connection Failed</div>
+      <div style="color:var(--text3);font-size:12px;margin-bottom:4px;font-family:'JetBrains Mono',monospace">${err.message}</div>
+      <div style="color:var(--text3);font-size:11px;margin-bottom:16px">Check browser console (F12) for details</div>
+      <button onclick="loadData(false)" style="padding:8px 20px;border:1px solid var(--blue);border-radius:4px;background:var(--blue-d);color:var(--blue-b);cursor:pointer;font-size:12px">⟳ Retry</button>`;
+  }
+}
+
+// BOOT
+loadData(false);
+</script>
+<script>
+// ============================================================
+// RENDER WEEKLY PULSE
+// ============================================================
+function renderWeekly(){
+  destroyCharts();
+  const ct=document.getElementById('content-weekly');
+  if(!ct||!PROD.length){if(ct)ct.innerHTML='<div class="no-data">No data loaded yet.</div>';return;}
+  const d=get(activeSite,activeWeek);
+  if(!d){ct.innerHTML=`<div class="no-data">No data — ${SLABELS[activeSite]||activeSite} Week ${activeWeek}</div>`;return;}
+  const mon=d.month||'';
+  const hd=hist(activeSite);
+  const wkLbls=hd.map(r=>'Wk'+r.week);
+
+  // KPI values
+  const wkCommit=WEEKLY_COMMIT[activeSite]||WEEKLY_COMMIT['NATIONAL'];
+  const planPct=wkCommit>0?d.output/wkCommit*100:0;
+  const pC=planPct>=100?'var(--green-b)':planPct>=85?'var(--amber)':'var(--red)';
+  const oC=d.oee>=85?'var(--green-b)':d.oee>=70?'var(--amber)':d.oee>0?'var(--red)':'var(--text3)';
+  const udtHrs=activeSite==='NATIONAL'?PROD_SITES.reduce((a,s)=>{const r=get(s,activeWeek);return a+(r?r.unscheduledDT:0);},0):d.unscheduledDT;
+  const sdtHrs=activeSite==='NATIONAL'?PROD_SITES.reduce((a,s)=>{const r=get(s,activeWeek);return a+(r?r.scheduledDT:0);},0):d.scheduledDT;
+  const udtPct=d.workingHours>0?udtHrs/d.workingHours*100:0;
+  const sdtPct=d.workingHours>0?sdtHrs/d.workingHours*100:0;
+
+  // National Scorecard
+  const scorecards=PROD_SITES.map(s=>{
+    const sd=get(s,activeWeek);
+    const out=sd?sd.output:0;
+    const wc=WEEKLY_COMMIT[s]||0;
+    const pp=wc>0?out/wc*100:0;
+    const color=pp>=100?'var(--green)':pp>=85?'var(--amber)':'var(--red)';
+    return `<div class="sc-card" style="--sc-color:${color}">
+      <div class="sc-site">${dot(s)}${s}</div>
+      <div class="sc-out" style="color:${color}">${out>0?fv(out,1):'—'}</div>
+      <div class="sc-pct">${wc>0?pp.toFixed(1)+'% commit':'—'}</div>
+      <div class="sc-oee">OEE: <span style="color:${sd&&sd.oee>=85?'var(--green-b)':sd&&sd.oee>=70?'var(--amber)':'var(--red)'}">${sd&&sd.oee>0?sd.oee.toFixed(1)+'%':'—'}</span></div>
+      <div class="sc-udt">UDT: ${sd&&sd.unscheduledDT>0?sd.unscheduledDT.toFixed(1)+'h':'—'}</div>
+    </div>`;
+  }).join('');
+
+  // Quality tables
+  const rejRows=PROD_SITES.map(s=>{
+    const sd=get(s,activeWeek);
+    if(!sd||sd.output===0) return `<tr><td>${dot(s)}${s}</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>`;
+    return `<tr>
+      <td>${dot(s)}${s}</td>
+      <td>${fv(sd.outrightRejectMt,3)}</td>
+      <td class="${sd.outrightRejectPct>0.3?'tr':sd.outrightRejectPct>0.15?'ta':'tg'}">${fv(sd.outrightRejectPct,3)}%</td>
+      <td>${fv(sd.otherRejectMt,3)}</td>
+      <td class="${sd.otherRejectPct>0.7?'tr':sd.otherRejectPct>0.35?'ta':'tg'}">${fv(sd.otherRejectPct,3)}%</td>
+      <td>${fv(sd.outrightRejectMt+sd.otherRejectMt,3)}</td>
+      <td class="${(sd.outrightRejectPct+sd.otherRejectPct)>1?'tr':'tg'}">${fv(sd.outrightRejectPct+sd.otherRejectPct,3)}%</td>
+    </tr>`;
+  }).join('');
+
+  const lossRows=PROD_SITES.map(s=>{
+    const sd=get(s,activeWeek);
+    if(!sd||sd.output===0) return `<tr><td>${dot(s)}${s}</td><td>—</td><td>—</td><td>—</td></tr>`;
+    const cls=sd.shrinkagePct<-0.5?'tr':sd.shrinkagePct<0?'ta':'tg';
+    return `<tr><td>${dot(s)}${s}</td>
+      <td class="${cls}">${sd.shrinkageMt>=0?'+':''}${fv(sd.shrinkageMt,3)} mt</td>
+      <td class="${cls}">${sd.shrinkagePct>=0?'+':''}${fv(sd.shrinkagePct,3)}%</td>
+      <td><span class="bdg ${sd.shrinkagePct<-0.5?'r':sd.shrinkagePct<0?'a':'g'}">${sd.shrinkagePct<0?'Loss':'Gain'}</span></td>
+    </tr>`;
+  }).join('');
+
+  const varRows=PROD_SITES.map(s=>{
+    const sd=get(s,activeWeek);
+    if(!sd||sd.output===0) return `<tr><td>${dot(s)}${s}</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>`;
+    const c1=sd.rmVarQty>0?'tg':sd.rmVarQty<0?'tr':'';
+    const c2=sd.rmVarWoSacksQty>0?'tg':sd.rmVarWoSacksQty<0?'tr':'';
+    return `<tr><td>${dot(s)}${s}</td>
+      <td class="${c1}">${fvs(sd.rmVarQty,2)} mt</td><td class="${c1}">${fvs(sd.rmVarPct,3)}%</td>
+      <td class="${c2}">${fvs(sd.rmVarWoSacksQty,2)} mt</td><td class="${c2}">${fvs(sd.rmVarWoSacksPct,3)}%</td>
+    </tr>`;
+  }).join('');
+
+  const energyRows=PROD_SITES.map(s=>{
+    const sd=get(s,activeWeek);
+    if(!sd||sd.output===0) return `<tr><td>${dot(s)}${s}</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>`;
+    const fuelCostTon=sd.liTon>0&&sd.fuelPrice>0?sd.liTon*sd.fuelPrice:0;
+    return `<tr><td>${dot(s)}${s}</td>
+      <td>${sd.totalKwh>0?fv(sd.totalKwh,0):' —'}</td><td>${fv(sd.kwhTon,2)}</td>
+      <td>${fv(sd.liTon,3)}</td>
+      <td>${fuelCostTon>0?'₱'+fuelCostTon.toFixed(2):'—'}</td>
+      <td>${sd.coalTon>0?fv(sd.coalTon,2):'—'}</td>
+    </tr>`;
+  }).join('');
+
+  // Downtime detail from MRWeekly
+  const dtRows=PROD_SITES.map(s=>{
+    const sd=get(s,activeWeek);
+    if(!sd||sd.output===0) return `<tr><td>${dot(s)}${s}</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>`;
+    const totDT=sd.scheduledDT+sd.unscheduledDT;
+    const dtPct=sd.workingHours>0?totDT/sd.workingHours*100:0;
+    return `<tr><td>${dot(s)}${s}</td>
+      <td class="${sd.unscheduledDT>10?'tr':''}">${fv(sd.unscheduledDT,2)}</td>
+      <td class="${sd.scheduledDT>10?'ta':''}">${fv(sd.scheduledDT,2)}</td>
+      <td>${sd.mechDT>0?fv(sd.mechDT,2):'—'}</td>
+      <td>${sd.elecDT>0?fv(sd.elecDT,2):'—'}</td>
+      <td>${sd.processDT>0?fv(sd.processDT,2):'—'}</td>
+      <td>${sd.changeOverDT>0?fv(sd.changeOverDT,2):'—'}</td>
+      <td class="${dtPct>10?'tr':''}">${dtPct>0?dtPct.toFixed(1)+'%':'—'}</td>
+    </tr>`;
+  }).join('');
+
+  ct.innerHTML=`
+<!-- NATIONAL SCORECARD -->
+${activeSite==='NATIONAL'?`
+<div class="sec">
+  <div class="sec-hdr"><div class="sec-title">National Scorecard — Week ${activeWeek} · ${mon}</div><div class="sec-line"></div></div>
+  <div class="sc-strip">${scorecards}</div>
+</div>`:''}
+
+<!-- KPI CARDS -->
+<div class="sec">
+  <div class="sec-hdr"><div class="sec-title">${SLABELS[activeSite]||activeSite} · Week ${activeWeek} · ${mon}</div><div class="sec-line"></div></div>
+  <div class="kpi-row g5" style="margin-bottom:12px">
+    <div class="kc" style="--kc-color:${pC}">
+      <div class="kc-lbl">Weekly Output</div>
+      <div class="kc-val" style="color:${pC}">${fv(d.output,1)}<span style="font-size:12px;color:var(--text3)"> mt</span></div>
+      <div class="kc-sub">Commit: ${(wkCommit).toLocaleString()} mt</div>
+      <span class="bdg ${bsc(planPct,100,85)}">${planPct.toFixed(1)}% of commit</span>
+    </div>
+    <div class="kc" style="--kc-color:${oC}">
+      <div class="kc-lbl">OEE</div>
+      <div class="kc-val" style="color:${oC}">${d.oee>0?fv(d.oee,1):'N/A'}<span style="font-size:12px;color:var(--text3)">%</span></div>
+      <div class="kc-sub">P:${d.performance>0?fv(d.performance,1)+'%':'—'} Q:${d.quality>0?fv(d.quality,1)+'%':'—'} A:${d.availability>0?fv(d.availability,1)+'%':'—'}</div>
+      <span class="bdg ${bsc(d.oee,85,70)}">${d.oee>=85?'World class':d.oee>=70?'Acceptable':d.oee>0?'Needs attn':'N/A'}</span>
+    </div>
+    <div class="kc" style="--kc-color:${udtHrs>20?'var(--red)':udtHrs>10?'var(--amber)':'var(--border2)'}">
+      <div class="kc-lbl">Downtime</div>
+      <div style="display:flex;gap:6px;margin:4px 0">
+        <div style="flex:1;text-align:center;background:var(--red-d);border-radius:4px;padding:4px">
+          <div style="font-size:9px;color:var(--red);font-weight:700">UDT</div>
+          <div style="font-size:16px;font-weight:700;color:var(--red)">${fv(udtHrs,2)}<span style="font-size:9px"> hr</span></div>
+          <div style="font-size:9px;color:var(--text3)">${udtPct>0?udtPct.toFixed(1)+'%':'—'}</div>
+        </div>
+        <div style="flex:1;text-align:center;background:var(--blue-d);border-radius:4px;padding:4px">
+          <div style="font-size:9px;color:var(--blue-b);font-weight:700">SDT</div>
+          <div style="font-size:16px;font-weight:700;color:var(--blue-b)">${fv(sdtHrs,2)}<span style="font-size:9px"> hr</span></div>
+          <div style="font-size:9px;color:var(--text3)">${sdtPct>0?sdtPct.toFixed(1)+'%':'—'}</div>
+        </div>
+      </div>
+      <div style="font-size:10px;color:var(--text3)">Total: ${fv(udtHrs+sdtHrs,2)} hr</div>
+    </div>
+    <div class="kc" style="--kc-color:var(--teal)">
+      <div class="kc-lbl">Run Rate</div>
+      <div class="kc-val">${d.runRate>0?fv(d.runRate,2):'—'}<span style="font-size:12px;color:var(--text3)"> t/hr</span></div>
+      <div class="kc-sub">Net of downtime</div>
+    </div>
+    <div class="kc" style="--kc-color:${oC}">
+      <div class="kc-lbl">OEE Breakdown</div>
+      <div style="display:flex;gap:4px;justify-content:space-around;margin:6px 0">
+        <div style="text-align:center">
+          <div style="font-size:9px;color:var(--text3)">P</div>
+          <div style="font-size:14px;font-weight:700;color:${d.performance>=90?'var(--blue-b)':'var(--amber)'}">${d.performance>0?fv(d.performance,1)+'%':'—'}</div>
+        </div>
+        <div style="text-align:center">
+          <div style="font-size:9px;color:var(--text3)">Q</div>
+          <div style="font-size:14px;font-weight:700;color:${d.quality>=98?'var(--green-b)':'var(--amber)'}">${d.quality>0?fv(d.quality,1)+'%':'—'}</div>
+        </div>
+        <div style="text-align:center">
+          <div style="font-size:9px;color:var(--text3)">A</div>
+          <div style="font-size:14px;font-weight:700;color:${d.availability>=90?'var(--green-b)':'var(--red)'}">${d.availability>0?fv(d.availability,1)+'%':'—'}</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- OEE RING + MTD TABLE -->
+<div class="g2 sec">
+  <div class="cc">
+    <div class="cc-title">OEE Breakdown</div>
+    <div style="display:flex;align-items:center;gap:16px;justify-content:center;padding:10px 0">
+      <div style="text-align:center">
+        <div class="ring-wrap">${ring(clamp(d.oee,0,120),d.oee>=85?'var(--green-b)':d.oee>=70?'var(--amber)':'var(--red)',110)}
+          <div class="ring-center" style="font-size:20px;color:${oC}">${d.oee>0?fv(d.oee,1)+'%':'N/A'}</div></div>
+        <div class="ring-lbl">OEE</div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        ${[['P','performance',90,'var(--blue-b)'],['Q','quality',98,'var(--green-b)'],['A','availability',90,'var(--green-b)']].map(([lbl,field,thr,col])=>`
+        <div style="display:flex;align-items:center;gap:10px">
+          <div class="ring-wrap">${ring(clamp(d[field],0,120),d[field]>=thr?col:'var(--amber)',54)}
+            <div class="ring-center" style="font-size:11px;color:${d[field]>=thr?col:'var(--amber)'}">${d[field]>0?fv(d[field],0)+'%':'—'}</div></div>
+          <div>
+            <div style="font-size:9px;color:var(--text3);letter-spacing:1px">${lbl==='P'?'PERFORMANCE':lbl==='Q'?'QUALITY':'AVAILABILITY'}</div>
+            <div style="font-size:13px;font-weight:600;color:${d[field]>=thr?col:'var(--amber)'}">${d[field]>0?fv(d[field],1)+'%':'—'}</div>
+          </div>
+        </div>`).join('')}
+      </div>
+    </div>
+    <div style="position:relative;height:120px;margin-top:8px"><canvas id="c-oee"></canvas></div>
+  </div>
+  <div class="cc">
+    <div class="cc-title">Weekly Output vs Commitment — Week ${activeWeek}</div>
+    <div class="tbl-wrap"><table class="dt">
+      <thead><tr><th>Site</th><th>Output (mt)</th><th>Commit (mt)</th><th>% Commit</th><th>Avg/day</th></tr></thead>
+      <tbody>
+        ${PROD_SITES.map(s=>{
+          const sd=get(s,activeWeek);
+          const wc=WEEKLY_COMMIT[s]||0;
+          const out=sd?sd.output:0;
+          const pp=wc>0?out/wc*100:0;
+          const pd=PROD.filter(r=>r.plant===s&&r.month===activeMonth);
+          const avgDay=pd.length>0?pd.reduce((a,r)=>a+r.output,0)/(pd.length*7):0;
+          return `<tr>
+            <td>${dot(s)}${s}</td>
+            <td>${out>0?fv(out,1):'—'}</td>
+            <td>${wc.toLocaleString()}</td>
+            <td class="${bsc(pp,100,85)}">${wc>0?pp.toFixed(1)+'%':'—'}</td>
+            <td>${avgDay>0?fv(avgDay,2):'—'}</td>
+          </tr>`;
+        }).join('')}
+        <tr class="tot">
+          <td>NATIONAL</td>
+          <td>${fv(PROD_SITES.reduce((a,s)=>{const r=get(s,activeWeek);return a+(r?r.output:0);},0),1)}</td>
+          <td>${(WEEKLY_COMMIT.NATIONAL||0).toLocaleString()}</td>
+          <td class="${bsc(planPct,100,85)}">${planPct.toFixed(1)}%</td>
+          <td>—</td>
+        </tr>
+      </tbody>
+    </table></div>
+  </div>
+</div>
+
+<!-- QUALITY TABLES -->
+<div class="sec">
+  <div class="sec-hdr"><div class="sec-title">Quality · Loss · RM Variance</div><div class="sec-line"></div></div>
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px">
+    <div class="cc">
+      <div class="cc-title">Rejection — Limit: Outright 0.3% / Other 0.7%</div>
+      <div class="tbl-wrap"><table class="dt">
+        <thead><tr><th>Site</th><th>Outright mt</th><th>%</th><th>Other mt</th><th>%</th><th>Total mt</th><th>Total %</th></tr></thead>
+        <tbody>${rejRows}</tbody>
+      </table></div>
+    </div>
+    <div class="cc">
+      <div class="cc-title">Process Loss/Gain — Limit: -0.5%</div>
+      <div class="tbl-wrap"><table class="dt">
+        <thead><tr><th>Site</th><th>Shrinkage mt</th><th>%</th><th>Status</th></tr></thead>
+        <tbody>${lossRows}</tbody>
+      </table></div>
+    </div>
+    <div class="cc">
+      <div class="cc-title">RM Variance</div>
+      <div class="tbl-wrap"><table class="dt">
+        <thead><tr><th>Site</th><th>Var qty</th><th>Var %</th><th>W/o sacks qty</th><th>W/o sacks %</th></tr></thead>
+        <tbody>${varRows}</tbody>
+      </table></div>
+    </div>
+  </div>
+</div>
+
+<!-- ENERGY -->
+<div class="sec">
+  <div class="sec-hdr"><div class="sec-title">Energy</div><div class="sec-line"></div></div>
+  <div class="cc">
+    <div class="cc-title">Energy Consumption — Week ${activeWeek}</div>
+    <div class="tbl-wrap"><table class="dt">
+      <thead><tr><th>Site</th><th>Total kWh</th><th>kWh/ton</th><th>L/ton Diesel</th><th>Fuel Cost/ton</th><th>Coal kg/ton</th></tr></thead>
+      <tbody>${energyRows}</tbody>
+    </table></div>
+  </div>
+</div>
+
+<!-- DOWNTIME TABLE -->
+<div class="sec">
+  <div class="sec-hdr"><div class="sec-title">Downtime Detail (from MRWeekly)</div><div class="sec-line"></div></div>
+  <div class="cc">
+    <div class="tbl-wrap"><table class="dt">
+      <thead><tr><th>Site</th><th>UDT hr</th><th>SDT hr</th><th>Mechanical</th><th>Electrical</th><th>Process</th><th>Change Over</th><th>DT Rate %</th></tr></thead>
+      <tbody>${dtRows}</tbody>
+    </table></div>
+  </div>
+</div>
+
+<!-- TREND CHARTS -->
+<div class="sec">
+  <div class="sec-hdr"><div class="sec-title">Trend Charts</div><div class="sec-line"></div></div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+    <div class="cc"><div class="cc-title">OEE Trend</div><div style="position:relative;height:140px"><canvas id="c-oee-trend"></canvas></div></div>
+    <div class="cc"><div class="cc-title">kWh/ton Trend</div><div style="position:relative;height:140px"><canvas id="c-kwh"></canvas></div></div>
+  </div>
+</div>`;
+
+  // Render charts after DOM is ready
+  setTimeout(()=>{
+    const oee=hd.map(r=>r.oee>0?+r.oee.toFixed(1):null);
+    const perf=hd.map(r=>r.performance>0?+r.performance.toFixed(1):null);
+    mkChart('c-oee-trend','line',wkLbls,[
+      {label:'OEE%',data:oee,borderColor:'#00ff85',backgroundColor:'rgba(0,255,133,.1)',borderWidth:2,pointRadius:3,tension:.3,fill:true},
+      {label:'Perf%',data:perf,borderColor:'#64b5f6',borderWidth:1.5,pointRadius:2,tension:.3,fill:false}
+    ],{scales:{y:{min:0,max:120}}});
+
+    const kwh=hd.map(r=>r.kwhTon>0?+r.kwhTon.toFixed(2):null);
+    mkChart('c-kwh','line',wkLbls,[
+      {label:'kWh/ton',data:kwh,borderColor:'#ffca28',backgroundColor:'rgba(255,202,40,.1)',borderWidth:2,pointRadius:3,tension:.3,fill:true}
+    ],{});
+
+    // OEE ring animation not needed - it's SVG
+  },100);
+}
+</script>
+<script>
+// ============================================================
+// PARSE COST CSV
+// ============================================================
+function parseCostCSV(text){
+  const rows=parseCSV(text);
+  let hi=-1;
+  for(let i=0;i<Math.min(rows.length,5);i++){if((rows[i][0]||'').trim().toUpperCase()==='PLANT'){hi=i;break;}}
+  if(hi<0){console.warn('Cost: no header');return[];}
+  const MLIST=['JANUARY','FEBRUARY','MARCH','APRIL','MAY','JUNE','JULY','AUGUST','SEPTEMBER','OCTOBER','NOVEMBER','DECEMBER'];
+  const data=[];
+  for(let i=hi+1;i<rows.length;i++){
+    const r=rows[i];
+    if(!r[0]||!r[1]||!r[2]) continue;
+    const plant=(r[0]||'').trim().toUpperCase();
+    const month=(r[1]||'').trim().toUpperCase();
+    const year=parseInt(r[2])||0;
+    if(!plant||!month||!year) continue;
+    if(plant.includes('ACCTG')||plant.includes('NATIONAL')) continue;
+    if(!MLIST.includes(month)) continue;
+    const gn=idx=>{const v=parseFloat((r[idx]||'').toString().replace(/,/g,''));return isNaN(v)?0:v;};
+    data.push({plant,month,year,
+      volumeKg:gn(3),rental:gn(4),spareParts:gn(5),
+      manpowerDirect:gn(6),diesel:gn(7),electricity:gn(8),
+      manpowerAgency:gn(9),others:gn(10),thirdParty:gn(11),
+      cessDepreciation:gn(12),spDepreciation:gn(13),
+      insurance:gn(14),water:gn(15),thread:gn(16),
+      tollingFee:gn(17),totalCost:gn(18),costPerKg:gn(19),
+      fixedCost:gn(20),variableCost:gn(21),
+    });
+  }
+  console.log('Cost parsed:',data.length,'rows | plants:',[...new Set(data.map(r=>r.plant))].join(','));
+  return data;
+}
+
+// ============================================================
+// RENDER COST
+// ============================================================
+function renderCost(){
+  const ct=document.getElementById('content-cost');
+  if(!ct) return;
+  if(!COST_DATA||COST_DATA.length===0){
+    ct.innerHTML='<div class="no-data">Cost data loading... please wait a moment then click Cost again.</div>';
+    setTimeout(()=>{if(COST_DATA&&COST_DATA.length>0)renderCost();},2500);
+    return;
+  }
+  const MLIST=['JANUARY','FEBRUARY','MARCH','APRIL','MAY','JUNE','JULY','AUGUST','SEPTEMBER','OCTOBER','NOVEMBER','DECEMBER'];
+  const years=[...new Set(COST_DATA.map(r=>r.year))].filter(Boolean).sort();
+  const selYear=window.costYear||(years.length?years[years.length-1]:2026);
+  window.costYear=parseInt(selYear);
+  const cMonths=[...new Set(COST_DATA.filter(r=>r.year===window.costYear).map(r=>r.month))].filter(m=>MLIST.includes(m)).sort((a,b)=>MLIST.indexOf(a)-MLIST.indexOf(b));
+  const selMonth=window.costMonth&&cMonths.includes(window.costMonth)?window.costMonth:cMonths[cMonths.length-1];
+  window.costMonth=selMonth;
+
+  const getCR=plant=>COST_DATA.find(r=>r.plant.toUpperCase()===plant.toUpperCase()&&r.month===selMonth&&r.year===window.costYear)||null;
+
+  const TH=`<thead><tr><th>Site</th><th>Vol (mt)</th><th>Rental</th><th>Spare Parts</th><th>Manpower Dir</th><th>Manpower Agn</th><th>Diesel</th><th>Electricity</th><th>3rd Party</th><th>Others</th><th>Tolling</th><th>Depreciation</th><th>Total Cost</th><th>Cost/mt</th></tr></thead>`;
+
+  function buildRow(plant,color){
+    const cr=getCR(plant);
+    const d=`<span style="display:inline-block;width:5px;height:5px;border-radius:50%;background:${color||'#8b949e'};margin-right:5px;vertical-align:middle"></span>`;
+    if(!cr||cr.volumeKg===0) return `<tr><td>${d}${plant}</td>${'<td>—</td>'.repeat(13)}</tr>`;
+    const vol=cr.volumeKg/1000,cpt=vol>0?cr.totalCost/vol:0;
+    return `<tr><td>${d}${plant}</td><td>${fMT(cr.volumeKg)}</td>
+      <td>${fPM(cr.rental)}</td><td>${fPM(cr.spareParts)}</td>
+      <td>${fPM(cr.manpowerDirect)}</td><td>${fPM(cr.manpowerAgency)}</td>
+      <td>${fPM(cr.diesel)}</td><td>${fPM(cr.electricity)}</td>
+      <td>${fPM(cr.thirdParty)}</td>
+      <td>${fPM(cr.others+cr.water+cr.thread+cr.insurance)}</td>
+      <td>${cr.tollingFee>0?fPM(cr.tollingFee):'—'}</td>
+      <td>${fPM(cr.cessDepreciation+cr.spDepreciation)}</td>
+      <td>${fPM(cr.totalCost)}</td>
+      <td class="${cpt>2000?'tr':cpt>1500?'ta':'tg'}">₱${cpt.toFixed(2)}</td></tr>`;
+  }
+
+  function buildTotal(plants,label){
+    const rows=plants.map(getCR).filter(Boolean);
+    if(!rows.length) return `<tr class="tot"><td>${label}</td>${'<td>—</td>'.repeat(13)}</tr>`;
+    const s=f=>rows.reduce((a,r)=>a+(r[f]||0),0);
+    const vol=s('volumeKg'),cost=s('totalCost'),cpt=vol>0?cost/vol*1000:0;
+    return `<tr class="tot"><td>${label}</td><td>${fMT(vol)}</td>
+      <td>${fPM(s('rental'))}</td><td>${fPM(s('spareParts'))}</td>
+      <td>${fPM(s('manpowerDirect'))}</td><td>${fPM(s('manpowerAgency'))}</td>
+      <td>${fPM(s('diesel'))}</td><td>${fPM(s('electricity'))}</td>
+      <td>${fPM(s('thirdParty'))}</td>
+      <td>${fPM(rows.reduce((a,r)=>a+r.others+r.water+r.thread+r.insurance,0))}</td>
+      <td>${fPM(s('tollingFee'))}</td>
+      <td>${fPM(rows.reduce((a,r)=>a+r.cessDepreciation+r.spDepreciation,0))}</td>
+      <td>${fPM(cost)}</td>
+      <td class="${cpt>2000?'tr':cpt>1500?'ta':'tg'}">₱${cpt.toFixed(2)}</td></tr>`;
+  }
+
+  const OPS=['AC','PFMIS','HOREB','BUKID','ARGAO'];
+  const TOLL=['CCPC','SOUTH'];
+  const MG=['HOREB MG','AC MG'];
+  const COL={AC:'#00ff85',PFMIS:'#ffca28',HOREB:'#00e5cc',BUKID:'#ff5252',ARGAO:'#e040fb',CCPC:'#40c4ff',SOUTH:'#ff6d00'};
+
+  const allR=[...OPS,...TOLL,...MG].map(getCR).filter(Boolean);
+  const natCost=allR.reduce((a,r)=>a+r.totalCost,0);
+  const natVol=allR.reduce((a,r)=>a+r.volumeKg,0);
+  const natCPT=natVol>0?natCost/natVol*1000:0;
+  const natFixed=allR.reduce((a,r)=>a+r.fixedCost,0);
+  const natVar=allR.reduce((a,r)=>a+r.variableCost,0);
+
+  const yrBtns=years.map(y=>`<button onclick="window.costYear=${y};window.costMonth=null;renderCost()" style="padding:4px 12px;font-size:10px;font-family:'JetBrains Mono',monospace;border:1px solid ${y===window.costYear?'var(--green-b)':'var(--border2)'};border-radius:4px;background:${y===window.costYear?'var(--green-d)':'none'};color:${y===window.costYear?'var(--green-b)':'var(--text2)'};cursor:pointer">${y}</button>`).join('');
+  const moBtns=cMonths.map(m=>`<button onclick="window.costMonth='${m}';renderCost()" style="padding:4px 9px;font-size:10px;font-family:'JetBrains Mono',monospace;border:1px solid var(--border2);border-radius:4px;background:${m===selMonth?'var(--blue)':'none'};color:${m===selMonth?'#fff':'var(--text2)'};cursor:pointer">${m.slice(0,3)}</button>`).join('');
+
+  ct.innerHTML=`
+<div class="sec">
+  <div class="sec-hdr"><div class="sec-title">Production Cost — ${selMonth} ${window.costYear}</div><div class="sec-line"></div></div>
+  <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:12px">
+    <span style="font-size:9px;color:var(--text3);font-family:'JetBrains Mono',monospace;letter-spacing:1px">YEAR</span>${yrBtns}
+    <div style="width:1px;height:18px;background:var(--border2);margin:0 4px"></div>
+    <span style="font-size:9px;color:var(--text3);font-family:'JetBrains Mono',monospace;letter-spacing:1px">MONTH</span>${moBtns}
+  </div>
+
+  <!-- KPI CARDS -->
+  <div class="kpi-row g4" style="margin-bottom:14px">
+    <div class="kc" style="--kc-color:var(--blue-b)">
+      <div class="kc-lbl">National Total Cost</div>
+      <div class="kc-val" style="color:var(--blue-b);font-size:22px">₱${(natCost/1000000).toFixed(3)}M</div>
+      <div class="kc-sub">${selMonth} ${window.costYear} · All plants</div>
+    </div>
+    <div class="kc" style="--kc-color:var(--green-b)">
+      <div class="kc-lbl">National Cost / mt</div>
+      <div class="kc-val" style="color:var(--green-b);font-size:22px">₱${natCPT.toFixed(2)}</div>
+      <div class="kc-sub">per metric ton</div>
+    </div>
+    <div class="kc" style="--kc-color:var(--amber)">
+      <div class="kc-lbl">Fixed Cost</div>
+      <div class="kc-val" style="color:var(--amber);font-size:22px">₱${(natFixed/1000000).toFixed(3)}M</div>
+      <div class="kc-sub">₱${natVol>0?(natFixed/natVol*1000).toFixed(2):'—'}/mt</div>
+    </div>
+    <div class="kc" style="--kc-color:var(--purple)">
+      <div class="kc-lbl">Variable Cost</div>
+      <div class="kc-val" style="color:var(--purple);font-size:22px">₱${(natVar/1000000).toFixed(3)}M</div>
+      <div class="kc-sub">₱${natVol>0?(natVar/natVol*1000).toFixed(2):'—'}/mt</div>
+    </div>
+  </div>
+
+  <!-- TABLES -->
+  <div class="cc" style="margin-bottom:10px">
+    <div class="cc-title">Operating Plants — ${selMonth} ${window.costYear} (amounts in ₱M)</div>
+    <div class="tbl-wrap"><table class="cost-table">${TH}<tbody>
+      ${OPS.map(s=>buildRow(s,COL[s])).join('')}${buildTotal(OPS,'OPERATING TOTAL')}
+    </tbody></table></div>
+  </div>
+  <div class="cc" style="margin-bottom:10px">
+    <div class="cc-title">Tolling Plants (CCPC & South) — ${selMonth} ${window.costYear}</div>
+    <div class="tbl-wrap"><table class="cost-table">${TH}<tbody>
+      ${TOLL.map(s=>buildRow(s,COL[s])).join('')}${buildTotal(TOLL,'TOLLING TOTAL')}
+    </tbody></table></div>
+  </div>
+  <div class="cc" style="margin-bottom:10px">
+    <div class="cc-title">Mix Grain Plants (HOREB MG & AC MG) — ${selMonth} ${window.costYear}</div>
+    <div class="tbl-wrap"><table class="cost-table">${TH}<tbody>
+      ${MG.map(s=>buildRow(s,'#00e5cc')).join('')}${buildTotal(MG,'MG TOTAL')}
+    </tbody></table></div>
+  </div>
+  <div class="cc">
+    <div class="cc-title">National Grand Total — All Plants — ${selMonth} ${window.costYear}</div>
+    <div class="tbl-wrap"><table class="cost-table">${TH}<tbody>
+      ${buildTotal([...OPS,...TOLL,...MG],'NATIONAL TOTAL')}
+    </tbody></table></div>
+  </div>
+</div>`;
+}
+</script>
+<script>
+// ============================================================
+// RENDER DOWNTIME (from Downtime sheet via GAS)
+// ============================================================
+function renderDowntime(){
+  const ct=document.getElementById('content-downtime');
+  if(!ct) return;
+
+  // Filter by selected month
+  const allKeys=Object.keys(DT_AGG);
+  if(!allKeys.length){ct.innerHTML='<div class="no-data">No downtime data. Make sure the Downtime sheet has data.</div>';return;}
+
+  // Get all weeks for selected month
+  const monthWeeks=PROD.filter(r=>r.plant==='NATIONAL'&&r.month===activeMonth).map(r=>r.week);
+
+  // Collect all UDT & SDT detail rows for this month
+  let udtDetails=[], sdtDetails=[];
+  PROD_SITES.forEach(s=>{
+    monthWeeks.forEach(w=>{
+      const key=s+'|'+w;
+      const da=DT_AGG[key];
+      if(!da) return;
+      da.details.forEach(d=>udtDetails.push({site:s,week:w,...d}));
+      da.sdtDetails.forEach(d=>sdtDetails.push({site:s,week:w,...d}));
+    });
+  });
+  udtDetails.sort((a,b)=>b.hrs-a.hrs);
+  sdtDetails.sort((a,b)=>b.hrs-a.hrs);
+
+  // Summary per site
+  const summaryRows=PROD_SITES.map(s=>{
+    let totUDT=0,totSDT=0;
+    monthWeeks.forEach(w=>{totUDT+=totalUDT(s,w);totSDT+=totalSDT(s,w);});
+    const totHrs=PROD.filter(r=>r.plant===s&&r.month===activeMonth).reduce((a,r)=>a+(r.workingHours||0),0);
+    const udtPct=totHrs>0?totUDT/totHrs*100:0;
+    return `<tr>
+      <td>${dot(s)}${s}</td>
+      <td class="${totUDT>40?'tr':totUDT>20?'ta':''}">${totUDT>0?fv(totUDT,2):'—'}</td>
+      <td class="${udtPct>10?'tr':udtPct>5?'ta':''}">${udtPct>0?udtPct.toFixed(1)+'%':'—'}</td>
+      <td class="${totSDT>20?'ta':''}">${totSDT>0?fv(totSDT,2):'—'}</td>
+      <td>${(totUDT+totSDT)>0?fv(totUDT+totSDT,2):'—'}</td>
+    </tr>`;
+  }).join('');
+
+  // Pareto data
+  const catTotals={};
+  udtDetails.forEach(d=>{catTotals[d.cat]=(catTotals[d.cat]||0)+d.hrs;});
+  const sorted=Object.entries(catTotals).sort((a,b)=>b[1]-a[1]);
+  const paretoLabels=sorted.map(([k])=>k||'Unknown');
+  const paretoVals=sorted.map(([,v])=>+v.toFixed(2));
+  const total=paretoVals.reduce((a,b)=>a+b,0);
+  let cum=0;
+  const cumPct=paretoVals.map(v=>{cum+=v;return total>0?+(cum/total*100).toFixed(1):0;});
+  const barColors=['#ff4757','#ff6b35','#ffb700','#00e5cc','#00d26a','#9c27b0','#2196f3','#8b949e'];
+
+  ct.innerHTML=`
+<div class="sec">
+  <div class="sec-hdr"><div class="sec-title">Downtime Analysis — ${activeMonth} · All Sites</div><div class="sec-line"></div></div>
+
+  <!-- SUMMARY SCORECARD -->
+  <div class="cc" style="margin-bottom:12px">
+    <div class="cc-title">Monthly Downtime Summary — ${activeMonth}</div>
+    <div class="tbl-wrap"><table class="dt">
+      <thead><tr><th>Site</th><th>UDT (hr)</th><th>UDT %</th><th>SDT (hr)</th><th>Total DT (hr)</th></tr></thead>
+      <tbody>${summaryRows}
+        <tr class="tot">
+          <td>NATIONAL</td>
+          <td class="tr">${fv(PROD_SITES.reduce((a,s)=>{let t=0;monthWeeks.forEach(w=>t+=totalUDT(s,w));return a+t;},0),2)}</td>
+          <td>—</td>
+          <td>${fv(PROD_SITES.reduce((a,s)=>{let t=0;monthWeeks.forEach(w=>t+=totalSDT(s,w));return a+t;},0),2)}</td>
+          <td>${fv(PROD_SITES.reduce((a,s)=>{let t=0;monthWeeks.forEach(w=>t+=totalUDT(s,w)+totalSDT(s,w));return a+t;},0),2)}</td>
+        </tr>
+      </tbody>
+    </table></div>
+  </div>
+
+  <!-- PARETO CHART -->
+  <div class="cc" style="margin-bottom:12px">
+    <div class="cc-title">UDT Pareto Analysis — Top Causes (${activeMonth})</div>
+    <div style="position:relative;height:220px"><canvas id="c-pareto"></canvas></div>
+  </div>
+
+  <!-- UDT DETAIL TABLE -->
+  <div class="cc" style="margin-bottom:12px">
+    <div class="cc-title">Major UDT Events — ${activeMonth} (sorted by hours)</div>
+    <div class="tbl-wrap"><table class="dt">
+      <thead><tr><th>Site</th><th>Week</th><th>Category</th><th>Sub-Category</th><th>Reason</th><th>Hours</th></tr></thead>
+      <tbody>
+        ${udtDetails.slice(0,60).map((d,i)=>`<tr>
+          <td>${dot(d.site)}${d.site}</td>
+          <td style="color:var(--text3)">Wk ${d.week}</td>
+          <td><span style="padding:2px 7px;border-radius:4px;font-size:9px;background:rgba(255,71,87,.15);color:var(--red);font-weight:600">${d.cat||'—'}</span></td>
+          <td style="color:var(--text2)">${d.sub||'—'}</td>
+          <td style="color:var(--text3);max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${d.rsn||'—'}</td>
+          <td class="tr" style="font-weight:600">${fv(d.hrs,2)}</td>
+        </tr>`).join('')}
+        ${!udtDetails.length?'<tr><td colspan="6" style="text-align:center;color:var(--text3);padding:20px">No UDT data for this period</td></tr>':''}
+      </tbody>
+    </table></div>
+  </div>
+
+  <!-- SDT DETAIL TABLE -->
+  <div class="cc">
+    <div class="cc-title">Scheduled Downtime (SDT) Events — ${activeMonth}</div>
+    <div class="tbl-wrap"><table class="dt">
+      <thead><tr><th>Site</th><th>Week</th><th>Category</th><th>Sub-Category</th><th>Reason</th><th>Hours</th></tr></thead>
+      <tbody>
+        ${sdtDetails.slice(0,40).map(d=>`<tr>
+          <td>${dot(d.site)}${d.site}</td>
+          <td style="color:var(--text3)">Wk ${d.week}</td>
+          <td><span style="padding:2px 7px;border-radius:4px;font-size:9px;background:var(--blue-d);color:var(--blue-b);font-weight:600">${d.cat||'—'}</span></td>
+          <td style="color:var(--text2)">${d.sub||'—'}</td>
+          <td style="color:var(--text3);max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${d.rsn||'—'}</td>
+          <td class="ta" style="font-weight:600">${fv(d.hrs,2)}</td>
+        </tr>`).join('')}
+        ${!sdtDetails.length?'<tr><td colspan="6" style="text-align:center;color:var(--text3);padding:20px">No SDT data for this period</td></tr>':''}
+      </tbody>
+    </table></div>
+  </div>
+</div>`;
+
+  // Pareto chart
+  setTimeout(()=>{
+    if(paretoLabels.length){
+      mkChart('c-pareto','bar',paretoLabels,[
+        {label:'UDT Hours',data:paretoVals,backgroundColor:paretoLabels.map((_,i)=>barColors[i%barColors.length]+'cc'),borderColor:paretoLabels.map((_,i)=>barColors[i%barColors.length]),borderWidth:1,yAxisID:'y'},
+        {label:'Cumulative %',data:cumPct,type:'line',borderColor:'#ffca28',borderWidth:2,pointRadius:4,fill:false,tension:.3,yAxisID:'y1'}
+      ],{scales:{y:{beginAtZero:true,title:{display:true,text:'Hours',color:'#4a7aaa'}},y1:{position:'right',min:0,max:100,title:{display:true,text:'Cumulative %',color:'#4a7aaa'},grid:{drawOnChartArea:false}}}});
+    }
+  },150);
+}
+</script>
+<script>
+// ============================================================
+// PARSE MONTHLY CSV (MRMonthly - gid=542702606)
+// ============================================================
+function parseMonthlyCSV(text){
+  const rows=parseCSV(text);
+  let hi=-1;
+  for(let i=0;i<Math.min(rows.length,5);i++){
+    const c=(rows[i][0]||'').trim().toUpperCase();
+    if(c==='PLANT'||c==='SITE'){hi=i;break;}
+  }
+  if(hi<0){console.warn('Monthly: no header');return[];}
+  const VALID=new Set(SITES);
+  const data=[];
+  for(let i=hi+1;i<rows.length;i++){
+    const r=rows[i];
+    if(!r||r.length<5) continue;
+    const plant=(r[0]||'').trim().toUpperCase();
+    const month=(r[1]||'').trim().toUpperCase();
+    if(!VALID.has(plant)||!month||!MONTHS_ORDER.includes(month)) continue;
+    const gn=idx=>{if(idx<0||idx>=r.length)return 0;const v=parseFloat((r[idx]||'').toString().replace(/,/g,'').replace('%',''));return isNaN(v)?0:v;};
+    data.push({plant,month,
+      output:gn(2), plan:gn(3), avgDailyRate:gn(4),
+      oee:gn(5)*100, unscheduledDT:gn(6), scheduledDT:gn(7),
+      kwhTon:gn(8), liTon:gn(9),
+    });
+  }
+  console.log('Monthly parsed:',data.length,'rows');
+  return data;
+}
+
+// ============================================================
+// RENDER MONTHLY
+// ============================================================
+function renderMonthly(){
+  const ct=document.getElementById('content-monthly');
+  if(!ct) return;
+
+  const months=[...new Set(PROD.filter(r=>r.plant==='NATIONAL').map(r=>r.month))].sort((a,b)=>MONTHS_ORDER.indexOf(a)-MONTHS_ORDER.indexOf(b));
+  const selMonth=window.monthlyMonth||activeMonth||months[months.length-1];
+  window.monthlyMonth=selMonth;
+
+  // Remaining days calculation
+  const today=new Date();
+  const mIdx=MONTHS_ORDER.indexOf(selMonth);
+  const lastDay=mIdx>=0?new Date(today.getFullYear(),mIdx+1,0):today;
+  const remDays=Math.max(0,Math.floor((lastDay-new Date(today.getFullYear(),today.getMonth(),today.getDate()))/(1000*60*60*24)));
+
+  // Helpers to get monthly data
+  const getMD=site=>MONTHLY_DATA.find(r=>r.plant===site&&r.month===selMonth)||null;
+  const mSum=(site,field)=>PROD.filter(r=>r.plant===site&&r.month===selMonth).reduce((a,r)=>a+(r[field]||0),0);
+  const mAvg=(site,field)=>{const rows=PROD.filter(r=>r.plant===site&&r.month===selMonth&&(r[field]||0)>0);return rows.length?rows.reduce((a,r)=>a+(r[field]||0),0)/rows.length:0;};
+  const getOut=site=>{const md=getMD(site);return md&&md.output>0?md.output:mSum(site,'output');};
+  const getAvgDay=site=>{const md=getMD(site);if(md&&md.avgDailyRate>0)return md.avgDailyRate;const wks=PROD.filter(r=>r.plant===site&&r.month===selMonth).length;const out=mSum(site,'output');return wks>0?out/(wks*7):0;};
+  const getOEE=site=>{const md=getMD(site);return md&&md.oee>0?md.oee:mAvg(site,'oee');};
+
+  const monthTabs=months.map(m=>`<button onclick="window.monthlyMonth='${m}';renderMonthly()" style="padding:4px 10px;font-size:10px;font-family:'JetBrains Mono',monospace;border:1px solid var(--border2);border-radius:4px;background:${m===selMonth?'var(--blue)':'none'};color:${m===selMonth?'#fff':'var(--text2)'};cursor:pointer">${m.slice(0,3)}</button>`).join('');
+
+  // National KPIs
+  const natOut=PROD_SITES.reduce((a,s)=>a+getOut(s),0);
+  const natPlan=mSum('NATIONAL','plan');
+  const planPctM=natPlan>0?natOut/natPlan*100:0;
+  const natOEE=mAvg('NATIONAL','oee');
+  const natUDT=PROD_SITES.reduce((a,s)=>a+mSum(s,'unscheduledDT'),0);
+  const natSDT=PROD_SITES.reduce((a,s)=>a+mSum(s,'scheduledDT'),0);
+  const nAvgDay=getAvgDay('NATIONAL')||PROD_SITES.reduce((a,s)=>a+getAvgDay(s),0);
+  const nProj=natOut+nAvgDay*remDays;
+  const nCP=DEMO_CAP.NATIONAL>0?nProj/DEMO_CAP.NATIONAL*100:0;
+
+  // Scorecard rows
+  const scRows=PROD_SITES.map(s=>{
+    const out=getOut(s);
+    const oee=getOEE(s);
+    const udt=mSum(s,'unscheduledDT');
+    const sdt=mSum(s,'scheduledDT');
+    const kwh=mAvg(s,'kwhTon');
+    const lton=mAvg(s,'liTon');
+    const wkC=WEEKLY_COMMIT[s]||0;
+    const mC=wkC*4.33;
+    const pp=mC>0?out/mC*100:0;
+    return `<tr><td>${dot(s)}${s}</td>
+      <td>${out>0?fv(out,1):'—'}</td>
+      <td class="${bsc(pp,100,85)}">${mC>0?pp.toFixed(1)+'%':'—'}</td>
+      <td class="${bsc(oee,85,70)}">${oee>0?oee.toFixed(1)+'%':'—'}</td>
+      <td class="${udt>40?'tr':udt>20?'ta':''}">${udt>0?fv(udt,1):'—'}</td>
+      <td>${sdt>0?fv(sdt,1):'—'}</td>
+      <td>${kwh>0?fv(kwh,2):'—'}</td>
+      <td>${lton>0?fv(lton,3):'—'}</td>
+    </tr>`;
+  }).join('');
+
+  // Projection rows
+  const projRows=PROD_SITES.map(s=>{
+    const out=getOut(s);
+    const avgDay=getAvgDay(s);
+    const proj=out+avgDay*remDays;
+    const dc=DEMO_CAP[s],dsc=DESIGN_CAP[s];
+    const cPct=dc>0?proj/dc*100:0;
+    const uPct=dsc>0?proj/dsc*100:0;
+    return `<tr><td>${dot(s)}${s}</td>
+      <td>${out>0?fv(out,1):'—'}</td>
+      <td>${avgDay>0?fv(avgDay,2):'—'}</td>
+      <td>${remDays}</td>
+      <td>${proj>0?fv(proj,1):'—'}</td>
+      <td>${dc.toLocaleString()}</td>
+      <td class="${bsc(cPct,90,70)}">${proj>0?cPct.toFixed(1)+'%':'—'}</td>
+      <td>${dsc.toLocaleString()}</td>
+      <td class="${bsc(uPct,70,50)}">${proj>0?uPct.toFixed(1)+'%':'—'}</td>
+    </tr>`;
+  }).join('');
+
+  const nProjFinal=natOut+nAvgDay*remDays;
+  const nCP2=DEMO_CAP.NATIONAL>0?nProjFinal/DEMO_CAP.NATIONAL*100:0;
+  const nUP=DESIGN_CAP.NATIONAL>0?nProjFinal/DESIGN_CAP.NATIONAL*100:0;
+
+  ct.innerHTML=`
+<div class="sec">
+  <div class="sec-hdr"><div class="sec-title">Monthly Report — ${selMonth}</div><div class="sec-line"></div></div>
+  <div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:14px">${monthTabs}</div>
+
+  <!-- KPI CARDS -->
+  <div class="kpi-row g4" style="margin-bottom:12px">
+    <div class="kc" style="--kc-color:${planPctM>=100?'var(--green-b)':'var(--amber)'}">
+      <div class="kc-lbl">Monthly Output</div>
+      <div class="kc-val" style="color:${planPctM>=100?'var(--green-b)':'var(--amber)'}">${fv(natOut,1)}<span style="font-size:12px;color:var(--text3)"> mt</span></div>
+      <div class="kc-sub">Plan: ${fv(natPlan,1)} mt</div>
+      <span class="bdg ${bsc(planPctM,100,90)}">${planPctM.toFixed(1)}% of plan</span>
+    </div>
+    <div class="kc" style="--kc-color:${bsc(natOEE,85,70)==='g'?'var(--green-b)':bsc(natOEE,85,70)==='a'?'var(--amber)':'var(--red)'}">
+      <div class="kc-lbl">Avg OEE</div>
+      <div class="kc-val" style="color:${natOEE>=85?'var(--green-b)':natOEE>=70?'var(--amber)':'var(--red)'}">${natOEE>0?natOEE.toFixed(1):'—'}<span style="font-size:12px;color:var(--text3)">%</span></div>
+      <div class="kc-sub">${selMonth} national avg</div>
+    </div>
+    <div class="kc" style="--kc-color:var(--red)">
+      <div class="kc-lbl">Downtime</div>
+      <div style="display:flex;gap:6px;margin:4px 0">
+        <div style="flex:1;text-align:center;background:var(--red-d);border-radius:4px;padding:4px">
+          <div style="font-size:9px;color:var(--red);font-weight:700">UDT</div>
+          <div style="font-size:16px;font-weight:700;color:var(--red)">${fv(natUDT,1)}<span style="font-size:9px"> hr</span></div>
+        </div>
+        <div style="flex:1;text-align:center;background:var(--blue-d);border-radius:4px;padding:4px">
+          <div style="font-size:9px;color:var(--blue-b);font-weight:700">SDT</div>
+          <div style="font-size:16px;font-weight:700;color:var(--blue-b)">${fv(natSDT,1)}<span style="font-size:9px"> hr</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="kc" style="--kc-color:var(--blue-b)">
+      <div class="kc-lbl">Projected Month-End</div>
+      <div class="kc-val" style="color:var(--blue-b)">${fv(nProjFinal,1)}<span style="font-size:12px;color:var(--text3)"> mt</span></div>
+      <div class="kc-sub">${remDays} days left · ${nCP2.toFixed(1)}% of demo cap</div>
+    </div>
+  </div>
+
+  <!-- SCORECARD TABLE -->
+  <div class="cc" style="margin-bottom:12px">
+    <div class="cc-title">Monthly Scorecard — ${selMonth}</div>
+    <div class="tbl-wrap"><table class="dt">
+      <thead><tr><th>Site</th><th>Output (mt)</th><th>vs Commit</th><th>OEE%</th><th>UDT hr</th><th>SDT hr</th><th>kWh/ton</th><th>L/ton</th></tr></thead>
+      <tbody>${scRows}
+        <tr class="tot"><td>NATIONAL</td><td>${fv(natOut,1)}</td>
+          <td class="${bsc(planPctM,100,90)}">${planPctM.toFixed(1)}%</td>
+          <td class="${bsc(natOEE,85,70)}">${natOEE>0?natOEE.toFixed(1)+'%':'—'}</td>
+          <td class="tr">${fv(natUDT,1)}</td><td>${fv(natSDT,1)}</td><td>—</td><td>—</td>
+        </tr>
+      </tbody>
+    </table></div>
+  </div>
+
+  <!-- PROJECTION TABLE -->
+  <div class="cc">
+    <div class="cc-title">Month-End Volume Projection — ${selMonth} (${remDays} calendar days remaining)</div>
+    <div class="tbl-wrap"><table class="dt">
+      <thead><tr><th>Site</th><th>Output MTD</th><th>Avg/day</th><th>Days Left</th><th>Projected</th><th>Demo Cap</th><th>Commit%</th><th>Design Cap</th><th>Util%</th></tr></thead>
+      <tbody>${projRows}
+        <tr class="tot"><td>NATIONAL</td><td>${fv(natOut,1)}</td>
+          <td>${fv(nAvgDay,2)}</td><td>${remDays}</td><td>${fv(nProjFinal,1)}</td>
+          <td>${DEMO_CAP.NATIONAL.toLocaleString()}</td>
+          <td class="${bsc(nCP2,90,70)}">${nCP2.toFixed(1)}%</td>
+          <td>${DESIGN_CAP.NATIONAL.toLocaleString()}</td>
+          <td class="${bsc(nUP,70,50)}">${nUP.toFixed(1)}%</td>
+        </tr>
+      </tbody>
+    </table></div>
+  </div>
+</div>`;
+}
+</script>
+</body>
+</html>
