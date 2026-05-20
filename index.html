@@ -193,7 +193,8 @@ async function loadData(isRefresh=false) {
     const weekly = await gasGet('weekly', {site:'National'});
     DATA.weekly = weekly;
     const weeks = (weekly.weeks||[]).map(w=>+w).filter(w=>w>0).sort((a,b)=>a-b);
-    if (!isRefresh) activeWeek = weeks[weeks.length-1] || 1;
+    if (!isRefresh) activeWeek = weeks[weeks.length-1] || 21;
+    console.log('Weeks available:', weeks, 'Active week:', activeWeek);
 
     setStatus('live');
     document.getElementById('last-updated').textContent = new Date().toLocaleTimeString('en-PH',{hour:'2-digit',minute:'2-digit'});
@@ -244,7 +245,7 @@ function buildNav() {
   if(ss) ss.innerHTML=SITES.map(s=>`<option value="${s}" ${s===activeSite?'selected':''}>${SL[s]}</option>`).join('');
   const ws=document.getElementById('week-select');
   const weeks=(DATA.weekly&&DATA.weekly.weeks)||[];
-  const sortedWks=[...new Set(weeks.map(w=>+w))].filter(w=>w>0).sort((a,b)=>a-b);if(ws) ws.innerHTML=sortedWks.map(w=>`<option value="${w}" ${+w===+activeWeek?'selected':''}>Week ${w}</option>`).join('');
+  const sortedWks=(DATA.weekly&&DATA.weekly.weeks||[]).map(w=>+w).filter(w=>w>0).sort((a,b)=>a-b);if(ws) ws.innerHTML=sortedWks.map(w=>`<option value="${w}" ${+w===+activeWeek?'selected':''}>Week ${w}</option>`).join('');
 }
 function setSite(s){activeSite=s;DATA={};gasGet('weekly',{site:s}).then(d=>{DATA.weekly=d;const wks=d.weeks||[];activeWeek=wks[wks.length-1]||activeWeek;buildNav();render();}).catch(()=>render());}
 function setWeek(w){activeWeek=w;buildNav();render();}
@@ -290,15 +291,17 @@ function render() {
 
   const rows=wd.rows||[];
   const allWeeks=[...new Set(rows.map(r=>+(r.Week||r.week||0)).filter(w=>w>0))].sort((a,b)=>a-b);
-  const wkRows=rows.filter(r=>+(r.Week||r.week||0)===+activeWeek);
+  const wkRows=rows.filter(r=>+r['Week']===+activeWeek||+r['week']===+activeWeek);
+  console.log('All rows count:', rows.length, 'Week', activeWeek, 'rows:', wkRows.length, 'Sample row keys:', rows[0]?Object.keys(rows[0]).slice(0,8):[]);
   const siteWkRows=activeSite==='NATIONAL'?wkRows:wkRows.filter(r=>(r.Plant||r.plant||'').toString().toUpperCase()===activeSite);
 
   // KPIs
   const totOut=siteWkRows.reduce((a,r)=>a+gf(r,'Total Plant Output,mt w/o toll','Total Plant Output, mt w/o toll','output'),0);
-  const totPlan=siteWkRows.reduce((a,r)=>a+gf(r,'Planned, mt','Planned','Total Mash Input','plan','Total Plant Input, mt'),0);
+  const totPlan=siteWkRows.reduce((a,r)=>a+gf(r,'Planned, mt','Total Plant Input, mt','Planned','Total Mash Input','plan'),0);
   const totUDT=siteWkRows.reduce((a,r)=>a+gf(r,'Unscheduled Down Time, hr','unscheduledDT'),0);
   const totSDT=siteWkRows.reduce((a,r)=>a+gf(r,'Scheduled Down Time, hr','scheduledDT'),0);
-  const avgOEE=siteWkRows.length?oeeNorm(siteWkRows.reduce((a,r)=>a+gf(r,'OEE','oee'),0)/siteWkRows.length):0;
+  const _rawOEE=siteWkRows.length?siteWkRows.reduce((a,r)=>a+gf(r,'OEE','oee'),0)/siteWkRows.length:0;
+  const avgOEE=_rawOEE>0&&_rawOEE<=1?_rawOEE*100:_rawOEE;
   const pp=totPlan>0?(totOut/totPlan*100):0;
   const pC=pp>=100?'var(--green-b)':pp>=85?'var(--amber)':'var(--red)';
   const oC=avgOEE>=85?'var(--green-b)':avgOEE>=70?'var(--amber)':'var(--red)';
@@ -310,9 +313,10 @@ function render() {
     ${PROD_SITES.map(s=>{
       const sr=wkRows.filter(r=>(r.Plant||r.plant||'').toUpperCase()===s);
       const out=sr.reduce((a,r)=>a+gf(r,'Total Plant Output,mt w/o toll','Total Plant Output, mt w/o toll','output'),0);
-      const plan=sr.reduce((a,r)=>a+gf(r,'Planned, mt','Planned','Total Mash Input','plan','Total Plant Input, mt'),0);
+      const plan=sr.reduce((a,r)=>a+gf(r,'Planned, mt','Total Plant Input, mt','Planned','Total Mash Input','plan'),0);
       const udt=sr.reduce((a,r)=>a+gf(r,'Unscheduled Down Time, hr','unscheduledDT'),0);
-      const oee=sr.length?oeeNorm(sr.reduce((a,r)=>a+gf(r,'OEE','oee'),0)/sr.length):0;
+      const _sOEE=sr.length?sr.reduce((a,r)=>a+gf(r,'OEE','oee'),0)/sr.length:0;
+      const oee=_sOEE>0&&_sOEE<=1?_sOEE*100:_sOEE;
       const p2=plan>0?(out/plan*100):0;
       return `<div style="background:var(--bg2);border:1px solid var(--border);border-top:2px solid ${p2>=100?'var(--green)':p2>=85?'var(--amber)':'var(--red)'};border-radius:var(--rl);padding:8px;text-align:center">
         <div>${dot(s)}</div>
@@ -376,7 +380,7 @@ function render() {
       const p2=plan>0?(out/plan*100):0;
       const udt=gf(r,'Unscheduled Down Time, hr','unscheduledDT');
       const sdt=gf(r,'Scheduled Down Time, hr','scheduledDT');
-      const oee=oeeNorm(gf(r,'OEE','oee'));
+      const _roee=gf(r,'OEE','oee');const oee=_roee>0&&_roee<=1?_roee*100:_roee;
       const rej=gf(r,'Total Remill Reject, mt','outrightRejectMt');
       return `<tr>
         <td>${dot(s)}${SL[s]||s}</td>
@@ -415,7 +419,7 @@ function render() {
   ],{plugins:{legend:{display:true,labels:{color:'#8b949e',font:{size:9},boxWidth:8}},tooltip:{backgroundColor:'#1f2631',borderColor:'rgba(255,255,255,.1)',borderWidth:1,bodyFont:{family:"'DM Mono',monospace",size:10}}}});
 
   mkChart('c-oee','line',lbl,[
-    {data:allWeeks.map(w=>{const v=bw(w);return v.length?+(oeeNorm(v.reduce((a,r)=>a+gf(r,'OEE'),0)/v.length)).toFixed(1):null;}),borderColor:'#3fb950',backgroundColor:'rgba(63,185,80,0.08)',fill:true,tension:.3,pointRadius:3,spanGaps:true}
+    {data:allWeeks.map(w=>{const v=bw(w);if(!v.length)return null;const raw=v.reduce((a,r)=>a+gf(r,'OEE'),0)/v.length;return +((raw>0&&raw<=1?raw*100:raw)).toFixed(1);}),borderColor:'#3fb950',backgroundColor:'rgba(63,185,80,0.08)',fill:true,tension:.3,pointRadius:3,spanGaps:true}
   ],{plugins:{legend:{display:false},tooltip:{backgroundColor:'#1f2631',borderColor:'rgba(255,255,255,.1)',borderWidth:1,bodyFont:{family:"'DM Mono',monospace",size:10}}},scales:{x:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'#484f58',font:{size:9}}},y:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'#484f58',font:{size:9}},min:0,max:120}}});
 
   mkChart('c-udt','bar',lbl,[
@@ -434,7 +438,7 @@ function renderMonthly() {
     <tbody>${rows.map(r=>{
       const s=(r.Plant||r.plant||'').toUpperCase();
       const udt=gf(r,'Unscheduled Down Time, hr','Unscheduled Dc');
-      const oee=oeeNorm(gf(r,'OEE','oee'));
+      const _roee=gf(r,'OEE','oee');const oee=_roee>0&&_roee<=1?_roee*100:_roee;
       return `<tr>
         <td>${dot(s)}${SL[s]||s}</td>
         <td>${r.MONTH||r.Month||r.month||'—'}</td>
@@ -567,7 +571,7 @@ function renderOEE() {
     <thead><tr><th>Site</th><th>OEE%</th><th>Availability%</th><th>Performance%</th><th>Quality%</th><th>Output mt</th><th>Adj Capacity</th></tr></thead>
     <tbody>${rows.map(r=>{
       const s=(r.Plant||r.plant||'').toUpperCase();
-      const oee=oeeNorm(gf(r,'OEE','oee'));
+      const _roee=gf(r,'OEE','oee');const oee=_roee>0&&_roee<=1?_roee*100:_roee;
       const av=oeeNorm(gf(r,'AVAILABIILITY','AVAILABILITY','availability'));
       const pf=oeeNorm(gf(r,'PERFORMANCE','performance'));
       const ql=oeeNorm(gf(r,'QUALITY','quality'));
