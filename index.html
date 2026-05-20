@@ -296,12 +296,16 @@ function render() {
   const siteWkRows=activeSite==='NATIONAL'?wkRows:wkRows.filter(r=>(r.Plant||r.plant||'').toString().toUpperCase()===activeSite);
 
   // KPIs
-  const totOut=siteWkRows.reduce((a,r)=>a+gf(r,'Total Plant Output,mt w/o toll','Total Plant Output, mt w/o toll','output'),0);
-  const totPlan=siteWkRows.reduce((a,r)=>a+gf(r,'Planned, mt','Total Plant Input, mt','Planned','Total Mash Input','plan'),0);
-  const totUDT=siteWkRows.reduce((a,r)=>a+gf(r,'Unscheduled Down Time, hr','unscheduledDT'),0);
-  const totSDT=siteWkRows.reduce((a,r)=>a+gf(r,'Scheduled Down Time, hr','scheduledDT'),0);
-  const _rawOEE=siteWkRows.length?siteWkRows.reduce((a,r)=>a+gf(r,'OEE','oee'),0)/siteWkRows.length:0;
-  const avgOEE=_rawOEE>0&&_rawOEE<=1?_rawOEE*100:_rawOEE;
+  // Output = CF + Mixgrain + Vietop (cols AP + AR + AZ)
+  const totCF   = siteWkRows.reduce((a,r)=>a+gf(r,'Total Plant Output EXC MIXGRAIN & VIETOP'),0);
+  const totMG   = siteWkRows.reduce((a,r)=>a+gf(r,'Mixgrain'),0);
+  const totVT   = siteWkRows.reduce((a,r)=>a+gf(r,'Vietop'),0);
+  const totOut  = totCF + totMG + totVT;
+  const totPlan = siteWkRows.reduce((a,r)=>a+gf(r,'Planned, mt','Total Plant Input, mt','Planned'),0);
+  const totUDT  = siteWkRows.reduce((a,r)=>a+gf(r,'Unscheduled Down Time, hr'),0);
+  const totSDT  = siteWkRows.reduce((a,r)=>a+gf(r,'Scheduled Down Time, hr'),0);
+  const _rawOEE = siteWkRows.length?siteWkRows.reduce((a,r)=>a+gf(r,'OEE'),0)/siteWkRows.length:0;
+  const avgOEE  = _rawOEE>1?_rawOEE:_rawOEE*100;
   const pp=totPlan>0?(totOut/totPlan*100):0;
   const pC=pp>=100?'var(--green-b)':pp>=85?'var(--amber)':'var(--red)';
   const oC=avgOEE>=85?'var(--green-b)':avgOEE>=70?'var(--amber)':'var(--red)';
@@ -362,6 +366,11 @@ function render() {
       <div class="kc-lbl">Output</div>
       <div class="kc-val" style="color:${pC}">${totOut>0?totOut.toFixed(1):'—'}<span style="font-size:12px;color:var(--text2)"> mt</span></div>
       <div class="kc-sub">Plan: ${totPlan>0?totPlan.toFixed(1):'—'} mt</div>
+      <div style="display:flex;gap:3px;flex-wrap:wrap;margin-bottom:4px">
+        ${totCF>0?`<span style="font-size:8px;background:rgba(56,139,253,0.15);color:#388bfd;padding:1px 5px;border-radius:3px">CF ${totCF.toFixed(1)}</span>`:''}
+        ${totMG>0?`<span style="font-size:8px;background:rgba(163,113,247,0.15);color:#a371f7;padding:1px 5px;border-radius:3px">MG ${totMG.toFixed(1)}</span>`:''}
+        ${totVT>0?`<span style="font-size:8px;background:rgba(26,188,156,0.15);color:#1abc9c;padding:1px 5px;border-radius:3px">VT ${totVT.toFixed(1)}</span>`:''}
+      </div>
       <span class="bdg ${bsc(pp,100,85)}">${pp>0?pp.toFixed(1)+'% of plan':'No data'}</span>
     </div>
     <div class="kc" style="--kc-color:var(--blue)">
@@ -400,12 +409,15 @@ function render() {
     <thead><tr><th>Site</th><th>Working Hrs</th><th>UDT Hr</th><th>SDT Hr</th><th>Total DT Hr</th><th>Output mt</th><th>Plan mt</th><th>Plan%</th><th>OEE%</th><th>Reject mt</th></tr></thead>
     <tbody>${wkRows.map(r=>{
       const s=(r.Plant||r.plant||'').toUpperCase();
-      const out=gf(r,'Total Plant Output,mt w/o toll','Total Plant Output, mt w/o toll','output');
-      const plan=gf(r,'Planned, mt','Planned','Total Mash Input','plan','Total Plant Input, mt');
+      const cf2=gf(r,'Total Plant Output EXC MIXGRAIN & VIETOP');
+      const mg2=gf(r,'Mixgrain');
+      const vt2=gf(r,'Vietop');
+      const out=cf2+mg2+vt2;
+      const plan=gf(r,'Planned, mt','Total Plant Input, mt','Planned');
       const p2=plan>0?(out/plan*100):0;
-      const udt=gf(r,'Unscheduled Down Time, hr','unscheduledDT');
-      const sdt=gf(r,'Scheduled Down Time, hr','scheduledDT');
-      const _roee=gf(r,'OEE','oee');const oee=_roee>0&&_roee<=1?_roee*100:_roee;
+      const udt=gf(r,'Unscheduled Down Time, hr');
+      const sdt=gf(r,'Scheduled Down Time, hr');
+      const _roee=gf(r,'OEE');const oee=_roee>1?_roee:_roee*100;
       const rej=gf(r,'Total Remill Reject, mt','outrightRejectMt');
       return `<tr>
         <td>${dot(s)}${SL[s]||s}</td>
@@ -439,8 +451,8 @@ function render() {
   const lbl = allWeeks.map(w=>'W'+w);
 
   mkChart('c-out','bar',lbl,[
-    {label:'Plan',data:allWeeks.map(w=>+bw(w).reduce((a,r)=>a+gf(r,'Planned','Total Mash Input'),0).toFixed(1)),backgroundColor:'rgba(255,255,255,0.07)',borderRadius:2},
-    {label:'Output',data:allWeeks.map(w=>+bw(w).reduce((a,r)=>a+gf(r,'Total Plant Output,mt w/o toll'),0).toFixed(1)),backgroundColor:'#388bfd',borderRadius:2}
+    {label:'Plan',data:allWeeks.map(w=>+bw(w).reduce((a,r)=>a+gf(r,'Planned, mt','Total Plant Input, mt'),0).toFixed(1)),backgroundColor:'rgba(255,255,255,0.07)',borderRadius:2},
+    {label:'Output',data:allWeeks.map(w=>+bw(w).reduce((a,r)=>a+gf(r,'Total Plant Output EXC MIXGRAIN & VIETOP')+gf(r,'Mixgrain')+gf(r,'Vietop'),0).toFixed(1)),backgroundColor:'#388bfd',borderRadius:2}
   ],{plugins:{legend:{display:true,labels:{color:'#8b949e',font:{size:9},boxWidth:8}},tooltip:{backgroundColor:'#1f2631',borderColor:'rgba(255,255,255,.1)',borderWidth:1,bodyFont:{family:"'DM Mono',monospace",size:10}}}});
 
   mkChart('c-oee','line',lbl,[
