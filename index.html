@@ -192,7 +192,7 @@ async function loadData(isRefresh=false) {
   try {
     const weekly = await gasGet('weekly', {site:'National'});
     DATA.weekly = weekly;
-    const weeks = weekly.weeks || [];
+    const weeks = (weekly.weeks||[]).map(w=>+w).filter(w=>w>0).sort((a,b)=>a-b);
     if (!isRefresh) activeWeek = weeks[weeks.length-1] || 1;
 
     setStatus('live');
@@ -244,9 +244,9 @@ function buildNav() {
   if(ss) ss.innerHTML=SITES.map(s=>`<option value="${s}" ${s===activeSite?'selected':''}>${SL[s]}</option>`).join('');
   const ws=document.getElementById('week-select');
   const weeks=(DATA.weekly&&DATA.weekly.weeks)||[];
-  if(ws) ws.innerHTML=weeks.map(w=>`<option value="${w}" ${w===activeWeek?'selected':''}>Week ${w}</option>`).join('');
+  const sortedWks=[...new Set(weeks.map(w=>+w))].filter(w=>w>0).sort((a,b)=>a-b);if(ws) ws.innerHTML=sortedWks.map(w=>`<option value="${w}" ${+w===+activeWeek?'selected':''}>Week ${w}</option>`).join('');
 }
-function setSite(s){activeSite=s;DATA={...DATA,downtime:null,cost:null,production:null,oee:null,cost_analytics:null,quality_energy:null};gasGet('weekly',{site:s}).then(d=>{DATA.weekly=d;buildNav();render();}).catch(()=>render());}
+function setSite(s){activeSite=s;DATA={};gasGet('weekly',{site:s}).then(d=>{DATA.weekly=d;const wks=d.weeks||[];activeWeek=wks[wks.length-1]||activeWeek;buildNav();render();}).catch(()=>render());}
 function setWeek(w){activeWeek=w;buildNav();render();}
 
 function setPage(p) {
@@ -268,7 +268,17 @@ function mkChart(id,type,labels,datasets,opts={}) {
 }
 
 // ── FIELD HELPERS ─────────────────────────────────────────
-const gf = (r,...keys) => { for(const k of keys){const v=parseFloat(r[k]);if(!isNaN(v)&&v!==0)return v;} return 0; };
+const gf = (r,...keys) => {
+  for(const k of keys){
+    if(r[k]!==undefined&&r[k]!==null&&r[k]!==''){
+      const v=parseFloat(String(r[k]).replace(/,/g,''));
+      if(!isNaN(v))return v;
+    }
+  }
+  return 0;
+};
+// Get string field
+const gs = (r,...keys) => { for(const k of keys){if(r[k]!==undefined&&r[k]!==null&&r[k]!=='')return String(r[k]);} return ''; };
 const oeeNorm = v => v>1?v:v>0?v*100:0;
 
 // ── WEEKLY PULSE ──────────────────────────────────────────
@@ -279,13 +289,13 @@ function render() {
   if(!wd||!wd.rows){ct.innerHTML='<div class="no-data">⟳ Loading weekly data...</div>';return;}
 
   const rows=wd.rows||[];
-  const allWeeks=[...new Set(rows.map(r=>r.Week||r.week))].sort((a,b)=>+a-+b);
-  const wkRows=rows.filter(r=>String(r.Week||r.week)===String(activeWeek));
-  const siteWkRows=activeSite==='NATIONAL'?wkRows:wkRows.filter(r=>(r.Plant||r.plant||'').toUpperCase()===activeSite);
+  const allWeeks=[...new Set(rows.map(r=>+(r.Week||r.week||0)).filter(w=>w>0))].sort((a,b)=>a-b);
+  const wkRows=rows.filter(r=>+(r.Week||r.week||0)===+activeWeek);
+  const siteWkRows=activeSite==='NATIONAL'?wkRows:wkRows.filter(r=>(r.Plant||r.plant||'').toString().toUpperCase()===activeSite);
 
   // KPIs
-  const totOut=siteWkRows.reduce((a,r)=>a+gf(r,'Total Plant Output,mt w/o toll','output'),0);
-  const totPlan=siteWkRows.reduce((a,r)=>a+gf(r,'Planned','Total Mash Input','plan'),0);
+  const totOut=siteWkRows.reduce((a,r)=>a+gf(r,'Total Plant Output,mt w/o toll','Total Plant Output, mt w/o toll','output'),0);
+  const totPlan=siteWkRows.reduce((a,r)=>a+gf(r,'Planned, mt','Planned','Total Mash Input','plan','Total Plant Input, mt'),0);
   const totUDT=siteWkRows.reduce((a,r)=>a+gf(r,'Unscheduled Down Time, hr','unscheduledDT'),0);
   const totSDT=siteWkRows.reduce((a,r)=>a+gf(r,'Scheduled Down Time, hr','scheduledDT'),0);
   const avgOEE=siteWkRows.length?oeeNorm(siteWkRows.reduce((a,r)=>a+gf(r,'OEE','oee'),0)/siteWkRows.length):0;
@@ -299,8 +309,8 @@ function render() {
     <div style="display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px">
     ${PROD_SITES.map(s=>{
       const sr=wkRows.filter(r=>(r.Plant||r.plant||'').toUpperCase()===s);
-      const out=sr.reduce((a,r)=>a+gf(r,'Total Plant Output,mt w/o toll','output'),0);
-      const plan=sr.reduce((a,r)=>a+gf(r,'Planned','Total Mash Input','plan'),0);
+      const out=sr.reduce((a,r)=>a+gf(r,'Total Plant Output,mt w/o toll','Total Plant Output, mt w/o toll','output'),0);
+      const plan=sr.reduce((a,r)=>a+gf(r,'Planned, mt','Planned','Total Mash Input','plan','Total Plant Input, mt'),0);
       const udt=sr.reduce((a,r)=>a+gf(r,'Unscheduled Down Time, hr','unscheduledDT'),0);
       const oee=sr.length?oeeNorm(sr.reduce((a,r)=>a+gf(r,'OEE','oee'),0)/sr.length):0;
       const p2=plan>0?(out/plan*100):0;
@@ -327,7 +337,7 @@ function render() {
     </div>
     <div class="kc" style="--kc-color:var(--blue)">
       <div class="kc-lbl">Working Hours</div>
-      <div class="kc-val" style="font-size:20px">${fv(siteWkRows.reduce((a,r)=>a+gf(r,'Working Hours'),0),1)}<span style="font-size:12px;color:var(--text2)"> hr</span></div>
+      <div class="kc-val" style="font-size:20px">${fv(siteWkRows.reduce((a,r)=>a+gf(r,'Working Hours','Working Days'),0),1)}<span style="font-size:12px;color:var(--text2)"> hr</span></div>
       <div class="kc-sub">Total scheduled hrs</div>
     </div>
     <div class="kc" style="--kc-color:${totUDT>20?'var(--red)':totUDT>10?'var(--amber)':'var(--border2)'}">
@@ -361,8 +371,8 @@ function render() {
     <thead><tr><th>Site</th><th>Working Hrs</th><th>UDT Hr</th><th>SDT Hr</th><th>Total DT Hr</th><th>Output mt</th><th>Plan mt</th><th>Plan%</th><th>OEE%</th><th>Reject mt</th></tr></thead>
     <tbody>${wkRows.map(r=>{
       const s=(r.Plant||r.plant||'').toUpperCase();
-      const out=gf(r,'Total Plant Output,mt w/o toll','output');
-      const plan=gf(r,'Planned','Total Mash Input','plan');
+      const out=gf(r,'Total Plant Output,mt w/o toll','Total Plant Output, mt w/o toll','output');
+      const plan=gf(r,'Planned, mt','Planned','Total Mash Input','plan','Total Plant Input, mt');
       const p2=plan>0?(out/plan*100):0;
       const udt=gf(r,'Unscheduled Down Time, hr','unscheduledDT');
       const sdt=gf(r,'Scheduled Down Time, hr','scheduledDT');
@@ -396,7 +406,7 @@ function render() {
   ct.className='content fade';
 
   const sf = activeSite==='NATIONAL' ? r=>true : r=>(r.Plant||r.plant||'').toUpperCase()===activeSite;
-  const bw = w => rows.filter(r=>String(r.Week||r.week)===String(w)&&sf(r));
+  const bw = w => rows.filter(r=>+(r.Week||r.week||0)===+w&&sf(r));
   const lbl = allWeeks.map(w=>'W'+w);
 
   mkChart('c-out','bar',lbl,[
@@ -518,8 +528,8 @@ function renderProduction() {
     <thead><tr><th>Site</th><th>Output mt</th><th>Plan mt</th><th>Plan%</th><th>Run Rate t/hr</th><th>Pellet mt</th><th>Crumble mt</th><th>Mash mt</th><th>Mixgrain mt</th></tr></thead>
     <tbody>${rows.map(r=>{
       const s=(r.Plant||r.plant||'').toUpperCase();
-      const out=gf(r,'Total Plant Output,mt w/o toll','output');
-      const plan=gf(r,'Planned','Total Mash Input','plan');
+      const out=gf(r,'Total Plant Output,mt w/o toll','Total Plant Output, mt w/o toll','output');
+      const plan=gf(r,'Planned, mt','Planned','Total Mash Input','plan','Total Plant Input, mt');
       const p2=plan>0?(out/plan*100):0;
       return `<tr>
         <td>${dot(s)}${SL[s]||s}</td>
