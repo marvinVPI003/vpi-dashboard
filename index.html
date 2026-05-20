@@ -1,361 +1,688 @@
-// VPI Dashboard — Google Apps Script (v40)
-// Sheet names (exact — verified from live Google Sheet tabs):
-//   MR Weekly, MR Daily, Downtime, Prod Cost, MR Monthly, PC daily, MCOS daily
-// Sites: AC, PFMIS, HOREB, BUKID, ARGAO, CCPC, SOUTH (+ National aggregate)
-// Deploy as: Web App → Execute as Me → Anyone
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>VPI Operations Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@300;400;500;600;700&family=Barlow+Condensed:wght@400;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+:root{--bg:#0d1117;--bg2:#161b22;--bg3:#1f2631;--border:rgba(255,255,255,0.07);--border2:rgba(255,255,255,0.13);--text:#e6edf3;--text2:#8b949e;--text3:#484f58;--green:#2ea043;--green-b:#3fb950;--green-d:rgba(46,160,67,0.15);--amber:#d29922;--amber-d:rgba(210,153,34,0.15);--red:#f85149;--red-d:rgba(248,81,73,0.15);--blue:#388bfd;--blue-d:rgba(56,139,253,0.15);--teal:#1abc9c;--purple:#a371f7;--r:6px;--rl:10px}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:'Barlow',sans-serif;font-size:13px;line-height:1.5;display:flex;flex-direction:column;min-height:100vh}
+.pulse{display:inline-block;width:5px;height:5px;border-radius:50%;background:var(--green-b);animation:pulse 2s infinite;vertical-align:middle}
+@keyframes pulse{0%{box-shadow:0 0 0 0 rgba(63,185,80,.4)}70%{box-shadow:0 0 0 5px rgba(63,185,80,0)}100%{box-shadow:0 0 0 0 rgba(63,185,80,0)}}
+.pulse.fetching{background:var(--amber);animation:none}.pulse.error{background:var(--red);animation:none}
+.loading-screen{position:fixed;inset:0;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:999;gap:16px}
+.loading-logo{font-family:'Barlow Condensed',sans-serif;font-size:28px;font-weight:700;color:var(--green-b)}
+.loading-sub{font-size:11px;color:var(--text3);font-family:'DM Mono',monospace;letter-spacing:1px}
+.loading-bar-wrap{width:220px;height:3px;background:var(--bg3);border-radius:2px;overflow:hidden}
+.loading-bar{height:100%;background:var(--green);border-radius:2px;animation:loadbar 1.5s ease-in-out infinite}
+@keyframes loadbar{0%{width:0%;margin-left:0}50%{width:60%}100%{width:0%;margin-left:100%}}
+.loading-msg{font-size:11px;color:var(--text2);font-family:'DM Mono',monospace}
+.retry-btn{padding:8px 20px;font-size:11px;font-family:'DM Mono',monospace;border:1px solid var(--red);border-radius:4px;background:none;color:var(--red);cursor:pointer;margin-top:8px}
+.topnav{position:fixed;top:0;left:0;right:0;height:52px;background:var(--bg2);border-bottom:1px solid var(--border);display:flex;align-items:center;z-index:200;padding:0 16px;gap:0;flex-wrap:nowrap;overflow:hidden}
+.topnav-brand{font-family:'Barlow Condensed',sans-serif;font-size:15px;font-weight:700;color:var(--green-b);white-space:nowrap;padding-right:12px;border-right:1px solid var(--border);margin-right:12px;flex-shrink:0}
+.topnav-brand span{display:block;font-size:9px;color:var(--text3);letter-spacing:1.5px;font-weight:400}
+.page-tabs{display:flex;gap:2px;margin-right:10px;flex-shrink:0}
+.page-tab{padding:5px 9px;font-size:10px;font-family:'Barlow Condensed',sans-serif;font-weight:600;letter-spacing:.3px;text-transform:uppercase;border:1px solid var(--border);border-radius:var(--r);background:none;color:var(--text2);cursor:pointer;transition:all .15s;white-space:nowrap}
+.page-tab:hover{background:rgba(255,255,255,.04);color:var(--text)}
+.page-tab.active{background:var(--green-d);color:var(--green-b);border-color:rgba(63,185,80,.3)}
+.topnav-selects{display:flex;gap:6px;align-items:center;margin-right:auto;flex-shrink:0}
+.tn-select{padding:4px 22px 4px 7px;background:var(--bg3);color:var(--text);border:1px solid var(--border2);border-radius:var(--r);font-family:'Barlow',sans-serif;font-size:11px;cursor:pointer;outline:none;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 12 12'%3E%3Cpath fill='%238b949e' d='M6 8L1 3h10z'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 6px center;min-width:110px}
+.tn-label{font-size:9px;color:var(--text3);font-family:'DM Mono',monospace;letter-spacing:1px;text-transform:uppercase;white-space:nowrap}
+.topnav-status{display:flex;align-items:center;gap:6px;margin-left:6px;flex-shrink:0}
+.tn-refresh{padding:4px 9px;font-size:10px;font-family:'DM Mono',monospace;border:1px solid var(--border2);border-radius:4px;background:none;color:var(--text2);cursor:pointer;white-space:nowrap}
+.tn-refresh:hover{border-color:var(--green);color:var(--green-b)}
+.tn-refresh:disabled{opacity:.4;cursor:not-allowed}
+.main{margin-top:52px;width:100%}
+.content{padding:16px 20px 48px}
+.page{display:none}.page.active{display:block}
+.sec{margin-bottom:18px}
+.sec-hdr{display:flex;align-items:center;gap:8px;margin-bottom:10px}
+.sec-title{font-family:'Barlow Condensed',sans-serif;font-size:10px;font-weight:600;letter-spacing:2px;text-transform:uppercase;color:var(--text3);white-space:nowrap}
+.sec-line{flex:1;height:1px;background:var(--border)}
+.g2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.g3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.g4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.g5{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px}
+.kc{background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:12px 14px;position:relative;overflow:hidden}
+.kc::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:var(--kc-color,var(--border2))}
+.kc-lbl{font-size:9px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--text3);margin-bottom:5px}
+.kc-val{font-family:'Barlow Condensed',sans-serif;font-size:26px;font-weight:700;line-height:1;margin-bottom:3px}
+.kc-sub{font-size:11px;color:var(--text2);margin-bottom:5px}
+.cc{background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:14px}
+.cc-title{font-size:9px;font-weight:600;letter-spacing:1.5px;text-transform:uppercase;color:var(--text3);margin-bottom:10px}
+.bdg{display:inline-flex;align-items:center;font-size:9px;font-weight:600;padding:2px 7px;border-radius:20px;font-family:'DM Mono',monospace}
+.g{background:var(--green-d);color:var(--green-b);border:1px solid rgba(63,185,80,.2)}
+.a{background:var(--amber-d);color:var(--amber);border:1px solid rgba(210,153,34,.2)}
+.r{background:var(--red-d);color:var(--red);border:1px solid rgba(248,81,73,.2)}
+.b{background:var(--blue-d);color:var(--blue);border:1px solid rgba(56,139,253,.2)}
+table{width:100%;border-collapse:collapse;font-size:11px}
+th{font-size:9px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--text3);padding:6px 8px;text-align:right;border-bottom:1px solid var(--border);white-space:nowrap}
+th:first-child{text-align:left}
+td{padding:6px 8px;text-align:right;border-bottom:1px solid var(--border);font-family:'DM Mono',monospace;font-size:10px;color:var(--text2)}
+td:first-child{text-align:left;font-family:'Barlow',sans-serif;font-size:11px;font-weight:500;color:var(--text)}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:rgba(255,255,255,.02)}
+.tg{color:var(--green-b)!important}.ta{color:var(--amber)!important}.tr{color:var(--red)!important}
+.mbar-row{display:flex;align-items:center;gap:6px;padding:4px 0}
+.mbar-lbl{color:var(--text2);width:60px;flex-shrink:0;font-size:9px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mbar-bg{flex:1;height:4px;background:var(--bg3);border-radius:2px;overflow:hidden}
+.mbar-fill{height:100%;border-radius:2px;transition:width .5s ease}
+.mbar-val{font-family:'DM Mono',monospace;font-size:9px;color:var(--text2);width:40px;text-align:right;flex-shrink:0}
+::-webkit-scrollbar{width:5px;height:5px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px}
+.fade{animation:fadeIn .2s ease}
+@keyframes fadeIn{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
+.no-data{text-align:center;padding:40px;color:var(--text3);font-family:'DM Mono',monospace;font-size:11px}
+.cat-pill{display:inline-flex;align-items:center;padding:2px 8px;border-radius:10px;font-size:9px;font-family:'DM Mono',monospace;font-weight:600;white-space:nowrap}
+.cat-mech{background:rgba(248,81,73,.15);color:#f85149}.cat-elec{background:rgba(210,153,34,.15);color:#d29922}
+.cat-proc{background:rgba(56,139,253,.15);color:#388bfd}.cat-co{background:rgba(163,113,247,.15);color:#a371f7}
+.cat-rm{background:rgba(26,188,156,.15);color:#1abc9c}.cat-pwr{background:rgba(255,166,87,.15);color:#ffa657}
+.cat-other{background:rgba(139,148,158,.15);color:#8b949e}
+.tbl-wrap{overflow-x:auto}
+</style>
+</head>
+<body>
 
-// ─── SHEET NAME CONSTANTS ────────────────────────────────────────────────────
-const SHEET = {
-  WEEKLY:   "MR Weekly",
-  DAILY:    "MR Daily",
-  DOWNTIME: "Downtime",
-  PROD_COST:"Prod Cost",
-  MONTHLY:  "MR Monthly",
-  PC_DAILY: "PC daily",
-  MCOS:     "MCOS daily"
-};
+<div class="loading-screen" id="loading">
+  <div class="loading-logo">VPI OPS</div>
+  <div class="loading-sub">Feed for Life · Live Dashboard</div>
+  <div class="loading-bar-wrap"><div class="loading-bar"></div></div>
+  <div class="loading-msg" id="loading-msg">Connecting to Google Sheets...</div>
+</div>
 
-const SITES = ["AC", "PFMIS", "HOREB", "BUKID", "ARGAO", "CCPC", "SOUTH"];
+<div class="topnav">
+  <div class="topnav-brand">VPI OPS<span>Feed for Life</span></div>
+  <div class="page-tabs">
+    <button class="page-tab active" onclick="setPage('dashboard')">📊 Weekly Pulse</button>
+    <button class="page-tab" onclick="setPage('monthly')">📅 Monthly</button>
+    <button class="page-tab" onclick="setPage('cost')">💰 Cost</button>
+    <button class="page-tab" onclick="setPage('downtime')">⚠ Downtime</button>
+    <button class="page-tab" onclick="setPage('production')">🏭 Production</button>
+    <button class="page-tab" onclick="setPage('oee')">⚙ OEE</button>
+    <button class="page-tab" onclick="setPage('cost_analytics')">📈 Cost Analytics</button>
+    <button class="page-tab" onclick="setPage('quality_energy')">⚡ Quality &amp; Energy</button>
+  </div>
+  <div class="topnav-selects">
+    <span class="tn-label">Site</span>
+    <select id="site-select" class="tn-select" onchange="setSite(this.value)"></select>
+    <span class="tn-label">Week</span>
+    <select id="week-select" class="tn-select" onchange="setWeek(parseInt(this.value))"></select>
+  </div>
+  <div class="topnav-status">
+    <div style="font-family:'DM Mono',monospace;font-size:10px;color:var(--text3)">
+      <span class="pulse" id="status-dot"></span> <span id="status-txt">Live</span>
+      <span id="last-updated" style="margin-left:6px">—</span>
+    </div>
+    <button class="tn-refresh" id="refresh-btn" onclick="manualRefresh()">⟳ Refresh</button>
+  </div>
+</div>
 
-// ─── ENTRY POINT ─────────────────────────────────────────────────────────────
-function doGet(e) {
-  const params   = e && e.parameter ? e.parameter : {};
-  const tab      = params.tab      || "weekly";
-  const site     = params.site     || "National";
-  const week     = params.week     || "";
-  const month    = params.month    || "";
-  const callback = params.callback || "";  // JSONP support
+<div class="main">
+  <div class="page active" id="page-dashboard"><div class="content fade" id="content"></div></div>
+  <div class="page" id="page-monthly"><div class="content" id="content-monthly"><div class="no-data">Select Monthly tab to load</div></div></div>
+  <div class="page" id="page-cost"><div class="content" id="content-cost"><div class="no-data">Select Cost tab to load</div></div></div>
+  <div class="page" id="page-downtime"><div class="content" id="content-downtime"><div class="no-data">Select Downtime tab to load</div></div></div>
+  <div class="page" id="page-production"><div class="content" id="content-production"><div class="no-data">Select Production tab to load</div></div></div>
+  <div class="page" id="page-oee"><div class="content" id="content-oee"><div class="no-data">Select OEE tab to load</div></div></div>
+  <div class="page" id="page-cost_analytics"><div class="content" id="content-cost_analytics"><div class="no-data">Select Cost Analytics tab to load</div></div></div>
+  <div class="page" id="page-quality_energy"><div class="content" id="content-quality_energy"><div class="no-data">Select Quality &amp; Energy tab to load</div></div></div>
+</div>
 
-  let result;
+<script>
+const GAS = 'https://script.google.com/macros/s/AKfycbznHnsf5gs6NT5Ps4s7PDj1HlbXRjcCF8F0713Q752pGBlBZwPvDVY0Y2zeX2w_5qgrEQ/exec';
+const SITES = ['NATIONAL','AC','PFMIS','HOREB','BUKID','ARGAO','CCPC','SOUTH'];
+const PROD_SITES = ['AC','PFMIS','HOREB','BUKID','ARGAO','CCPC','SOUTH'];
+const SL = {NATIONAL:'National',AC:'AC · Bulacan',PFMIS:'PFMIS · Isabela',HOREB:'Horeb · Cebu',BUKID:'Bukidnon',ARGAO:'Argao · Cebu',CCPC:'CCPC · CDO',SOUTH:'South · Davao'};
+const SC = {NATIONAL:'#3fb950',AC:'#388bfd',PFMIS:'#d29922',HOREB:'#1abc9c',BUKID:'#f85149',ARGAO:'#a371f7',CCPC:'#58a6ff',SOUTH:'#ffa657'};
+const DT_CATS = {'Mechanical':'cat-mech','Electrical':'cat-elec','PLC':'cat-elec','Process':'cat-proc','Warehouse':'cat-proc','Raw Materials':'cat-rm','Change Over':'cat-co','Change Die':'cat-co','Change Screen':'cat-co','Power Interruption':'cat-pwr'};
+
+let DATA = {}, activeSite='NATIONAL', activeWeek=1, activePage='dashboard', charts={}, refreshTimer=null;
+
+// ── FETCH ──────────────────────────────────────────────────
+// Fetch via iframe proxy — handles GAS redirect to googleusercontent.com
+function gasGet(tab, extra={}) {
+  return new Promise((resolve, reject) => {
+    const p = new URLSearchParams({tab, site:activeSite, week:activeWeek, ...extra});
+    const url = GAS + '?' + p;
+    const timeout = setTimeout(() => reject(new Error('Timeout — data took too long')), 30000);
+
+    fetch(url, {redirect:'follow'})
+      .then(r => r.text())
+      .then(text => {
+        clearTimeout(timeout);
+        try {
+          const j = JSON.parse(text);
+          if (j.error) reject(new Error(j.error));
+          else resolve(j);
+        } catch(e) {
+          reject(new Error('Bad response from server'));
+        }
+      })
+      .catch(() => {
+        clearTimeout(timeout);
+        // fetch blocked by CORS — fall back to JSONP
+        jsonpGet(tab, extra).then(resolve).catch(reject);
+      });
+  });
+}
+
+// JSONP fallback
+function jsonpGet(tab, extra={}) {
+  return new Promise((resolve, reject) => {
+    const cb = '_vpi_' + tab.replace(/[^a-z]/g,'') + '_' + Date.now();
+    const p = new URLSearchParams({tab, site:activeSite, week:activeWeek, callback:cb, ...extra});
+    const s = document.createElement('script');
+    const t = setTimeout(() => { cleanup(); reject(new Error('JSONP timeout')); }, 30000);
+    function cleanup(){ clearTimeout(t); delete window[cb]; if(s.parentNode)s.parentNode.removeChild(s); }
+    window[cb] = d => { cleanup(); d&&d.error ? reject(new Error(d.error)) : resolve(d); };
+    s.onerror = () => { cleanup(); reject(new Error('Cannot reach Google Apps Script. Check deployment.')); };
+    s.src = GAS + '?' + p;
+    document.head.appendChild(s);
+  });
+}
+
+// ── BOOT ──────────────────────────────────────────────────
+async function loadData(isRefresh=false) {
+  setStatus('fetching');
+  setMsg(isRefresh ? 'Syncing...' : 'Connecting to Google Sheets...');
+  if (!isRefresh) show('loading');
+
   try {
-    switch (tab) {
-      case "weekly":         result = getWeeklyPulse(site, week);      break;
-      case "monthly":        result = getMonthly(site, month);         break;
-      case "cost":           result = getCost(site, week);             break;
-      case "downtime":       result = getDowntime(site, week);         break;
-      case "production":     result = getProduction(site, week);       break;
-      case "oee":            result = getOEE(site, week);              break;
-      case "cost_analytics": result = getCostAnalytics(site, month);   break;
-      case "quality_energy": result = getQualityEnergy(site, week);    break;
-      case "meta":           result = getMeta();                        break;
-      default:               result = getWeeklyPulse(site, week);
-    }
-  } catch (err) {
-    result = { error: err.message, tab, site };
-  }
+    const weekly = await gasGet('weekly', {site:'National'});
+    DATA.weekly = weekly;
+    const weeks = (weekly.weeks||[]).map(w=>+w).filter(w=>w>0).sort((a,b)=>a-b);
+    if (!isRefresh) activeWeek = weeks[weeks.length-1] || 21;
+    console.log('Weeks available:', weeks, 'Active week:', activeWeek);
 
-  const json = JSON.stringify(result);
+    setStatus('live');
+    document.getElementById('last-updated').textContent = new Date().toLocaleTimeString('en-PH',{hour:'2-digit',minute:'2-digit'});
+    hide('loading');
+    buildNav();
+    render();
+    scheduleRefresh();
 
-  // JSONP callback (for browsers that block direct fetch)
-  if (callback) {
-    return ContentService
-      .createTextOutput(callback + "(" + json + ");")
-      .setMimeType(ContentService.MimeType.JAVASCRIPT);
-  }
-
-  // Plain JSON with CORS headers
-  return ContentService
-    .createTextOutput(json)
-    .setMimeType(ContentService.MimeType.JSON);
-}
-
-// Required for CORS preflight
-function doOptions(e) {
-  return ContentService
-    .createTextOutput("")
-    .setMimeType(ContentService.MimeType.TEXT);
-}
-
-// ─── HELPERS ─────────────────────────────────────────────────────────────────
-function getSheet(name) {
-  const ss    = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName(name);
-  if (!sheet) throw new Error("Sheet not found: " + name);
-  return sheet;
-}
-
-function sheetToObjects(sheet, headerRow) {
-  headerRow = headerRow || 1;
-  const data    = sheet.getDataRange().getValues();
-  const headers = data[headerRow - 1].map(h => String(h).trim());
-  const rows    = [];
-  for (let i = headerRow; i < data.length; i++) {
-    if (data[i].every(c => c === "" || c === null)) continue;
-    const obj = {};
-    headers.forEach((h, j) => { obj[h] = data[i][j]; });
-    rows.push(obj);
-  }
-  return rows;
-}
-
-function filterBySite(rows, site, siteCol) {
-  siteCol = siteCol || "Site";
-  if (!site || site === "National") return rows;
-  return rows.filter(r => String(r[siteCol]).trim().toUpperCase() === site.toUpperCase());
-}
-
-function filterByWeek(rows, week, weekCol) {
-  weekCol = weekCol || "Week";
-  if (!week) return rows;
-  return rows.filter(r => String(r[weekCol]).trim() === String(week).trim());
-}
-
-function filterByMonth(rows, month, monthCol) {
-  monthCol = monthCol || "Month";
-  if (!month) return rows;
-  return rows.filter(r => String(r[monthCol]).trim() === String(month).trim());
-}
-
-function sumField(rows, field) {
-  return rows.reduce((s, r) => s + (parseFloat(r[field]) || 0), 0);
-}
-
-function uniqueWeeks(rows, weekCol) {
-  weekCol = weekCol || "Week";
-  return [...new Set(rows.map(r => r[weekCol]).filter(Boolean))].sort();
-}
-
-function uniqueMonths(rows, monthCol) {
-  monthCol = monthCol || "Month";
-  return [...new Set(rows.map(r => r[monthCol]).filter(Boolean))].sort();
-}
-
-// ─── TAB HANDLERS ─────────────────────────────────────────────────────────────
-
-// 1. Weekly Pulse  (MR Weekly) — returns ALL rows so dashboard can filter by week client-side
-function getWeeklyPulse(site, week) {
-  const sheet = getSheet(SHEET.WEEKLY);
-  const allRows = sheetToObjects(sheet);
-  const weeks   = uniqueWeeks(allRows);
-  if (!week) week = weeks[weeks.length - 1] || "";
-
-  // Return ALL rows (all weeks, all sites) so the dashboard can filter freely
-  // This enables week selector to work for weeks 1-21
-  return {
-    tab:   "weekly",
-    site,
-    week,
-    weeks,
-    rows:  allRows    // ALL rows — dashboard filters client-side
-  };
-}
-
-// 2. Monthly  (MRMonthly)
-function getMonthly(site, month) {
-  const sheet  = getSheet(SHEET.MONTHLY);
-  let   rows   = sheetToObjects(sheet);
-  const months = uniqueMonths(rows);
-  if (!month) month = months[months.length - 1] || "";
-
-  rows = filterByMonth(filterBySite(rows, site), month);
-
-  return {
-    tab: "monthly",
-    site,
-    month,
-    months,
-    rows,
-    totals: {
-      production: sumField(rows, "Production"),
-      cost:       sumField(rows, "Cost"),
-      downtime:   sumField(rows, "Downtime")
-    }
-  };
-}
-
-// 3. Cost  (Prod Cost)
-function getCost(site, week) {
-  const sheet = getSheet(SHEET.PROD_COST);
-  let   rows  = sheetToObjects(sheet);
-  const weeks = uniqueWeeks(rows);
-  if (!week) week = weeks[weeks.length - 1] || "";
-
-  rows = filterByWeek(filterBySite(rows, site), week);
-
-  return {
-    tab: "cost",
-    site,
-    week,
-    weeks,
-    rows,
-    totals: {
-      total_cost:    sumField(rows, "Total Cost"),
-      feed_cost:     sumField(rows, "Feed Cost"),
-      labor_cost:    sumField(rows, "Labor Cost"),
-      utility_cost:  sumField(rows, "Utility Cost"),
-      other_cost:    sumField(rows, "Other Cost")
-    }
-  };
-}
-
-// 4. Downtime  (Downtime)
-function getDowntime(site, week) {
-  const sheet = getSheet(SHEET.DOWNTIME);
-  let   rows  = sheetToObjects(sheet);
-  const weeks = uniqueWeeks(rows);
-  if (!week) week = weeks[weeks.length - 1] || "";
-
-  rows = filterByWeek(filterBySite(rows, site), week);
-
-  // Group by reason
-  const byReason = {};
-  rows.forEach(r => {
-    const reason = r["Reason"] || r["Downtime Reason"] || "Unknown";
-    byReason[reason] = (byReason[reason] || 0) + (parseFloat(r["Hours"] || r["Downtime Hours"]) || 0);
-  });
-
-  return {
-    tab: "downtime",
-    site,
-    week,
-    weeks,
-    rows,
-    byReason,
-    totals: {
-      total_hours: sumField(rows, "Hours") || sumField(rows, "Downtime Hours")
-    }
-  };
-}
-
-// 5. Production  (MR Daily + MR Weekly)
-function getProduction(site, week) {
-  const weeklySheet = getSheet(SHEET.WEEKLY);
-  const dailySheet  = getSheet(SHEET.DAILY);
-
-  let weeklyRows = sheetToObjects(weeklySheet);
-  let dailyRows  = sheetToObjects(dailySheet);
-  const weeks    = uniqueWeeks(weeklyRows);
-  if (!week) week = weeks[weeks.length - 1] || "";
-
-  weeklyRows = filterByWeek(filterBySite(weeklyRows, site), week);
-  dailyRows  = filterByWeek(filterBySite(dailyRows,  site), week);
-
-  return {
-    tab: "production",
-    site,
-    week,
-    weeks,
-    weekly: weeklyRows,
-    daily:  dailyRows,
-    totals: {
-      total_production:  sumField(weeklyRows, "Production"),
-      target_production: sumField(weeklyRows, "Target"),
-      actual_vs_target:  (
-        sumField(weeklyRows, "Target") > 0
-          ? ((sumField(weeklyRows, "Production") / sumField(weeklyRows, "Target")) * 100).toFixed(1)
-          : 0
-      )
-    }
-  };
-}
-
-// 6. OEE  (MR Weekly + MR Daily)
-function getOEE(site, week) {
-  const sheet = getSheet(SHEET.WEEKLY);
-  let   rows  = sheetToObjects(sheet);
-  const weeks = uniqueWeeks(rows);
-  if (!week) week = weeks[weeks.length - 1] || "";
-
-  rows = filterByWeek(filterBySite(rows, site), week);
-
-  const avgOEE = rows.length
-    ? (sumField(rows, "OEE") / rows.length).toFixed(2)
-    : 0;
-
-  // Per-site breakdown for National view
-  const bySite = {};
-  if (!site || site === "National") {
-    SITES.forEach(s => {
-      const sRows = filterBySite(rows, s);
-      bySite[s] = sRows.length
-        ? (sumField(sRows, "OEE") / sRows.length).toFixed(2)
-        : 0;
+    // background loads
+    ['downtime','monthly','cost','production','oee','cost_analytics','quality_energy'].forEach(tab => {
+      gasGet(tab).then(d => { DATA[tab]=d; }).catch(()=>{});
     });
+
+  } catch(e) {
+    setStatus('error');
+    document.getElementById('loading').innerHTML =
+      '<div style="font-size:28px;color:var(--red)">✕</div>' +
+      '<div style="font-family:Barlow Condensed,sans-serif;font-size:20px;color:var(--red)">Connection Failed</div>' +
+      '<div style="font-size:11px;color:var(--text2);font-family:DM Mono,monospace;max-width:380px;text-align:center;line-height:1.8">' + e.message + '</div>' +
+      '<button class="retry-btn" onclick="loadData(false)">⟳ Retry</button>';
   }
-
-  return {
-    tab: "oee",
-    site,
-    week,
-    weeks,
-    rows,
-    bySite,
-    totals: {
-      avg_oee:         avgOEE,
-      availability:    rows.length ? (sumField(rows, "Availability")  / rows.length).toFixed(2) : 0,
-      performance:     rows.length ? (sumField(rows, "Performance")   / rows.length).toFixed(2) : 0,
-      quality_rate:    rows.length ? (sumField(rows, "Quality Rate")  / rows.length).toFixed(2) : 0
-    }
-  };
 }
 
-// 7. Cost Analytics  (PC Daily + Prod Cost)
-function getCostAnalytics(site, month) {
-  const pcDailySheet  = getSheet(SHEET.PC_DAILY);
-  const prodCostSheet = getSheet(SHEET.PROD_COST);
+function show(id){const e=document.getElementById(id);if(e)e.style.display='flex';}
+function hide(id){const e=document.getElementById(id);if(e)e.parentNode&&e.parentNode.removeChild(e);}
+function setStatus(s){
+  const dot=document.getElementById('status-dot'),txt=document.getElementById('status-txt'),btn=document.getElementById('refresh-btn');
+  if(s==='fetching'){dot.className='pulse fetching';txt.textContent='Syncing...';if(btn)btn.disabled=true;}
+  else if(s==='live'){dot.className='pulse';txt.textContent='Live';if(btn)btn.disabled=false;}
+  else{dot.className='pulse error';txt.textContent='Error';if(btn)btn.disabled=false;}
+}
+function setMsg(m){const e=document.getElementById('loading-msg');if(e)e.textContent=m;}
+function scheduleRefresh(){if(refreshTimer)clearInterval(refreshTimer);refreshTimer=setInterval(()=>loadData(true),5*60*1000);}
+function manualRefresh(){loadData(true);}
 
-  let pcRows   = sheetToObjects(pcDailySheet);
-  let costRows = sheetToObjects(prodCostSheet);
-  const months = uniqueMonths(pcRows);
-  if (!month) month = months[months.length - 1] || "";
+// ── HELPERS ───────────────────────────────────────────────
+const fv  = (n,d=1) => (!n||isNaN(n))?'—':Number(n).toFixed(d);
+const fKK = n => (!n||n===0)?'—':n>=1000000?(n/1000000).toFixed(2)+'M':n>=1000?(n/1000).toFixed(1)+'k':n.toFixed(0);
+const fK  = n => (!n||n===0)?'—':n>=1000?(n/1000).toFixed(1)+'k':n.toFixed(0);
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const bsc=(v,g,ok)=>v>=g?'g':v>=ok?'a':'r';
+const dot = s => `<span style="display:inline-block;width:5px;height:5px;border-radius:50%;background:${SC[s]||'#8b949e'};margin-right:5px;vertical-align:middle"></span>`;
+const catCls = c => DT_CATS[c]||'cat-other';
+const pct = (n,d,fallback='—') => d>0?((n/d)*100).toFixed(1)+'%':fallback;
 
-  pcRows   = filterByMonth(filterBySite(pcRows,   site), month);
-  costRows = filterBySite(costRows, site);
+function buildNav() {
+  const ss=document.getElementById('site-select');
+  if(ss) ss.innerHTML=SITES.map(s=>`<option value="${s}" ${s===activeSite?'selected':''}>${SL[s]}</option>`).join('');
+  const ws=document.getElementById('week-select');
+  const weeks=(DATA.weekly&&DATA.weekly.weeks)||[];
+  const sortedWks=(DATA.weekly&&DATA.weekly.weeks||[]).map(w=>+w).filter(w=>w>0).sort((a,b)=>a-b);if(ws) ws.innerHTML=sortedWks.map(w=>`<option value="${w}" ${+w===+activeWeek?'selected':''}>Week ${w}</option>`).join('');
+}
+function setSite(s){activeSite=s;DATA={};gasGet('weekly',{site:s}).then(d=>{DATA.weekly=d;const wks=d.weeks||[];activeWeek=wks[wks.length-1]||activeWeek;buildNav();render();}).catch(()=>render());}
+function setWeek(w){activeWeek=w;buildNav();render();}
 
-  return {
-    tab: "cost_analytics",
-    site,
-    month,
-    months,
-    pc_daily:  pcRows,
-    prod_cost: costRows,
-    totals: {
-      total_cost:   sumField(pcRows, "Total Cost"),
-      feed_cost:    sumField(pcRows, "Feed Cost"),
-      labor_cost:   sumField(pcRows, "Labor Cost"),
-      utility_cost: sumField(pcRows, "Utility Cost")
-    }
-  };
+function setPage(p) {
+  activePage=p;
+  document.querySelectorAll('.page').forEach(x=>x.classList.remove('active'));
+  document.querySelectorAll('.page-tab').forEach(x=>x.classList.remove('active'));
+  const pg=document.getElementById('page-'+p);if(pg)pg.classList.add('active');
+  document.querySelectorAll('.page-tab').forEach(x=>{if(x.getAttribute('onclick')&&x.getAttribute('onclick').includes("'"+p+"'"))x.classList.add('active');});
+  const fns={dashboard:render,monthly:renderMonthly,cost:renderCost,downtime:renderDowntime,production:renderProduction,oee:renderOEE,cost_analytics:renderCostAnalytics,quality_energy:renderQualityEnergy};
+  if(fns[p]) fns[p]();
 }
 
-// 8. Quality & Energy  (MCOS Daily)
-function getQualityEnergy(site, week) {
-  const sheet = getSheet(SHEET.MCOS);
-  let   rows  = sheetToObjects(sheet);
-  const weeks = uniqueWeeks(rows);
-  if (!week) week = weeks[weeks.length - 1] || "";
-
-  rows = filterByWeek(filterBySite(rows, site), week);
-
-  return {
-    tab: "quality_energy",
-    site,
-    week,
-    weeks,
-    rows,
-    totals: {
-      energy_kwh:       sumField(rows, "Energy KWH")    || sumField(rows, "KWH"),
-      energy_cost:      sumField(rows, "Energy Cost"),
-      quality_score:    rows.length ? (sumField(rows, "Quality Score") / rows.length).toFixed(2) : 0,
-      rejection_rate:   rows.length ? (sumField(rows, "Rejection Rate") / rows.length).toFixed(2) : 0,
-      mcos:             rows.length ? (sumField(rows, "MCOS") / rows.length).toFixed(4) : 0
-    }
-  };
+function destroyCharts(){Object.values(charts).forEach(c=>{try{c.destroy();}catch(e){}});charts={};}
+function mkChart(id,type,labels,datasets,opts={}) {
+  const cv=document.getElementById(id);if(!cv)return;
+  const gc='rgba(255,255,255,0.04)';
+  const sc={grid:{color:gc},ticks:{color:'#484f58',font:{size:9,family:"'DM Mono',monospace"}}};
+  charts[id]=new Chart(cv.getContext('2d'),{type,data:{labels,datasets},options:{responsive:true,maintainAspectRatio:false,animation:{duration:200},plugins:{legend:{display:false},tooltip:{backgroundColor:'#1f2631',borderColor:'rgba(255,255,255,.1)',borderWidth:1,bodyFont:{family:"'DM Mono',monospace",size:10}}},scales:{x:sc,y:sc},...opts}});
 }
 
-// ─── METADATA ENDPOINT ───────────────────────────────────────────────────────
-// Called with ?tab=meta to verify sheet connectivity
-function getMeta() {
-  const results = {};
-  Object.entries(SHEET).forEach(([key, name]) => {
-    try {
-      const s = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(name);
-      results[key] = s
-        ? { found: true, rows: s.getLastRow(), cols: s.getLastColumn() }
-        : { found: false, error: "Sheet not found: " + name };
-    } catch (e) {
-      results[key] = { found: false, error: e.message };
+// ── FIELD HELPERS ─────────────────────────────────────────
+const gf = (r,...keys) => {
+  for(const k of keys){
+    if(r[k]!==undefined&&r[k]!==null&&r[k]!==''){
+      const v=parseFloat(String(r[k]).replace(/,/g,''));
+      if(!isNaN(v))return v;
     }
-  });
-  return { tab: "meta", sheets: results, sites: SITES, version: "v39" };
+  }
+  return 0;
+};
+// Get string field
+const gs = (r,...keys) => { for(const k of keys){if(r[k]!==undefined&&r[k]!==null&&r[k]!=='')return String(r[k]);} return ''; };
+const oeeNorm = v => v>1?v:v>0?v*100:0;
+
+// ── WEEKLY PULSE ──────────────────────────────────────────
+function render() {
+  destroyCharts();
+  const ct=document.getElementById('content');
+  const wd=DATA.weekly;
+  if(!wd||!wd.rows){ct.innerHTML='<div class="no-data">⟳ Loading weekly data...</div>';return;}
+
+  const rows=wd.rows||[];
+  const allWeeks=[...new Set(rows.map(r=>+(r.Week||r.week||0)).filter(w=>w>0))].sort((a,b)=>a-b);
+  const wkRows=rows.filter(r=>+r['Week']===+activeWeek||+r['week']===+activeWeek);
+  console.log('All rows count:', rows.length, 'Week', activeWeek, 'rows:', wkRows.length, 'Sample row keys:', rows[0]?Object.keys(rows[0]).slice(0,8):[]);
+  const siteWkRows=activeSite==='NATIONAL'?wkRows:wkRows.filter(r=>(r.Plant||r.plant||'').toString().toUpperCase()===activeSite);
+
+  // KPIs
+  const totOut=siteWkRows.reduce((a,r)=>a+gf(r,'Total Plant Output,mt w/o toll','Total Plant Output, mt w/o toll','output'),0);
+  const totPlan=siteWkRows.reduce((a,r)=>a+gf(r,'Planned, mt','Total Plant Input, mt','Planned','Total Mash Input','plan'),0);
+  const totUDT=siteWkRows.reduce((a,r)=>a+gf(r,'Unscheduled Down Time, hr','unscheduledDT'),0);
+  const totSDT=siteWkRows.reduce((a,r)=>a+gf(r,'Scheduled Down Time, hr','scheduledDT'),0);
+  const _rawOEE=siteWkRows.length?siteWkRows.reduce((a,r)=>a+gf(r,'OEE','oee'),0)/siteWkRows.length:0;
+  const avgOEE=_rawOEE>0&&_rawOEE<=1?_rawOEE*100:_rawOEE;
+  const pp=totPlan>0?(totOut/totPlan*100):0;
+  const pC=pp>=100?'var(--green-b)':pp>=85?'var(--amber)':'var(--red)';
+  const oC=avgOEE>=85?'var(--green-b)':avgOEE>=70?'var(--amber)':'var(--red)';
+
+  // Scorecard (National only)
+  const scorecard=activeSite==='NATIONAL'?`<div class="sec">
+    <div class="sec-hdr"><div class="sec-title">National Scorecard — Week ${activeWeek}</div><div class="sec-line"></div></div>
+    <div style="display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px">
+    ${PROD_SITES.map(s=>{
+      const sr=wkRows.filter(r=>(r.Plant||r.plant||'').toUpperCase()===s);
+      // MR Weekly: AP=CF Output, AR=Mixgrain, AZ=Vietop, CQ=Cap Util%, CR=OEE, H=UDT
+      const cf  = sr.reduce((a,r)=>a+gf(r,'Total Plant Output EXC MIXGRAIN & VIETOP'),0);
+      const mg  = sr.reduce((a,r)=>a+gf(r,'Mixgrain'),0);
+      const vt  = sr.reduce((a,r)=>a+gf(r,'Vietop'),0);
+      const tot = cf+mg+vt;
+      const cuRaw = sr.length?sr.reduce((a,r)=>a+gf(r,'Capacity Utilization Rate,%'),0)/sr.length:0;
+      const cu  = cuRaw>1?cuRaw:cuRaw*100;
+      const oeeRaw = sr.length?sr.reduce((a,r)=>a+gf(r,'OEE'),0)/sr.length:0;
+      const oee = oeeRaw>1?oeeRaw:oeeRaw*100;
+      const udt = sr.reduce((a,r)=>a+gf(r,'Unscheduled Down Time, hr'),0);
+      const cuC = cu>=80?'var(--green)':cu>=60?'var(--amber)':'var(--red)';
+      const oeeC= oee>=85?'var(--green-b)':oee>=70?'var(--amber)':'var(--red)';
+      const udtC= udt>20?'var(--red)':udt>10?'var(--amber)':'var(--text3)';
+      return `<div style="background:var(--bg2);border:1px solid var(--border);border-top:2px solid ${cuC};border-radius:var(--rl);padding:10px 8px;text-align:center">
+        <div style="margin-bottom:5px">${dot(s)}<span style="font-size:10px;font-weight:700;color:var(--text)">${s}</span></div>
+        <div style="border-bottom:1px solid var(--border);padding-bottom:6px;margin-bottom:6px">
+          <div style="font-size:8px;color:var(--text3);letter-spacing:1px;text-transform:uppercase;margin-bottom:2px">Output mt</div>
+          <div style="font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:700;color:var(--text);line-height:1">${tot>0?tot.toFixed(1):'—'}</div>
+          <div style="display:flex;justify-content:center;gap:3px;margin-top:5px;flex-wrap:wrap">
+            ${cf>0?`<span style="font-size:8px;background:rgba(56,139,253,0.15);color:#388bfd;padding:1px 5px;border-radius:3px">CF ${cf.toFixed(1)}</span>`:''}
+            ${mg>0?`<span style="font-size:8px;background:rgba(163,113,247,0.15);color:#a371f7;padding:1px 5px;border-radius:3px">MG ${mg.toFixed(1)}</span>`:''}
+            ${vt>0?`<span style="font-size:8px;background:rgba(26,188,156,0.15);color:#1abc9c;padding:1px 5px;border-radius:3px">VT ${vt.toFixed(1)}</span>`:''}
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:5px">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <span style="font-size:9px;color:var(--text3)">Cap Util</span>
+            <span style="font-family:'DM Mono',monospace;font-size:10px;font-weight:600;color:${cuC}">${cu>0?cu.toFixed(1)+'%':'—'}</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <span style="font-size:9px;color:var(--text3)">OEE</span>
+            <span style="font-family:'DM Mono',monospace;font-size:10px;font-weight:600;color:${oeeC}">${oee>0?oee.toFixed(1)+'%':'—'}</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <span style="font-size:9px;color:var(--text3)">UDT</span>
+            <span style="font-family:'DM Mono',monospace;font-size:10px;font-weight:600;color:${udtC}">${udt>0?udt.toFixed(2)+'h':'—'}</span>
+          </div>
+        </div>
+      </div>`;
+    }).join('')}
+    </div></div>` : '';
+
+  ct.innerHTML = scorecard + `
+<div class="sec">
+  <div class="sec-hdr"><div class="sec-title">${SL[activeSite]} · Week ${activeWeek}</div><div class="sec-line"></div></div>
+  <div class="g5">
+    <div class="kc" style="--kc-color:${pC}">
+      <div class="kc-lbl">Output</div>
+      <div class="kc-val" style="color:${pC}">${totOut>0?totOut.toFixed(1):'—'}<span style="font-size:12px;color:var(--text2)"> mt</span></div>
+      <div class="kc-sub">Plan: ${totPlan>0?totPlan.toFixed(1):'—'} mt</div>
+      <span class="bdg ${bsc(pp,100,85)}">${pp>0?pp.toFixed(1)+'% of plan':'No data'}</span>
+    </div>
+    <div class="kc" style="--kc-color:var(--blue)">
+      <div class="kc-lbl">Working Hours</div>
+      <div class="kc-val" style="font-size:20px">${fv(siteWkRows.reduce((a,r)=>a+gf(r,'Working Hours','Working Days'),0),1)}<span style="font-size:12px;color:var(--text2)"> hr</span></div>
+      <div class="kc-sub">Total scheduled hrs</div>
+    </div>
+    <div class="kc" style="--kc-color:${totUDT>20?'var(--red)':totUDT>10?'var(--amber)':'var(--border2)'}">
+      <div class="kc-lbl">Downtime</div>
+      <div style="display:flex;gap:8px;align-items:flex-end;margin-bottom:4px">
+        <div><div style="font-size:9px;color:var(--red);font-weight:600;letter-spacing:1px">UDT</div>
+          <div style="font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:700;color:${totUDT>20?'var(--red)':totUDT>10?'var(--amber)':'var(--text)'}">${totUDT>0?totUDT.toFixed(2):'—'}<span style="font-size:11px;color:var(--text2)"> hr</span></div></div>
+        <div style="width:1px;height:32px;background:var(--border)"></div>
+        <div><div style="font-size:9px;color:var(--text3);font-weight:600;letter-spacing:1px">SDT</div>
+          <div style="font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:700;color:var(--text2)">${totSDT>0?totSDT.toFixed(2):'—'}<span style="font-size:11px;color:var(--text3)"> hr</span></div></div>
+      </div>
+      <span class="bdg ${totUDT>20?'r':totUDT>10?'a':'g'}">${totUDT>20?'High UDT':totUDT>10?'Moderate':'Low DT'}</span>
+    </div>
+    <div class="kc" style="--kc-color:${oC}">
+      <div class="kc-lbl">OEE</div>
+      <div class="kc-val" style="color:${oC}">${avgOEE>0?avgOEE.toFixed(1):'N/A'}<span style="font-size:12px;color:var(--text2)">${avgOEE>0?'%':''}</span></div>
+      <div class="kc-sub">Overall Equipment Effectiveness</div>
+      <span class="bdg ${avgOEE>=85?'g':avgOEE>=70?'a':avgOEE>0?'r':'b'}">${avgOEE>=85?'World Class':avgOEE>=70?'Acceptable':avgOEE>0?'Needs Attn':'N/A'}</span>
+    </div>
+    <div class="kc" style="--kc-color:var(--teal)">
+      <div class="kc-lbl">Total Rejection mt</div>
+      <div class="kc-val" style="font-size:20px;color:var(--teal)">${fv(siteWkRows.reduce((a,r)=>a+gf(r,'Total Remill Reject, mt','outrightRejectMt'),0),2)}</div>
+      <div class="kc-sub">Remill + outright rejects</div>
+    </div>
+  </div>
+</div>
+
+<div class="sec">
+  <div class="sec-hdr"><div class="sec-title">Site Detail Table — Week ${activeWeek}</div><div class="sec-line"></div></div>
+  <div class="cc"><div class="tbl-wrap"><table>
+    <thead><tr><th>Site</th><th>Working Hrs</th><th>UDT Hr</th><th>SDT Hr</th><th>Total DT Hr</th><th>Output mt</th><th>Plan mt</th><th>Plan%</th><th>OEE%</th><th>Reject mt</th></tr></thead>
+    <tbody>${wkRows.map(r=>{
+      const s=(r.Plant||r.plant||'').toUpperCase();
+      const out=gf(r,'Total Plant Output,mt w/o toll','Total Plant Output, mt w/o toll','output');
+      const plan=gf(r,'Planned, mt','Planned','Total Mash Input','plan','Total Plant Input, mt');
+      const p2=plan>0?(out/plan*100):0;
+      const udt=gf(r,'Unscheduled Down Time, hr','unscheduledDT');
+      const sdt=gf(r,'Scheduled Down Time, hr','scheduledDT');
+      const _roee=gf(r,'OEE','oee');const oee=_roee>0&&_roee<=1?_roee*100:_roee;
+      const rej=gf(r,'Total Remill Reject, mt','outrightRejectMt');
+      return `<tr>
+        <td>${dot(s)}${SL[s]||s}</td>
+        <td>${fv(gf(r,'Working Hours'),1)}</td>
+        <td class="${udt>20?'tr':udt>10?'ta':''}">${udt>0?udt.toFixed(2):'—'}</td>
+        <td>${sdt>0?sdt.toFixed(2):'—'}</td>
+        <td>${(udt+sdt)>0?(udt+sdt).toFixed(2):'—'}</td>
+        <td class="${p2>=100?'tg':p2>=85?'ta':'tr'}">${out>0?out.toFixed(1):'—'}</td>
+        <td>${plan>0?plan.toFixed(1):'—'}</td>
+        <td class="${p2>=100?'tg':p2>=85?'ta':'tr'}">${p2>0?p2.toFixed(1)+'%':'—'}</td>
+        <td class="${oee>=85?'tg':oee>=70?'ta':oee>0?'tr':''}">${oee>0?oee.toFixed(1)+'%':'—'}</td>
+        <td>${rej>0?rej.toFixed(2):'—'}</td>
+      </tr>`;
+    }).join('')||'<tr><td colspan="10" class="no-data">No data for Week '+activeWeek+'</td></tr>'}</tbody>
+  </table></div></div>
+</div>
+
+<div class="sec">
+  <div class="sec-hdr"><div class="sec-title">Trends — All Weeks</div><div class="sec-line"></div></div>
+  <div class="g3">
+    <div class="cc"><div class="cc-title">Output vs Plan (mt)</div><div style="position:relative;height:140px"><canvas id="c-out"></canvas></div></div>
+    <div class="cc"><div class="cc-title">OEE % Trend</div><div style="position:relative;height:140px"><canvas id="c-oee"></canvas></div></div>
+    <div class="cc"><div class="cc-title">UDT Hours Trend</div><div style="position:relative;height:140px"><canvas id="c-udt"></canvas></div></div>
+  </div>
+</div>`;
+
+  ct.className='content fade';
+
+  const sf = activeSite==='NATIONAL' ? r=>true : r=>(r.Plant||r.plant||'').toUpperCase()===activeSite;
+  const bw = w => rows.filter(r=>+(r.Week||r.week||0)===+w&&sf(r));
+  const lbl = allWeeks.map(w=>'W'+w);
+
+  mkChart('c-out','bar',lbl,[
+    {label:'Plan',data:allWeeks.map(w=>+bw(w).reduce((a,r)=>a+gf(r,'Planned','Total Mash Input'),0).toFixed(1)),backgroundColor:'rgba(255,255,255,0.07)',borderRadius:2},
+    {label:'Output',data:allWeeks.map(w=>+bw(w).reduce((a,r)=>a+gf(r,'Total Plant Output,mt w/o toll'),0).toFixed(1)),backgroundColor:'#388bfd',borderRadius:2}
+  ],{plugins:{legend:{display:true,labels:{color:'#8b949e',font:{size:9},boxWidth:8}},tooltip:{backgroundColor:'#1f2631',borderColor:'rgba(255,255,255,.1)',borderWidth:1,bodyFont:{family:"'DM Mono',monospace",size:10}}}});
+
+  mkChart('c-oee','line',lbl,[
+    {data:allWeeks.map(w=>{const v=bw(w);if(!v.length)return null;const raw=v.reduce((a,r)=>a+gf(r,'OEE'),0)/v.length;return +((raw>0&&raw<=1?raw*100:raw)).toFixed(1);}),borderColor:'#3fb950',backgroundColor:'rgba(63,185,80,0.08)',fill:true,tension:.3,pointRadius:3,spanGaps:true}
+  ],{plugins:{legend:{display:false},tooltip:{backgroundColor:'#1f2631',borderColor:'rgba(255,255,255,.1)',borderWidth:1,bodyFont:{family:"'DM Mono',monospace",size:10}}},scales:{x:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'#484f58',font:{size:9}}},y:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'#484f58',font:{size:9}},min:0,max:120}}});
+
+  mkChart('c-udt','bar',lbl,[
+    {data:allWeeks.map(w=>{const v=bw(w).reduce((a,r)=>a+gf(r,'Unscheduled Down Time, hr'),0);return+v.toFixed(2);}),backgroundColor:allWeeks.map(w=>{const v=bw(w).reduce((a,r)=>a+gf(r,'Unscheduled Down Time, hr'),0);return v>20?'#f85149':v>10?'#d29922':'#388bfd';}),borderRadius:2}
+  ],{plugins:{legend:{display:false},tooltip:{backgroundColor:'#1f2631',borderColor:'rgba(255,255,255,.1)',borderWidth:1,bodyFont:{family:"'DM Mono',monospace",size:10}}}});
 }
+
+// ── MONTHLY ───────────────────────────────────────────────
+function renderMonthly() {
+  const ct=document.getElementById('content-monthly');
+  if(!DATA.monthly){ct.innerHTML='<div class="no-data">⟳ Loading...</div>';gasGet('monthly').then(d=>{DATA.monthly=d;renderMonthly();}).catch(e=>ct.innerHTML='<div class="no-data">Error: '+e.message+'</div>');return;}
+  const rows=DATA.monthly.rows||[];
+  ct.innerHTML=`<div class="sec"><div class="sec-hdr"><div class="sec-title">Monthly Summary</div><div class="sec-line"></div></div>
+  <div class="cc"><div class="cc-title">MR Monthly Data</div><div class="tbl-wrap"><table>
+    <thead><tr><th>Site</th><th>Month</th><th>Calendar Days</th><th>Actual Days</th><th>Working Hrs</th><th>Sched OT Hr</th><th>UDT Hr</th><th>SDT Hr</th><th>Output mt</th><th>OEE%</th></tr></thead>
+    <tbody>${rows.map(r=>{
+      const s=(r.Plant||r.plant||'').toUpperCase();
+      const udt=gf(r,'Unscheduled Down Time, hr','Unscheduled Dc');
+      const _roee=gf(r,'OEE','oee');const oee=_roee>0&&_roee<=1?_roee*100:_roee;
+      return `<tr>
+        <td>${dot(s)}${SL[s]||s}</td>
+        <td>${r.MONTH||r.Month||r.month||'—'}</td>
+        <td>${fv(gf(r,'CALENDAR DA','Calendar Days','CALENDAR_DAY'),0)}</td>
+        <td>${fv(gf(r,'ACTUAL COUNT','Actual Days'),0)}</td>
+        <td>${fv(gf(r,'Working Hours'),1)}</td>
+        <td>${fv(gf(r,'Scheduled Oper','Scheduled Operating Time, hr'),1)}</td>
+        <td class="${udt>40?'tr':udt>20?'ta':''}">${udt>0?udt.toFixed(2):'—'}</td>
+        <td>${fv(gf(r,'Scheduled Dowr','Scheduled Down Time, hr'),2)}</td>
+        <td>${fv(gf(r,'Total Plant Output,mt w/o toll','output'),1)}</td>
+        <td class="${oee>=85?'tg':oee>=70?'ta':oee>0?'tr':''}">${oee>0?oee.toFixed(1)+'%':'—'}</td>
+      </tr>`;
+    }).join('')||'<tr><td colspan="10" class="no-data">No monthly data</td></tr>'}
+    </tbody></table></div></div></div>`;
+}
+
+// ── COST ──────────────────────────────────────────────────
+function renderCost() {
+  const ct=document.getElementById('content-cost');
+  if(!DATA.cost){ct.innerHTML='<div class="no-data">⟳ Loading...</div>';gasGet('cost').then(d=>{DATA.cost=d;renderCost();}).catch(e=>ct.innerHTML='<div class="no-data">Error: '+e.message+'</div>');return;}
+  const rows=DATA.cost.rows||[];
+  ct.innerHTML=`<div class="sec"><div class="sec-hdr"><div class="sec-title">Cost — Week ${activeWeek}</div><div class="sec-line"></div></div>
+  <div class="cc"><div class="cc-title">Cost Breakdown</div><div class="tbl-wrap"><table>
+    <thead><tr><th>Site</th><th>Month</th><th>Volume mt</th><th>Rental</th><th>Spare Parts</th><th>Manpower</th><th>Diesel</th><th>Electricity</th><th>Agency</th><th>Others</th><th>Tolling</th><th>Total Cost</th><th>Cost/mt</th></tr></thead>
+    <tbody>${rows.map(r=>{
+      const s=(r.PLANT||r.Plant||r.plant||'').toUpperCase();
+      const vol=gf(r,'Volume, kg','volumeKg')/1000;
+      const tot=gf(r,'TOTAL COST','totalCost');
+      const cpt=vol>0?tot/vol:0;
+      return `<tr>
+        <td>${dot(s)}${SL[s]||s}</td>
+        <td>${r.MONTH||r.Month||'—'}</td>
+        <td>${vol>0?vol.toFixed(1):'—'}</td>
+        <td>${fKK(gf(r,'Rental/Amor kph','rental'))}</td>
+        <td>${fKK(gf(r,'Spare Parts. kph','spareParts'))}</td>
+        <td>${fKK(gf(r,'Manpower Direc','manpowerDirect'))}</td>
+        <td>${fKK(gf(r,'Diesel, kphp','diesel'))}</td>
+        <td>${fKK(gf(r,'Electricity Machi','electricity'))}</td>
+        <td>${fKK(gf(r,'Manpower Agen','manpowerAgency'))}</td>
+        <td>${fKK(gf(r,'Other, kphp','others'))}</td>
+        <td>${fKK(gf(r,'tollingFee'))}</td>
+        <td class="tg">${fKK(tot)}</td>
+        <td class="${cpt>2000?'tr':cpt>1500?'ta':'tg'}">₱${cpt>0?cpt.toFixed(0):'—'}</td>
+      </tr>`;
+    }).join('')||'<tr><td colspan="13" class="no-data">No cost data for Week '+activeWeek+'</td></tr>'}
+    </tbody></table></div></div></div>`;
+}
+
+// ── DOWNTIME ──────────────────────────────────────────────
+function renderDowntime() {
+  const ct=document.getElementById('content-downtime');
+  if(!DATA.downtime){ct.innerHTML='<div class="no-data">⟳ Loading...</div>';gasGet('downtime').then(d=>{DATA.downtime=d;renderDowntime();}).catch(e=>ct.innerHTML='<div class="no-data">Error: '+e.message+'</div>');return;}
+  const d=DATA.downtime;const rows=d.rows||[];const byReason=d.byReason||{};
+  const reasons=Object.entries(byReason).sort((a,b)=>b[1]-a[1]);
+  const totHrs=d.totals&&d.totals.total_hours||0;
+  ct.innerHTML=`<div class="sec"><div class="sec-hdr"><div class="sec-title">Downtime — Week ${activeWeek}</div><div class="sec-line"></div></div>
+  <div class="g4" style="margin-bottom:12px">
+    <div class="kc" style="--kc-color:var(--red)"><div class="kc-lbl">Total UDT Hours</div><div class="kc-val" style="color:var(--red)">${totHrs>0?totHrs.toFixed(1):'—'}<span style="font-size:12px;color:var(--text2)"> hr</span></div></div>
+    <div class="kc" style="--kc-color:var(--amber)"><div class="kc-lbl">Top Category</div><div class="kc-val" style="font-size:16px">${reasons[0]?reasons[0][0]:'—'}</div><div class="kc-sub">${reasons[0]?reasons[0][1].toFixed(1)+' hr':''}</div></div>
+    <div class="kc" style="--kc-color:var(--blue)"><div class="kc-lbl">Records</div><div class="kc-val">${rows.length}</div><div class="kc-sub">downtime entries</div></div>
+    <div class="kc" style="--kc-color:var(--purple)"><div class="kc-lbl">Sites Affected</div><div class="kc-val">${new Set(rows.map(r=>r.Plant||r.plant||'')).size}</div></div>
+  </div>
+  <div class="g2">
+    <div class="cc"><div class="cc-title">By Category (hours)</div>
+      ${reasons.slice(0,10).map(([reason,hrs])=>{const max=reasons[0]?reasons[0][1]:1;return `<div class="mbar-row"><div class="mbar-lbl" title="${reason}">${reason.slice(0,18)}</div><div class="mbar-bg"><div class="mbar-fill" style="width:${(hrs/max*100).toFixed(0)}%;background:var(--red)"></div></div><div class="mbar-val">${hrs.toFixed(1)}h</div></div>`;}).join('')||'<div class="no-data">No downtime</div>'}
+    </div>
+    <div class="cc"><div class="cc-title">Detail Records (top 30)</div><div class="tbl-wrap"><table>
+      <thead><tr><th style="text-align:left">Plant</th><th style="text-align:left">Category</th><th style="text-align:left">Sub-Cat</th><th>UDT hr</th></tr></thead>
+      <tbody>${rows.slice(0,30).map(r=>{
+        const s=(r.Plant||r.plant||'').toUpperCase();
+        const cat=r.Category||r.category||r['Machine Line']||'';
+        const hrs=gf(r,'Unscheduled Down Time, hr','udtHours','Hours');
+        return `<tr><td>${dot(s)}${s}</td><td><span class="cat-pill ${catCls(cat)}">${cat||'—'}</span></td><td style="text-align:left;color:var(--text3);font-size:10px">${r['Sub-Category']||r.subCategory||'—'}</td><td class="tr">${hrs>0?hrs.toFixed(2):'—'}</td></tr>`;
+      }).join('')||'<tr><td colspan="4" class="no-data">No records</td></tr>'}</tbody>
+    </table></div></div>
+  </div></div>`;
+}
+
+// ── PRODUCTION ────────────────────────────────────────────
+function renderProduction() {
+  const ct=document.getElementById('content-production');
+  if(!DATA.production){ct.innerHTML='<div class="no-data">⟳ Loading...</div>';gasGet('production').then(d=>{DATA.production=d;renderProduction();}).catch(e=>ct.innerHTML='<div class="no-data">Error: '+e.message+'</div>');return;}
+  const d=DATA.production;const rows=d.weekly||d.rows||[];
+  ct.innerHTML=`<div class="sec"><div class="sec-hdr"><div class="sec-title">Production — Week ${activeWeek}</div><div class="sec-line"></div></div>
+  <div class="g3" style="margin-bottom:12px">
+    <div class="kc" style="--kc-color:var(--green)"><div class="kc-lbl">Total Output</div><div class="kc-val" style="color:var(--green-b)">${fv(d.totals&&d.totals.total_production||0,1)}<span style="font-size:12px;color:var(--text2)"> mt</span></div></div>
+    <div class="kc" style="--kc-color:var(--blue)"><div class="kc-lbl">Target</div><div class="kc-val" style="font-size:20px">${fv(d.totals&&d.totals.target_production||0,1)}<span style="font-size:12px;color:var(--text2)"> mt</span></div></div>
+    <div class="kc" style="--kc-color:var(--amber)"><div class="kc-lbl">vs Target</div><div class="kc-val">${d.totals&&d.totals.actual_vs_target?d.totals.actual_vs_target+'%':'—'}</div></div>
+  </div>
+  <div class="cc"><div class="cc-title">Production Detail</div><div class="tbl-wrap"><table>
+    <thead><tr><th>Site</th><th>Output mt</th><th>Plan mt</th><th>Plan%</th><th>Run Rate t/hr</th><th>Pellet mt</th><th>Crumble mt</th><th>Mash mt</th><th>Mixgrain mt</th></tr></thead>
+    <tbody>${rows.map(r=>{
+      const s=(r.Plant||r.plant||'').toUpperCase();
+      const out=gf(r,'Total Plant Output,mt w/o toll','Total Plant Output, mt w/o toll','output');
+      const plan=gf(r,'Planned, mt','Planned','Total Mash Input','plan','Total Plant Input, mt');
+      const p2=plan>0?(out/plan*100):0;
+      return `<tr>
+        <td>${dot(s)}${SL[s]||s}</td>
+        <td class="${p2>=100?'tg':p2>=85?'ta':'tr'}">${out>0?out.toFixed(1):'—'}</td>
+        <td>${plan>0?plan.toFixed(1):'—'}</td>
+        <td class="${p2>=100?'tg':p2>=85?'ta':'tr'}">${p2>0?p2.toFixed(1)+'%':'—'}</td>
+        <td>${fv(gf(r,'Run Rate, ton/hr (net of DT)','Plant Run Rate, Ton/hr'),2)}</td>
+        <td>${fv(gf(r,'Pellet Volume, mt','Pellet'),2)}</td>
+        <td>${fv(gf(r,'Crumble Volume, mt','Crumble'),2)}</td>
+        <td>${fv(gf(r,'Mash,mt','Mash'),2)}</td>
+        <td>${fv(gf(r,'Mixgrain'),2)}</td>
+      </tr>`;
+    }).join('')||'<tr><td colspan="9" class="no-data">No production data</td></tr>'}</tbody>
+  </table></div></div></div>`;
+}
+
+// ── OEE ───────────────────────────────────────────────────
+function renderOEE() {
+  const ct=document.getElementById('content-oee');
+  if(!DATA.oee){ct.innerHTML='<div class="no-data">⟳ Loading...</div>';gasGet('oee').then(d=>{DATA.oee=d;renderOEE();}).catch(e=>ct.innerHTML='<div class="no-data">Error: '+e.message+'</div>');return;}
+  const d=DATA.oee;const rows=d.rows||[];const bySite=d.bySite||{};
+  const avgOEE=parseFloat(d.totals&&d.totals.avg_oee||0);
+  const oC=avgOEE>=85?'var(--green-b)':avgOEE>=70?'var(--amber)':'var(--red)';
+  ct.innerHTML=`<div class="sec"><div class="sec-hdr"><div class="sec-title">OEE — Week ${activeWeek}</div><div class="sec-line"></div></div>
+  <div class="g4" style="margin-bottom:12px">
+    <div class="kc" style="--kc-color:${oC}"><div class="kc-lbl">Avg OEE</div><div class="kc-val" style="color:${oC}">${avgOEE>0?avgOEE.toFixed(1):'—'}<span style="font-size:12px;color:var(--text2)">%</span></div><span class="bdg ${avgOEE>=85?'g':avgOEE>=70?'a':avgOEE>0?'r':'b'}">${avgOEE>=85?'World Class':avgOEE>=70?'Acceptable':avgOEE>0?'Needs Attn':'N/A'}</span></div>
+    <div class="kc" style="--kc-color:var(--blue)"><div class="kc-lbl">Availability</div><div class="kc-val">${fv(parseFloat(d.totals&&d.totals.availability||0),1)}<span style="font-size:12px;color:var(--text2)">%</span></div></div>
+    <div class="kc" style="--kc-color:var(--teal)"><div class="kc-lbl">Performance</div><div class="kc-val">${fv(parseFloat(d.totals&&d.totals.performance||0),1)}<span style="font-size:12px;color:var(--text2)">%</span></div></div>
+    <div class="kc" style="--kc-color:var(--green)"><div class="kc-lbl">Quality Rate</div><div class="kc-val">${fv(parseFloat(d.totals&&d.totals.quality_rate||0),1)}<span style="font-size:12px;color:var(--text2)">%</span></div></div>
+  </div>
+  ${Object.keys(bySite).length?`<div class="cc" style="margin-bottom:10px"><div class="cc-title">OEE by Site</div>
+    ${Object.entries(bySite).map(([s,v])=>{const pv=parseFloat(v);return `<div class="mbar-row"><div class="mbar-lbl">${s}</div><div class="mbar-bg"><div class="mbar-fill" style="width:${clamp(pv,0,100).toFixed(0)}%;background:${pv>=85?'var(--green-b)':pv>=70?'var(--amber)':'var(--red)'}"></div></div><div class="mbar-val" style="color:${pv>=85?'var(--green-b)':pv>=70?'var(--amber)':'var(--red)'}">${pv>0?pv.toFixed(1)+'%':'—'}</div></div>`;}).join('')}
+  </div>`:''}
+  <div class="cc"><div class="cc-title">OEE Detail by Site</div><div class="tbl-wrap"><table>
+    <thead><tr><th>Site</th><th>OEE%</th><th>Availability%</th><th>Performance%</th><th>Quality%</th><th>Output mt</th><th>Adj Capacity</th></tr></thead>
+    <tbody>${rows.map(r=>{
+      const s=(r.Plant||r.plant||'').toUpperCase();
+      const _roee=gf(r,'OEE','oee');const oee=_roee>0&&_roee<=1?_roee*100:_roee;
+      const av=oeeNorm(gf(r,'AVAILABIILITY','AVAILABILITY','availability'));
+      const pf=oeeNorm(gf(r,'PERFORMANCE','performance'));
+      const ql=oeeNorm(gf(r,'QUALITY','quality'));
+      const out=gf(r,'Total Plant Output,mt w/o toll','output');
+      const adjCap=gf(r,'ADJ CAPACITY');
+      return `<tr>
+        <td>${dot(s)}${SL[s]||s}</td>
+        <td class="${oee>=85?'tg':oee>=70?'ta':oee>0?'tr':''}">${oee>0?oee.toFixed(1)+'%':'—'}</td>
+        <td class="${av>=90?'tg':av>=75?'ta':av>0?'tr':''}">${av>0?av.toFixed(1)+'%':'—'}</td>
+        <td class="${pf>=90?'tg':pf>=75?'ta':pf>0?'tr':''}">${pf>0?pf.toFixed(1)+'%':'—'}</td>
+        <td class="${ql>=98?'tg':ql>=95?'ta':ql>0?'tr':''}">${ql>0?ql.toFixed(1)+'%':'—'}</td>
+        <td>${out>0?out.toFixed(1):'—'}</td>
+        <td>${adjCap>0?adjCap.toFixed(1):'—'}</td>
+      </tr>`;
+    }).join('')||'<tr><td colspan="7" class="no-data">No OEE data</td></tr>'}</tbody>
+  </table></div></div></div>`;
+}
+
+// ── COST ANALYTICS ────────────────────────────────────────
+function renderCostAnalytics() {
+  const ct=document.getElementById('content-cost_analytics');
+  if(!DATA.cost_analytics){ct.innerHTML='<div class="no-data">⟳ Loading...</div>';gasGet('cost_analytics').then(d=>{DATA.cost_analytics=d;renderCostAnalytics();}).catch(e=>ct.innerHTML='<div class="no-data">Error: '+e.message+'</div>');return;}
+  const d=DATA.cost_analytics;const rows=d.pc_daily||d.rows||[];
+  ct.innerHTML=`<div class="sec"><div class="sec-hdr"><div class="sec-title">Cost Analytics (PC Daily)</div><div class="sec-line"></div></div>
+  <div class="g4" style="margin-bottom:12px">
+    <div class="kc" style="--kc-color:var(--green)"><div class="kc-lbl">Total MCOS</div><div class="kc-val" style="font-size:20px;color:var(--green-b)">${fKK(d.totals&&d.totals.total_cost||0)}</div></div>
+    <div class="kc" style="--kc-color:var(--amber)"><div class="kc-lbl">Variable Cost</div><div class="kc-val" style="font-size:20px;color:var(--amber)">${fKK(d.totals&&d.totals.feed_cost||0)}</div></div>
+    <div class="kc" style="--kc-color:var(--purple)"><div class="kc-lbl">Fixed Cost</div><div class="kc-val" style="font-size:20px;color:var(--purple)">${fKK(d.totals&&d.totals.labor_cost||0)}</div></div>
+    <div class="kc" style="--kc-color:var(--blue)"><div class="kc-lbl">Records</div><div class="kc-val">${rows.length}</div><div class="kc-sub">PC Daily entries</div></div>
+  </div>
+  <div class="cc"><div class="cc-title">PC Daily — Cost Detail</div><div class="tbl-wrap"><table>
+    <thead><tr><th>Plant</th><th>Date</th><th>Week</th><th>Volume mt</th><th>Pellet mt</th><th>Variable Cost</th><th>Fixed Cost</th><th>MCOS Php</th><th>MCOS/Ton</th></tr></thead>
+    <tbody>${rows.slice(0,60).map(r=>{
+      const s=(r.PLANT||r.Plant||r.plant||'').toUpperCase();
+      const vol=gf(r,'Volume,MT','TOTAL VOLUME','totalVolume');
+      const mcos=gf(r,'MCOS (Php)','mcos');
+      return `<tr>
+        <td>${dot(s)}${SL[s]||s}</td>
+        <td style="text-align:left">${r.DATE||r.Date||r.date||'—'}</td>
+        <td>${r.WEEK||r.Week||r.week||'—'}</td>
+        <td>${vol>0?vol.toFixed(2):'—'}</td>
+        <td>${fv(gf(r,'PELLET VOLUME','pelletVolume'),2)}</td>
+        <td>${fKK(gf(r,'Variable Cost (P','variableCost'))}</td>
+        <td>${fKK(gf(r,'Fixed Cost (Php','fixedCost'))}</td>
+        <td class="${mcos>200000?'tr':''}">${fKK(mcos)}</td>
+        <td>${fv(gf(r,'MCOS / Ton','mcosPerTon'),2)}</td>
+      </tr>`;
+    }).join('')||'<tr><td colspan="9" class="no-data">No cost analytics data</td></tr>'}</tbody>
+  </table></div></div></div>`;
+}
+
+// ── QUALITY & ENERGY ──────────────────────────────────────
+function renderQualityEnergy() {
+  const ct=document.getElementById('content-quality_energy');
+  if(!DATA.quality_energy){ct.innerHTML='<div class="no-data">⟳ Loading...</div>';gasGet('quality_energy').then(d=>{DATA.quality_energy=d;renderQualityEnergy();}).catch(e=>ct.innerHTML='<div class="no-data">Error: '+e.message+'</div>');return;}
+  const d=DATA.quality_energy;const rows=d.rows||[];
+  ct.innerHTML=`<div class="sec"><div class="sec-hdr"><div class="sec-title">Quality &amp; Energy (MCOS Daily) — Week ${activeWeek}</div><div class="sec-line"></div></div>
+  <div class="g4" style="margin-bottom:12px">
+    <div class="kc" style="--kc-color:var(--purple)"><div class="kc-lbl">Records</div><div class="kc-val">${rows.length}</div><div class="kc-sub">MCOS daily entries</div></div>
+    <div class="kc" style="--kc-color:var(--green)"><div class="kc-lbl">Avg MCOS/Ton</div><div class="kc-val" style="color:var(--green-b)">${fv(d.totals&&d.totals.mcos||0,2)}</div></div>
+    <div class="kc" style="--kc-color:var(--amber)"><div class="kc-lbl">Total Variable Cost</div><div class="kc-val" style="font-size:20px;color:var(--amber)">${fKK(d.totals&&d.totals.energy_cost||0)}</div></div>
+    <div class="kc" style="--kc-color:var(--blue)"><div class="kc-lbl">Total Volume mt</div><div class="kc-val" style="font-size:20px">${fv(rows.reduce((a,r)=>a+gf(r,'Volume,MT'),0),1)}</div></div>
+  </div>
+  <div class="cc"><div class="cc-title">MCOS Daily Detail</div><div class="tbl-wrap"><table>
+    <thead><tr><th>Plant</th><th>Date</th><th>Week</th><th>Volume mt</th><th>Variable Cost</th><th>Fixed Cost</th><th>MCOS Php</th><th>MCOS/Ton</th><th>Rolls &amp; Die</th></tr></thead>
+    <tbody>${rows.slice(0,60).map(r=>{
+      const s=(r.PLANT||r.Plant||r.plant||'').toUpperCase();
+      const vol=gf(r,'Volume,MT','volume');
+      const mcos=gf(r,'MCOS (Php)','mcos');
+      return `<tr>
+        <td>${dot(s)}${SL[s]||s}</td>
+        <td style="text-align:left">${r.DATE||r.Date||r.date||'—'}</td>
+        <td>${r.WEEK||r.Week||r.week||'—'}</td>
+        <td>${vol>0?vol.toFixed(2):'—'}</td>
+        <td>${fKK(gf(r,'Variable Cost (P','variableCost'))}</td>
+        <td>${fKK(gf(r,'Fixed Cost (Php','fixedCost'))}</td>
+        <td>${fKK(mcos)}</td>
+        <td>${fv(gf(r,'MCOS / Ton','mcosPerTon'),2)}</td>
+        <td>${fv(gf(r,'Rolls & Die','rollsDie'),2)}</td>
+      </tr>`;
+    }).join('')||'<tr><td colspan="9" class="no-data">No MCOS data</td></tr>'}</tbody>
+  </table></div></div></div>`;
+}
+
+// ── START ─────────────────────────────────────────────────
+loadData(false);
+</script>
+</body>
+</html>
