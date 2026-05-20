@@ -310,16 +310,24 @@ function render() {
   const siteWkRows=activeSite==='NATIONAL'?wkRows:wkRows.filter(r=>(r.Plant||r.plant||'').toString().toUpperCase()===activeSite);
 
   // KPIs
-  // Output = CF + Mixgrain + Vietop (cols AP + AR + AZ)
+  // Output col AM — sum across sites (no doubling: one row per plant per week)
+  const totOut  = siteWkRows.reduce((a,r)=>a+gf(r,'Total Plant Output,mt w/o toll'),0);
+  // CF/MG/VT breakdown badges (cols AP, AR, AZ)
   const totCF   = siteWkRows.reduce((a,r)=>a+gf(r,'Total Plant Output EXC MIXGRAIN & VIETOP'),0);
   const totMG   = siteWkRows.reduce((a,r)=>a+gf(r,'Mixgrain'),0);
   const totVT   = siteWkRows.reduce((a,r)=>a+gf(r,'Vietop'),0);
-  const totOut  = totCF + totMG + totVT;
-  const totPlan = siteWkRows.reduce((a,r)=>a+gf(r,'Planned, mt','Total Plant Input, mt','Planned'),0);
+  // Cap Util col CQ
+  const cuRaw   = siteWkRows.length?siteWkRows.reduce((a,r)=>a+gf(r,'Capacity Utilization Rate,%'),0)/siteWkRows.length:0;
+  const totCapUtil = cuRaw>1?cuRaw:cuRaw*100;
+  // UDT col H, SDT col G
   const totUDT  = siteWkRows.reduce((a,r)=>a+gf(r,'Unscheduled Down Time, hr'),0);
   const totSDT  = siteWkRows.reduce((a,r)=>a+gf(r,'Scheduled Down Time, hr'),0);
+  // OEE col CR
   const _rawOEE = siteWkRows.length?siteWkRows.reduce((a,r)=>a+gf(r,'OEE'),0)/siteWkRows.length:0;
   const avgOEE  = _rawOEE>1?_rawOEE:_rawOEE*100;
+  // Plant Daily Rate col BG
+  const totPDR  = siteWkRows.reduce((a,r)=>a+gf(r,'Plant Daily Pelleting Rate,ton/day'),0);
+  const totPlan = siteWkRows.reduce((a,r)=>a+gf(r,'Planned, mt','Total Plant Input, mt'),0);
   const pp=totPlan>0?(totOut/totPlan*100):0;
   const pC=pp>=100?'var(--green-b)':pp>=85?'var(--amber)':'var(--red)';
   const oC=avgOEE>=85?'var(--green-b)':avgOEE>=70?'var(--amber)':'var(--red)';
@@ -377,29 +385,33 @@ function render() {
   <div class="sec-hdr"><div class="sec-title">${SL[activeSite]} · Week ${activeWeek}</div><div class="sec-line"></div></div>
   <div class="g5">
     <div class="kc" style="--kc-color:${pC}">
-      <div class="kc-lbl">Output</div>
+      <div class="kc-lbl">Output (col AM)</div>
       <div class="kc-val" style="color:${pC}">${totOut>0?totOut.toFixed(1):'—'}<span style="font-size:12px;color:var(--text2)"> mt</span></div>
-      <div class="kc-sub">Plan: ${totPlan>0?totPlan.toFixed(1):'—'} mt</div>
-      <div style="display:flex;gap:3px;flex-wrap:wrap;margin-bottom:4px">
+      <div style="display:flex;gap:3px;flex-wrap:wrap;margin-bottom:5px;margin-top:2px">
         ${totCF>0?`<span style="font-size:8px;background:rgba(56,139,253,0.15);color:#388bfd;padding:1px 5px;border-radius:3px">CF ${totCF.toFixed(1)}</span>`:''}
         ${totMG>0?`<span style="font-size:8px;background:rgba(163,113,247,0.15);color:#a371f7;padding:1px 5px;border-radius:3px">MG ${totMG.toFixed(1)}</span>`:''}
         ${totVT>0?`<span style="font-size:8px;background:rgba(26,188,156,0.15);color:#1abc9c;padding:1px 5px;border-radius:3px">VT ${totVT.toFixed(1)}</span>`:''}
       </div>
       <span class="bdg ${bsc(pp,100,85)}">${pp>0?pp.toFixed(1)+'% of plan':'No data'}</span>
     </div>
-    <div class="kc" style="--kc-color:var(--blue)">
-      <div class="kc-lbl">Working Hours</div>
-      <div class="kc-val" style="font-size:20px">${fv(siteWkRows.reduce((a,r)=>a+gf(r,'Working Hours','Working Days'),0),1)}<span style="font-size:12px;color:var(--text2)"> hr</span></div>
-      <div class="kc-sub">Total scheduled hrs</div>
+    <div class="kc" style="--kc-color:${totCapUtil>=80?'var(--green)':totCapUtil>=60?'var(--amber)':'var(--red)'}">
+      <div class="kc-lbl">Capacity Utilization (col CQ)</div>
+      <div class="kc-val" style="color:${totCapUtil>=80?'var(--green-b)':totCapUtil>=60?'var(--amber)':'var(--red)'}">${totCapUtil>0?totCapUtil.toFixed(1):'—'}<span style="font-size:12px;color:var(--text2)">%</span></div>
+      <div class="kc-sub">vs Demo Capacity</div>
+      <span class="bdg ${bsc(totCapUtil,80,60)}">${totCapUtil>=80?'On Track':totCapUtil>=60?'Moderate':'Low'}</span>
     </div>
     <div class="kc" style="--kc-color:${totUDT>20?'var(--red)':totUDT>10?'var(--amber)':'var(--border2)'}">
       <div class="kc-lbl">Downtime</div>
       <div style="display:flex;gap:8px;align-items:flex-end;margin-bottom:4px">
-        <div><div style="font-size:9px;color:var(--red);font-weight:600;letter-spacing:1px">UDT</div>
-          <div style="font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:700;color:${totUDT>20?'var(--red)':totUDT>10?'var(--amber)':'var(--text)'}">${totUDT>0?totUDT.toFixed(2):'—'}<span style="font-size:11px;color:var(--text2)"> hr</span></div></div>
+        <div>
+          <div style="font-size:9px;color:var(--red);font-weight:600;letter-spacing:1px">UDT <span style="color:var(--text3);font-weight:400">col H</span></div>
+          <div style="font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:700;color:${totUDT>20?'var(--red)':totUDT>10?'var(--amber)':'var(--text)'}">${totUDT>0?totUDT.toFixed(2):'—'}<span style="font-size:11px;color:var(--text2)"> hr</span></div>
+        </div>
         <div style="width:1px;height:32px;background:var(--border)"></div>
-        <div><div style="font-size:9px;color:var(--text3);font-weight:600;letter-spacing:1px">SDT</div>
-          <div style="font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:700;color:var(--text2)">${totSDT>0?totSDT.toFixed(2):'—'}<span style="font-size:11px;color:var(--text3)"> hr</span></div></div>
+        <div>
+          <div style="font-size:9px;color:var(--text3);font-weight:600;letter-spacing:1px">SDT <span style="font-weight:400">col G</span></div>
+          <div style="font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:700;color:var(--text2)">${totSDT>0?totSDT.toFixed(2):'—'}<span style="font-size:11px;color:var(--text3)"> hr</span></div>
+        </div>
       </div>
       <span class="bdg ${totUDT>20?'r':totUDT>10?'a':'g'}">${totUDT>20?'High UDT':totUDT>10?'Moderate':'Low DT'}</span>
     </div>
@@ -410,9 +422,9 @@ function render() {
       <span class="bdg ${avgOEE>=85?'g':avgOEE>=70?'a':avgOEE>0?'r':'b'}">${avgOEE>=85?'World Class':avgOEE>=70?'Acceptable':avgOEE>0?'Needs Attn':'N/A'}</span>
     </div>
     <div class="kc" style="--kc-color:var(--teal)">
-      <div class="kc-lbl">Total Rejection mt</div>
-      <div class="kc-val" style="font-size:20px;color:var(--teal)">${fv(siteWkRows.reduce((a,r)=>a+gf(r,'Total Remill Reject, mt','outrightRejectMt'),0),2)}</div>
-      <div class="kc-sub">Remill + outright rejects</div>
+      <div class="kc-lbl">Plant Daily Rate (col BG)</div>
+      <div class="kc-val" style="font-size:22px;color:var(--teal)">${totPDR>0?totPDR.toFixed(2):'—'}<span style="font-size:12px;color:var(--text2)"> tph</span></div>
+      <div class="kc-sub">Plant Daily Pelleting Rate</div>
     </div>
   </div>
 </div>
@@ -420,22 +432,21 @@ function render() {
 <div class="sec">
   <div class="sec-hdr"><div class="sec-title">Site Detail Table — Week ${activeWeek}</div><div class="sec-line"></div></div>
   <div class="cc"><div class="tbl-wrap"><table>
-    <thead><tr><th>Site</th><th>Working Hrs</th><th>UDT Hr</th><th>SDT Hr</th><th>Total DT Hr</th><th>Output mt</th><th>Plan mt</th><th>Plan%</th><th>OEE%</th><th>Reject mt</th></tr></thead>
+    <thead><tr><th>Site</th><th>Cap Util%</th><th>UDT Hr (H)</th><th>SDT Hr (G)</th><th>Total DT Hr</th><th>Output mt (AM)</th><th>Plan mt</th><th>Plan%</th><th>OEE% (CR)</th><th>PDR tph (BG)</th></tr></thead>
     <tbody>${wkRows.map(r=>{
       const s=(r.Plant||r.plant||'').toUpperCase();
-      const cf2=gf(r,'Total Plant Output EXC MIXGRAIN & VIETOP');
-      const mg2=gf(r,'Mixgrain');
-      const vt2=gf(r,'Vietop');
-      const out=cf2+mg2+vt2;
-      const plan=gf(r,'Planned, mt','Total Plant Input, mt','Planned');
+      const out=gf(r,'Total Plant Output,mt w/o toll');
+      const plan=gf(r,'Planned, mt','Total Plant Input, mt');
       const p2=plan>0?(out/plan*100):0;
       const udt=gf(r,'Unscheduled Down Time, hr');
       const sdt=gf(r,'Scheduled Down Time, hr');
       const _roee=gf(r,'OEE');const oee=_roee>1?_roee:_roee*100;
-      const rej=gf(r,'Total Remill Reject, mt','outrightRejectMt');
+      const cuRaw2=gf(r,'Capacity Utilization Rate,%');const cuRow=cuRaw2>1?cuRaw2:cuRaw2*100;
+      const pdr=gf(r,'Plant Daily Pelleting Rate,ton/day');
+
       return `<tr>
         <td>${dot(s)}${SL[s]||s}</td>
-        <td>${fv(gf(r,'Working Hours'),1)}</td>
+        <td class="${cuRow>=80?'tg':cuRow>=60?'ta':'tr'}">${cuRow>0?cuRow.toFixed(1)+'%':'—'}</td>
         <td class="${udt>20?'tr':udt>10?'ta':''}">${udt>0?udt.toFixed(2):'—'}</td>
         <td>${sdt>0?sdt.toFixed(2):'—'}</td>
         <td>${(udt+sdt)>0?(udt+sdt).toFixed(2):'—'}</td>
@@ -443,7 +454,7 @@ function render() {
         <td>${plan>0?plan.toFixed(1):'—'}</td>
         <td class="${p2>=100?'tg':p2>=85?'ta':'tr'}">${p2>0?p2.toFixed(1)+'%':'—'}</td>
         <td class="${oee>=85?'tg':oee>=70?'ta':oee>0?'tr':''}">${oee>0?oee.toFixed(1)+'%':'—'}</td>
-        <td>${rej>0?rej.toFixed(2):'—'}</td>
+        <td>${pdr>0?pdr.toFixed(2):'—'}</td>
       </tr>`;
     }).join('')||'<tr><td colspan="10" class="no-data">No data for Week '+activeWeek+'</td></tr>'}</tbody>
   </table></div></div>
