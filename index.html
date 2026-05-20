@@ -72,6 +72,11 @@ tr:hover td{background:rgba(255,255,255,.02)}
 .mbar-fill{height:100%;border-radius:2px;transition:width .5s ease}
 .mbar-val{font-family:'DM Mono',monospace;font-size:9px;color:var(--text2);width:40px;text-align:right;flex-shrink:0}
 ::-webkit-scrollbar{width:5px;height:5px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px}
+#week-strip::-webkit-scrollbar{height:3px}
+#week-strip::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
+.wk-pill{padding:4px 10px;font-size:10px;font-family:'DM Mono',monospace;border:1px solid var(--border2);border-radius:4px;background:none;color:var(--text2);cursor:pointer;white-space:nowrap;transition:all .15s;flex-shrink:0}
+.wk-pill:hover{border-color:var(--green);color:var(--green-b)}
+.wk-pill.active{background:var(--green);border-color:var(--green);color:#000;font-weight:700}
 .fade{animation:fadeIn .2s ease}
 @keyframes fadeIn{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
 .no-data{text-align:center;padding:40px;color:var(--text3);font-family:'DM Mono',monospace;font-size:11px}
@@ -108,7 +113,7 @@ tr:hover td{background:rgba(255,255,255,.02)}
     <span class="tn-label">Site</span>
     <select id="site-select" class="tn-select" onchange="setSite(this.value)"></select>
     <span class="tn-label">Week</span>
-    <select id="week-select" class="tn-select" onchange="setWeek(parseInt(this.value))"></select>
+    <select id="week-select" class="tn-select" onchange="setWeek(parseInt(this.value))" style="min-width:90px"></select>
   </div>
   <div class="topnav-status">
     <div style="font-family:'DM Mono',monospace;font-size:10px;color:var(--text3)">
@@ -120,6 +125,11 @@ tr:hover td{background:rgba(255,255,255,.02)}
 </div>
 
 <div class="main">
+  <!-- WEEK STRIP — scrollable horizontal pills -->
+  <div id="week-strip" style="background:var(--bg2);border-bottom:1px solid var(--border);padding:6px 16px;display:flex;align-items:center;gap:6px;overflow-x:auto;flex-shrink:0;-webkit-overflow-scrolling:touch;">
+    <span style="font-size:9px;color:var(--text3);font-family:'DM Mono',monospace;letter-spacing:1px;text-transform:uppercase;white-space:nowrap;margin-right:4px">WEEK</span>
+    <div id="week-pills" style="display:flex;gap:4px;flex-shrink:0"></div>
+  </div>
   <div class="page active" id="page-dashboard"><div class="content fade" id="content"></div></div>
   <div class="page" id="page-monthly"><div class="content" id="content-monthly"><div class="no-data">Select Monthly tab to load</div></div></div>
   <div class="page" id="page-cost"><div class="content" id="content-cost"><div class="no-data">Select Cost tab to load</div></div></div>
@@ -193,8 +203,7 @@ async function loadData(isRefresh=false) {
     const weekly = await gasGet('weekly', {site:'National'});
     DATA.weekly = weekly;
     const weeks = (weekly.weeks||[]).map(w=>+w).filter(w=>w>0).sort((a,b)=>a-b);
-    if (!isRefresh) activeWeek = weeks[weeks.length-1] || 21;
-    console.log('Weeks available:', weeks, 'Active week:', activeWeek);
+    if (!isRefresh) activeWeek = weeks[weeks.length-1] || 1;
 
     setStatus('live');
     document.getElementById('last-updated').textContent = new Date().toLocaleTimeString('en-PH',{hour:'2-digit',minute:'2-digit'});
@@ -247,8 +256,13 @@ function buildNav() {
   const weeks=(DATA.weekly&&DATA.weekly.weeks)||[];
   const sortedWks=(DATA.weekly&&DATA.weekly.weeks||[]).map(w=>+w).filter(w=>w>0).sort((a,b)=>a-b);if(ws) ws.innerHTML=sortedWks.map(w=>`<option value="${w}" ${+w===+activeWeek?'selected':''}>Week ${w}</option>`).join('');
 }
-function setSite(s){activeSite=s;DATA={};gasGet('weekly',{site:s}).then(d=>{DATA.weekly=d;const wks=d.weeks||[];activeWeek=wks[wks.length-1]||activeWeek;buildNav();render();}).catch(()=>render());}
-function setWeek(w){activeWeek=w;buildNav();render();}
+function setSite(s){
+  activeSite=s;
+  // Don't re-fetch — use existing data, just re-render
+  buildNav();
+  render();
+}
+function setWeek(w){activeWeek=+w;buildNav();render();}
 
 function setPage(p) {
   activePage=p;
