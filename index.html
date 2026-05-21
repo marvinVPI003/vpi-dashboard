@@ -380,7 +380,7 @@ function render() {
     }).join('')}
     </div></div>` : '';
 
-  ct.innerHTML = `<div id="_debug_panel" style="background:#1a1a2e;border:1px solid var(--amber);border-radius:6px;padding:12px;margin:12px 20px;font-family:'DM Mono',monospace;font-size:10px;color:var(--text2);line-height:1.8">Loading debug info...</div>` + scorecard + `
+  ct.innerHTML = scorecard + `
 <div class="sec">
   <div class="sec-hdr"><div class="sec-title">${SL[activeSite]} · Week ${activeWeek}</div><div class="sec-line"></div></div>
   <div class="g5">
@@ -470,6 +470,36 @@ function render() {
 </div>`;
 
   ct.className='content fade';
+
+  // Insert debug panel at top
+  const dbDiv = document.createElement('div');
+  dbDiv.id = '_debug_panel';
+  dbDiv.style.cssText = 'background:#0d1117;border:1px solid #d29922;border-radius:6px;padding:12px 16px;margin-bottom:12px;font-family:DM Mono,monospace;font-size:10px;color:#8b949e;line-height:2';
+  if(rows.length>0){
+    const acR = wkRows.filter(r=>(r.Plant||r.plant||'').toUpperCase()==='AC');
+    const pfR = wkRows.filter(r=>(r.Plant||r.plant||'').toUpperCase()==='PFMIS');
+    const r0 = acR[0]||{};
+    dbDiv.innerHTML =
+      '<span style="color:#d29922;font-weight:700">⚙ DEBUG PANEL — Week '+activeWeek+'</span> &nbsp;|&nbsp; '+
+      'Total rows: <b style="color:#e6edf3">'+rows.length+'</b> &nbsp;|&nbsp; '+
+      'Week '+activeWeek+' rows: <b style="color:#e6edf3">'+wkRows.length+'</b> &nbsp;|&nbsp; '+
+      'AC rows: <b style="color:#388bfd">'+acR.length+'</b> &nbsp;|&nbsp; '+
+      'PFMIS rows: <b style="color:#d29922">'+pfR.length+'</b><br>'+
+      '<span style="color:#3fb950">AC Field Values →</span> '+
+      'Output(AM): <b style="color:#fff">'+r0['Total Plant Output,mt w/o toll']+'</b> | '+
+      'OEE(CR): <b style="color:#fff">'+r0['OEE']+'</b> | '+
+      'CapUtil(CQ): <b style="color:#fff">'+r0['Capacity Utilization Rate,%']+'</b> | '+
+      'UDT(H): <b style="color:#fff">'+r0['Unscheduled Down Time, hr']+'</b> | '+
+      'SDT(G): <b style="color:#fff">'+r0['Scheduled Down Time, hr']+'</b> | '+
+      'PDR(BG): <b style="color:#fff">'+r0['Plant Daily Pelleting Rate,ton/day']+'</b><br>'+
+      '<span style="color:#3fb950">AC Breakdown →</span> '+
+      'CF(AP): <b style="color:#388bfd">'+r0['Total Plant Output EXC MIXGRAIN & VIETOP']+'</b> | '+
+      'MG(AR): <b style="color:#a371f7">'+r0['Mixgrain']+'</b> | '+
+      'VT(AZ): <b style="color:#1abc9c">'+r0['Vietop']+'</b>';
+  } else {
+    dbDiv.innerHTML = '<span style="color:#f85149">No rows found for Week '+activeWeek+'</span>';
+  }
+  ct.insertBefore(dbDiv, ct.firstChild);
 
   const sf = activeSite==='NATIONAL' ? r=>true : r=>(r.Plant||r.plant||'').toUpperCase()===activeSite;
   const bw = w => rows.filter(r=>+(r.Week||r.week||0)===+w&&sf(r));
