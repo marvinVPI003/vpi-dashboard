@@ -593,50 +593,52 @@ function render() {
     gasGet('daily_detail',{site:activeSite,week:activeWeek}).then(d=>{
       const wrap=document.getElementById('detail-table-wrap');
       if(!wrap)return;
-      const allDrows=d.rows||[];
-      const drows=allDrows.filter(r=>{
-        const rSite=(r.Plant||r.plant||'').toUpperCase();
-        const rWeek=String(r['Week Num']||r['Week']||r['week']||'').trim();
-        return rSite===activeSite && rWeek===String(activeWeek);
-      }).sort((a,b)=>new Date(a.Date||a.date||0)-new Date(b.Date||b.date||0));
+      // GAS now filters server-side, rows are already for this site+week
+      const drows=(d.rows||[]);
 
       if(!drows.length){
-        wrap.innerHTML='<div class="no-data">No daily data for '+SL[activeSite]+' Week '+activeWeek+'</div>';
+        wrap.innerHTML='<div class="no-data">No daily data for '+SL[activeSite]+' Week '+activeWeek+'<br><small style="color:var(--text3)">Check GAS was redeployed</small></div>';
         return;
       }
 
-      const fmtDate=r=>{
-        const fd=r['_dateFormatted']||'';
-        if(fd)return fd;
-        const raw=String(r['Date']||r['date']||'').split('T')[0];
-        try{const dt=new Date(raw+'T12:00:00');return dt.toLocaleDateString('en-PH',{month:'short',day:'numeric',weekday:'short'});}
-        catch(e){return raw;}
-      };
+      const fmtDate=r=>r['_dateFormatted']||String(r['Date']||r['date']||'—').split('T')[0];
 
       const dateCols=drows.map(r=>fmtDate(r));
       const metrics=[
-        {label:'Output mt',   fn:r=>gf(r,'Total Plant Output,mt w/o toll'), cls:v=>''},
-        {label:'SDT Hr',      fn:r=>gf(r,'Scheduled Down Time, hr'),         cls:v=>''},
-        {label:'UDT Hr',      fn:r=>gf(r,'Unscheduled Down Time, hr'),       cls:v=>v>8?'tr':v>4?'ta':''},
-        {label:'kWh/ton',     fn:r=>gf(r,'kWh/ton'),                         cls:v=>''},
-        {label:'Fuel L/ton',  fn:r=>gf(r,'Li/ton'),                          cls:v=>v>3.5?'tr':v>3.15?'ta':''},
-        {label:'Coal kg/ton', fn:r=>gf(r,'kg/ton'),                          cls:v=>v>12?'tr':v>10.8?'ta':''},
+        {label:'Output mt',   fn:r=>gf(r,'Total Plant Output,mt w/o toll'), lim:0,   cls:(v,l)=>''},
+        {label:'SDT Hr',      fn:r=>gf(r,'Scheduled Down Time, hr'),        lim:0,   cls:(v,l)=>''},
+        {label:'UDT Hr',      fn:r=>gf(r,'Unscheduled Down Time, hr'),      lim:8,   cls:(v,l)=>v>l?'tr':v>l*0.8?'ta':'tg'},
+        {label:'kWh/ton',     fn:r=>gf(r,'kWh/ton'),                        lim:35,  cls:(v,l)=>v>l?'tr':v>l*0.9?'ta':'tg'},
+        {label:'Fuel L/ton',  fn:r=>gf(r,'Li/ton'),                         lim:3.5, cls:(v,l)=>v>l?'tr':v>l*0.9?'ta':'tg'},
+        {label:'Coal kg/ton', fn:r=>gf(r,'kg/ton'),                         lim:12,  cls:(v,l)=>v>l?'tr':v>l*0.9?'ta':'tg'},
       ];
 
-      wrap.innerHTML='<div class="tbl-wrap"><table>'+
-        '<thead><tr><th style="text-align:left;min-width:100px">Metric</th>'+
-        dateCols.map(d=>'<th style="white-space:nowrap">'+d+'</th>').join('')+
+      // Table style — bigger, more visible
+      const thStyle='style="white-space:nowrap;font-size:11px;padding:8px 12px;text-align:center;background:var(--bg3)"';
+      const tdMetric='style="text-align:left;font-family:Barlow,sans-serif;font-size:12px;font-weight:600;color:var(--text);white-space:nowrap;padding:10px 12px;background:var(--bg3);border-right:1px solid var(--border2)"';
+      const tdVal=(cls)=>'style="text-align:center;font-family:DM Mono,monospace;font-size:13px;font-weight:600;padding:10px 12px;letter-spacing:.5px"';
+
+      wrap.innerHTML='<div class="tbl-wrap"><table style="width:100%;border-collapse:collapse">'+
+        '<thead><tr>'+
+          '<th '+thStyle+' style="text-align:left;min-width:120px;background:var(--bg3)">Metric</th>'+
+          dateCols.map(d=>'<th '+thStyle+'>'+d+'</th>').join('')+
         '</tr></thead>'+
-        '<tbody>'+metrics.map(m=>
-          '<tr>'+
-          '<td style="text-align:left;font-family:Barlow,sans-serif;color:var(--text);white-space:nowrap">'+m.label+'</td>'+
-          drows.map(r=>{const v=m.fn(r);return '<td class="'+m.cls(v)+'">'+(v>0?+v.toFixed(2):'—')+'</td>';}).join('')+
+        '<tbody>'+metrics.map((m,mi)=>
+          '<tr style="border-bottom:1px solid var(--border)">'+
+          '<td '+tdMetric+'>'+m.label+'</td>'+
+          drows.map(r=>{
+            const v=m.fn(r);
+            const cls=v>0?m.cls(v,m.lim):'';
+            const display=v>0?v.toFixed(2):'—';
+            const bg=cls==='tr'?'rgba(248,81,73,0.12)':cls==='ta'?'rgba(210,153,34,0.12)':cls==='tg'&&m.lim>0?'rgba(46,160,67,0.08)':'';
+            return '<td class="'+cls+'" style="text-align:center;font-family:DM Mono,monospace;font-size:13px;font-weight:600;padding:10px 12px;letter-spacing:.5px;background:'+bg+'">'+(v>0?'<span style="font-size:14px">'+display+'</span>':'<span style="color:var(--text3);font-size:11px">—</span>')+'</td>';
+          }).join('')+
           '</tr>'
         ).join('')+
         '</tbody></table></div>';
     }).catch(e=>{
       const wrap=document.getElementById('detail-table-wrap');
-      if(wrap)wrap.innerHTML='<div class="no-data" style="color:var(--red)">Error loading: '+e.message+'</div>';
+      if(wrap)wrap.innerHTML='<div class="no-data" style="color:var(--red)">Error: '+e.message+'<br><small>Redeploy GAS script</small></div>';
     });
   }
 
