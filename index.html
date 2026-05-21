@@ -212,10 +212,14 @@ async function loadData(isRefresh=false) {
     render();
     scheduleRefresh();
 
-    // background loads
+    // background loads — load daily_detail early to avoid delay on site switch
     ['downtime','monthly','cost','production','oee','cost_analytics','quality_energy'].forEach(tab => {
       gasGet(tab).then(d => { DATA[tab]=d; }).catch(()=>{});
     });
+    // Preload daily data for all sites
+    gasGet('daily_detail',{site:'National',week:activeWeek}).then(d=>{
+      DATA.daily_detail=d;
+    }).catch(()=>{});
 
   } catch(e) {
     setStatus('error');
@@ -544,8 +548,22 @@ function render() {
   // If specific site selected, load daily data from MR Daily
   if(activeSite!=='NATIONAL'){
     const wrap=document.getElementById('detail-table-wrap');
-    gasGet('daily_detail',{site:activeSite,week:activeWeek}).then(d=>{
-      const drows=d.rows||[];
+    // Use preloaded data if available, otherwise fetch
+    const _dailyFetch = (DATA.daily_detail && DATA.daily_detail.rows && DATA.daily_detail.rows.length)
+      ? Promise.resolve(DATA.daily_detail)
+      : gasGet('daily_detail',{site:activeSite,week:activeWeek});
+    _dailyFetch.then(d=>{
+      // Filter by site and week client-side
+      const allDrows=d.rows||[];
+      const drows=allDrows.filter(r=>{
+        const rSite=(r.Plant||r.plant||'').toUpperCase();
+        const rWeek=String(r['Week Num']||r['Week']||r['week']||'').trim();
+        return rSite===activeSite && rWeek===String(activeWeek);
+      }).sort((a,b)=>{
+        // Sort by date - week starts Sunday
+        const da=new Date(a.Date||a.date||0), db=new Date(b.Date||b.date||0);
+        return da-db;
+      });
       if(!wrap)return;
       if(!drows.length){
         wrap.innerHTML='<div class="no-data">No daily data found for '+SL[activeSite]+' Week '+activeWeek+
@@ -554,13 +572,21 @@ function render() {
       }
       // Show first row keys for debugging
       const keys=Object.keys(drows[0]);
-      // MR Daily field names — try multiple variants
-      const getOut=r=>gf(r,'Total Plant Output,mt w/o toll','Total Plant Output, mt w/o toll','Pellet Volume, mt');
-      const getSdt=r=>gf(r,'Scheduled Down Time, hr','Scheduled Dowr','Scheduled Operating Time, hr');
-      const getUdt=r=>gf(r,'Unscheduled Down Time, hr','Unscheduled Dc');
-      const getKwh=r=>gf(r,'kWh/ton','KWH/ton','kwh/ton');
-      const getFuel=r=>gf(r,'Li/ton','li/ton','Fuel L/ton');
-      const getCoal=r=>gf(r,'kg/ton','Coal kg/ton');
+      // MR Daily confirmed field names from debug
+      const getOut =r=>gf(r,'Total Plant Output,mt w/o toll');
+      const getSdt =r=>gf(r,'Scheduled Down Time, hr');   // col G = actual SDT hours
+      const getUdt =r=>gf(r,'Unscheduled Down Time, hr'); // col H = actual UDT hours
+      const getKwh =r=>gf(r,'kWh/ton');
+      const getFuel=r=>gf(r,'Li/ton');
+      const getCoal=r=>gf(r,'kg/ton');
+      // Format date — use preformatted or clean up ISO string
+      const fmtDate=r=>{
+        const fd=r['_dateFormatted']||'';
+        if(fd) return fd;
+        const raw=String(r['Date']||r['date']||'—');
+        if(raw.includes('T')) return raw.split('T')[0]; // 2026-05-17
+        return raw;
+      };
 
       wrap.innerHTML='<div class="tbl-wrap"><table>'+
         '<thead><tr>'+
@@ -569,7 +595,7 @@ function render() {
           '<th>kWh/ton</th><th>Fuel L/ton</th><th>Coal kg/ton</th>'+
         '</tr></thead>'+
         '<tbody>'+drows.map(r=>{
-          const date=r['Date']||r['date']||'—';
+
           const out=getOut(r);
           const sdt=getSdt(r);
           const udt=getUdt(r);
@@ -577,7 +603,7 @@ function render() {
           const fuel=getFuel(r);
           const coal=getCoal(r);
           return '<tr>'+
-            '<td style="text-align:left;font-family:Barlow,sans-serif;color:var(--text)">'+date+'</td>'+
+            '<td style="text-align:left;font-family:Barlow,sans-serif;color:var(--text)">'+fmtDate(r)+'</td>'+
             '<td>'+(out>0?out.toFixed(2):'—')+'</td>'+
             '<td>'+(sdt>0?sdt.toFixed(2):'—')+'</td>'+
             '<td class="'+(udt>8?'tr':udt>4?'ta':'')+'">'+(udt>0?udt.toFixed(2):'—')+'</td>'+
