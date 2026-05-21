@@ -181,12 +181,12 @@ function gasGet(tab, extra={}) {
 // ── BOOT ──────────────────────────────────────────────────
 async function loadData(isRefresh=false) {
   setStatus('fetching');
+  if (!isRefresh) show('loading');
   setMsg(isRefresh ? 'Syncing...' : 'Connecting to Google Sheets...');
   if(!isRefresh){
     setTimeout(()=>setMsg('Loading weekly data...'),3000);
     setTimeout(()=>setMsg('Almost ready...'),8000);
   }
-  if (!isRefresh) show('loading');
 
   try {
     const weekly = await gasGet('weekly', {site:'National'});
@@ -198,7 +198,11 @@ async function loadData(isRefresh=false) {
     document.getElementById('last-updated').textContent = new Date().toLocaleTimeString('en-PH',{hour:'2-digit',minute:'2-digit'});
     hide('loading');
     buildNav();
-    render();
+    try { render(); } catch(renderErr) {
+      console.error('Render error:', renderErr);
+      document.getElementById('content').innerHTML = 
+        '<div class="no-data" style="color:var(--red)">Render error: ' + renderErr.message + '</div>';
+    }
     scheduleRefresh();
 
     // background loads
@@ -222,8 +226,8 @@ async function loadData(isRefresh=false) {
   }
 }
 
-function show(id){const e=document.getElementById(id);if(e)e.style.display='flex';}
-function hide(id){const e=document.getElementById(id);if(e)e.parentNode&&e.parentNode.removeChild(e);}
+function show(id){const e=document.getElementById(id);if(e){e.style.display='flex';e.style.opacity='1';}}
+function hide(id){const e=document.getElementById(id);if(e){e.style.display='none';}}
 function setStatus(s){
   const dot=document.getElementById('status-dot'),txt=document.getElementById('status-txt'),btn=document.getElementById('refresh-btn');
   if(s==='fetching'){dot.className='pulse fetching';txt.textContent='Syncing...';if(btn)btn.disabled=true;}
