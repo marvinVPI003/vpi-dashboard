@@ -533,11 +533,16 @@ function render() {
 </div>
 
 <div class="sec">
-  <div class="sec-hdr"><div class="sec-title">Trends — All Weeks</div><div class="sec-line"></div></div>
-  <div class="g3">
-    <div class="cc"><div class="cc-title">Output vs Plan (mt)</div><div style="position:relative;height:140px"><canvas id="c-out"></canvas></div></div>
-    <div class="cc"><div class="cc-title">OEE % Trend</div><div style="position:relative;height:140px"><canvas id="c-oee"></canvas></div></div>
-    <div class="cc"><div class="cc-title">UDT Hours Trend</div><div style="position:relative;height:140px"><canvas id="c-udt"></canvas></div></div>
+  <div class="sec-hdr"><div class="sec-title">Trends</div><div class="sec-line"></div></div>
+  <div class="g2">
+    <div class="cc">
+      <div class="cc-title">Weekly Output — ${activeSite==='NATIONAL'?'National':SL[activeSite]} (mt)</div>
+      <div style="position:relative;height:180px"><canvas id="c-out"></canvas></div>
+    </div>
+    <div class="cc">
+      <div class="cc-title">Daily Output — Week ${activeWeek} · ${activeSite==='NATIONAL'?'National':SL[activeSite]} (mt)</div>
+      <div style="position:relative;height:180px"><canvas id="c-daily-out"></canvas></div>
+    </div>
   </div>
 </div>`;
 
@@ -626,17 +631,46 @@ function render() {
   const bw = w => rows.filter(r=>+(r.Week||r.week||0)===+w&&sf(r));
   const lbl = allWeeks.map(w=>'W'+w);
 
+  // ── CHART 1: Weekly Output (all weeks, national or site) ──
+  const weeklyOutData = allWeeks.map(w=>{
+    const wr = activeSite==='NATIONAL'
+      ? rows.filter(r=>+(r.Week||r.week||0)===+w && (r.Plant||r.plant||'').toUpperCase()==='NATIONAL')
+      : bw(w);
+    return +wr.reduce((a,r)=>a+gf(r,'Total Plant Output EXC MIXGRAIN & VIETOP')+gf(r,'Mixgrain')+gf(r,'Vietop'),0).toFixed(1);
+  });
+
   mkChart('c-out','bar',lbl,[
-    {label:'Plan',data:allWeeks.map(w=>+bw(w).reduce((a,r)=>a+gf(r,'Planned, mt','Total Plant Input, mt'),0).toFixed(1)),backgroundColor:'rgba(255,255,255,0.07)',borderRadius:2},
-    {label:'Output',data:allWeeks.map(w=>+bw(w).reduce((a,r)=>a+gf(r,'Total Plant Output EXC MIXGRAIN & VIETOP')+gf(r,'Mixgrain')+gf(r,'Vietop'),0).toFixed(1)),backgroundColor:'#388bfd',borderRadius:2}
-  ],{plugins:{legend:{display:true,labels:{color:'#8b949e',font:{size:9},boxWidth:8}},tooltip:{backgroundColor:'#1f2631',borderColor:'rgba(255,255,255,.1)',borderWidth:1,bodyFont:{family:"'DM Mono',monospace",size:10}}}});
+    {label:'Output mt',data:weeklyOutData,
+     backgroundColor:weeklyOutData.map((v,i)=>+allWeeks[i]===+activeWeek?'#3fb950':'#388bfd'),
+     borderRadius:3}
+  ],{plugins:{legend:{display:false},tooltip:{backgroundColor:'#1f2631',borderColor:'rgba(255,255,255,.1)',borderWidth:1,bodyFont:{family:"'DM Mono',monospace",size:10}}}});
 
-  mkChart('c-oee','line',lbl,[
-    {data:allWeeks.map(w=>{const v=bw(w);if(!v.length)return null;return +(v.reduce((a,r)=>a+gf(r,'OEE'),0)/v.length*100).toFixed(1);}),borderColor:'#3fb950',backgroundColor:'rgba(63,185,80,0.08)',fill:true,tension:.3,pointRadius:3,spanGaps:true}
-  ],{plugins:{legend:{display:false},tooltip:{backgroundColor:'#1f2631',borderColor:'rgba(255,255,255,.1)',borderWidth:1,bodyFont:{family:"'DM Mono',monospace",size:10}}},scales:{x:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'#484f58',font:{size:9}}},y:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'#484f58',font:{size:9}},min:0,max:120}}});
+  // ── CHART 2: Daily Output for selected week (from MR Daily) ──
+  const dailyRows = (DATA.daily_detail&&DATA.daily_detail.rows||[]).filter(r=>{
+    const rSite=(r.Plant||r.plant||'').toUpperCase();
+    const rWeek=String(r['Week Num']||r['Week']||r['week']||'').trim();
+    const siteMatch = activeSite==='NATIONAL' ? true : rSite===activeSite;
+    return siteMatch && rWeek===String(activeWeek);
+  }).sort((a,b)=>new Date(a.Date||a.date||0)-new Date(b.Date||b.date||0));
 
-  mkChart('c-udt','bar',lbl,[
-    {data:allWeeks.map(w=>{const v=bw(w).reduce((a,r)=>a+gf(r,'Unscheduled Down Time, hr'),0);return+v.toFixed(2);}),backgroundColor:allWeeks.map(w=>{const v=bw(w).reduce((a,r)=>a+gf(r,'Unscheduled Down Time, hr'),0);return v>20?'#f85149':v>10?'#d29922':'#388bfd';}),borderRadius:2}
+  // Group by date for National (sum across sites)
+  const dailyByDate={};
+  dailyRows.forEach(r=>{
+    const raw=String(r['_dateFormatted']||r.Date||r.date||'').split('T')[0];
+    const d=raw||'?';
+    dailyByDate[d]=(dailyByDate[d]||0)+gf(r,'Total Plant Output,mt w/o toll');
+  });
+  const dailyDates=Object.keys(dailyByDate).sort();
+  const dailyVals=dailyDates.map(d=>+dailyByDate[d].toFixed(2));
+  // Clean date labels — show Mon DD
+  const dailyLabels=dailyDates.map(d=>{
+    if(d.includes('T'))return d.split('T')[0];
+    try{const dt=new Date(d);return dt.toLocaleDateString('en-PH',{month:'short',day:'numeric',weekday:'short'});}catch(e){return d;}
+  });
+
+  mkChart('c-daily-out','bar',dailyLabels,[
+    {label:'Output mt',data:dailyVals,
+     backgroundColor:'#388bfd',borderRadius:3}
   ],{plugins:{legend:{display:false},tooltip:{backgroundColor:'#1f2631',borderColor:'rgba(255,255,255,.1)',borderWidth:1,bodyFont:{family:"'DM Mono',monospace",size:10}}}});
 }
 
