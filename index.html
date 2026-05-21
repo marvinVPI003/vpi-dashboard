@@ -163,41 +163,17 @@ let DATA = {}, activeSite='NATIONAL', activeWeek=1, activePage='dashboard', char
 // Fetch via iframe proxy — handles GAS redirect to googleusercontent.com
 function gasGet(tab, extra={}) {
   return new Promise((resolve, reject) => {
-    const p = new URLSearchParams({tab, site:activeSite, week:activeWeek, ...extra});
-    const url = GAS + '?' + p;
-    const timeout = setTimeout(() => reject(new Error('Timeout — data took too long')), 30000);
-
-    fetch(url, {redirect:'follow'})
-      .then(r => r.text())
-      .then(text => {
-        clearTimeout(timeout);
-        try {
-          const j = JSON.parse(text);
-          if (j.error) reject(new Error(j.error));
-          else resolve(j);
-        } catch(e) {
-          reject(new Error('Bad response from server'));
-        }
-      })
-      .catch(() => {
-        clearTimeout(timeout);
-        // fetch blocked by CORS — fall back to JSONP
-        jsonpGet(tab, extra).then(resolve).catch(reject);
-      });
-  });
-}
-
-// JSONP fallback
-function jsonpGet(tab, extra={}) {
-  return new Promise((resolve, reject) => {
-    const cb = '_vpi_' + tab.replace(/[^a-z]/g,'') + '_' + Date.now();
+    const cb = '_vpi_' + Math.random().toString(36).slice(2);
     const p = new URLSearchParams({tab, site:activeSite, week:activeWeek, callback:cb, ...extra});
     const s = document.createElement('script');
-    const t = setTimeout(() => { cleanup(); reject(new Error('JSONP timeout')); }, 30000);
-    function cleanup(){ clearTimeout(t); delete window[cb]; if(s.parentNode)s.parentNode.removeChild(s); }
+    const t = setTimeout(() => {
+      cleanup();
+      reject(new Error('Timeout after 30s'));
+    }, 30000);
+    function cleanup(){ clearTimeout(t); delete window[cb]; try{s.parentNode&&s.parentNode.removeChild(s);}catch(e){} }
     window[cb] = d => { cleanup(); d&&d.error ? reject(new Error(d.error)) : resolve(d); };
-    s.onerror = () => { cleanup(); reject(new Error('Cannot reach Google Apps Script. Check deployment.')); };
-    s.src = GAS + '?' + p;
+    s.onerror = () => { cleanup(); reject(new Error('GAS load failed')); };
+    s.src = GAS + '?' + p.toString();
     document.head.appendChild(s);
   });
 }
