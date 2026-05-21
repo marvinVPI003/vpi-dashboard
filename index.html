@@ -317,12 +317,12 @@ function render() {
   // For individual sites, use that site's single row
   const kpiRows = activeSite==='NATIONAL' ? natRow : siteWkRows;
 
-  // Output col AM
-  const totOut     = kpiRows.reduce((a,r)=>a+gf(r,'Total Plant Output,mt w/o toll'),0);
   // CF/MG/VT badges cols AP, AR, AZ
   const totCF      = kpiRows.reduce((a,r)=>a+gf(r,'Total Plant Output EXC MIXGRAIN & VIETOP'),0);
   const totMG      = kpiRows.reduce((a,r)=>a+gf(r,'Mixgrain'),0);
   const totVT      = kpiRows.reduce((a,r)=>a+gf(r,'Vietop'),0);
+  // Output col AM = CF + MG + VT (matches sheet exactly)
+  const totOut     = totCF + totMG + totVT;
   // Cap Util col CQ — stored as decimal in GAS (0.2835 = 28.35%)
   const _cuRaw     = kpiRows.length?kpiRows.reduce((a,r)=>a+gf(r,'Capacity Utilization Rate,%'),0)/kpiRows.length:0;
   const totCapUtil = _cuRaw*100;
@@ -401,7 +401,7 @@ function render() {
         ${totMG>0?`<span style="font-size:8px;background:rgba(163,113,247,0.15);color:#a371f7;padding:1px 5px;border-radius:3px">MG ${totMG.toFixed(1)}</span>`:''}
         ${totVT>0?`<span style="font-size:8px;background:rgba(26,188,156,0.15);color:#1abc9c;padding:1px 5px;border-radius:3px">VT ${totVT.toFixed(1)}</span>`:''}
       </div>
-      <span class="bdg ${bsc(pp,100,85)}">${pp>0?pp.toFixed(1)+'% of plan':'No data'}</span>
+
     </div>
     <div class="kc" style="--kc-color:${totCapUtil>=80?'var(--green)':totCapUtil>=60?'var(--amber)':'var(--red)'}">
       <div class="kc-lbl">Capacity Utilization</div>
