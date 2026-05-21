@@ -586,6 +586,60 @@ function render() {
 
   ct.className='content fade';
 
+  // ── LOAD DAILY TABLE FOR SPECIFIC SITE ───────────────
+  if(activeSite!=='NATIONAL'){
+    const wrap=document.getElementById('detail-table-wrap');
+    if(wrap) wrap.innerHTML='<div class="no-data" style="padding:20px">⟳ Loading daily data...</div>';
+    gasGet('daily_detail',{site:activeSite,week:activeWeek}).then(d=>{
+      const wrap=document.getElementById('detail-table-wrap');
+      if(!wrap)return;
+      const allDrows=d.rows||[];
+      const drows=allDrows.filter(r=>{
+        const rSite=(r.Plant||r.plant||'').toUpperCase();
+        const rWeek=String(r['Week Num']||r['Week']||r['week']||'').trim();
+        return rSite===activeSite && rWeek===String(activeWeek);
+      }).sort((a,b)=>new Date(a.Date||a.date||0)-new Date(b.Date||b.date||0));
+
+      if(!drows.length){
+        wrap.innerHTML='<div class="no-data">No daily data for '+SL[activeSite]+' Week '+activeWeek+'</div>';
+        return;
+      }
+
+      const fmtDate=r=>{
+        const fd=r['_dateFormatted']||'';
+        if(fd)return fd;
+        const raw=String(r['Date']||r['date']||'').split('T')[0];
+        try{const dt=new Date(raw+'T12:00:00');return dt.toLocaleDateString('en-PH',{month:'short',day:'numeric',weekday:'short'});}
+        catch(e){return raw;}
+      };
+
+      const dateCols=drows.map(r=>fmtDate(r));
+      const metrics=[
+        {label:'Output mt',   fn:r=>gf(r,'Total Plant Output,mt w/o toll'), cls:v=>''},
+        {label:'SDT Hr',      fn:r=>gf(r,'Scheduled Down Time, hr'),         cls:v=>''},
+        {label:'UDT Hr',      fn:r=>gf(r,'Unscheduled Down Time, hr'),       cls:v=>v>8?'tr':v>4?'ta':''},
+        {label:'kWh/ton',     fn:r=>gf(r,'kWh/ton'),                         cls:v=>''},
+        {label:'Fuel L/ton',  fn:r=>gf(r,'Li/ton'),                          cls:v=>v>3.5?'tr':v>3.15?'ta':''},
+        {label:'Coal kg/ton', fn:r=>gf(r,'kg/ton'),                          cls:v=>v>12?'tr':v>10.8?'ta':''},
+      ];
+
+      wrap.innerHTML='<div class="tbl-wrap"><table>'+
+        '<thead><tr><th style="text-align:left;min-width:100px">Metric</th>'+
+        dateCols.map(d=>'<th style="white-space:nowrap">'+d+'</th>').join('')+
+        '</tr></thead>'+
+        '<tbody>'+metrics.map(m=>
+          '<tr>'+
+          '<td style="text-align:left;font-family:Barlow,sans-serif;color:var(--text);white-space:nowrap">'+m.label+'</td>'+
+          drows.map(r=>{const v=m.fn(r);return '<td class="'+m.cls(v)+'">'+(v>0?+v.toFixed(2):'—')+'</td>';}).join('')+
+          '</tr>'
+        ).join('')+
+        '</tbody></table></div>';
+    }).catch(e=>{
+      const wrap=document.getElementById('detail-table-wrap');
+      if(wrap)wrap.innerHTML='<div class="no-data" style="color:var(--red)">Error loading: '+e.message+'</div>';
+    });
+  }
+
   // ── CHART RENDERING ───────────────────────────────────
   const sf = activeSite==='NATIONAL' ? r=>true : r=>(r.Plant||r.plant||'').toUpperCase()===activeSite;
   const bw = w => rows.filter(r=>+(r.Week||r.week||0)===+w&&sf(r));
