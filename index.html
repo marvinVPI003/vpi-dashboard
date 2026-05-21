@@ -306,31 +306,37 @@ function render() {
   const rows=wd.rows||[];
   const allWeeks=[...new Set(rows.map(r=>+(r.Week||r.week||0)).filter(w=>w>0))].sort((a,b)=>a-b);
   const wkRows=rows.filter(r=>+r['Week']===+activeWeek||+r['week']===+activeWeek);
+  // For KPIs: National uses NATIONAL row, sites use their own row
+  const natRow = wkRows.filter(r=>(r.Plant||r.plant||'').toUpperCase()==='NATIONAL');
   console.log('All rows count:', rows.length, 'Week', activeWeek, 'rows:', wkRows.length, 'Sample row keys:', rows[0]?Object.keys(rows[0]).slice(0,8):[]);
   const siteWkRows=activeSite==='NATIONAL'?wkRows:wkRows.filter(r=>(r.Plant||r.plant||'').toString().toUpperCase()===activeSite);
 
   // KPIs
-  // ── CONFIRMED FIELD NAMES FROM DEBUG ──
+  // ── USE NATIONAL ROW DIRECTLY FOR NATIONAL VIEW ──
+  // Sheet already has aggregated NATIONAL row — use it directly
+  // For individual sites, use that site's single row
+  const kpiRows = activeSite==='NATIONAL' ? natRow : siteWkRows;
+
   // Output col AM
-  const totOut     = siteWkRows.reduce((a,r)=>a+gf(r,'Total Plant Output,mt w/o toll'),0);
+  const totOut     = kpiRows.reduce((a,r)=>a+gf(r,'Total Plant Output,mt w/o toll'),0);
   // CF/MG/VT badges cols AP, AR, AZ
-  const totCF      = siteWkRows.reduce((a,r)=>a+gf(r,'Total Plant Output EXC MIXGRAIN & VIETOP'),0);
-  const totMG      = siteWkRows.reduce((a,r)=>a+gf(r,'Mixgrain'),0);
-  const totVT      = siteWkRows.reduce((a,r)=>a+gf(r,'Vietop'),0);
-  // Cap Util col CQ — decimal 0.43 → multiply ×100
-  const _cuRaw     = siteWkRows.length?siteWkRows.reduce((a,r)=>a+gf(r,'Capacity Utilization Rate,%'),0)/siteWkRows.length:0;
+  const totCF      = kpiRows.reduce((a,r)=>a+gf(r,'Total Plant Output EXC MIXGRAIN & VIETOP'),0);
+  const totMG      = kpiRows.reduce((a,r)=>a+gf(r,'Mixgrain'),0);
+  const totVT      = kpiRows.reduce((a,r)=>a+gf(r,'Vietop'),0);
+  // Cap Util col CQ — stored as decimal in GAS (0.2835 = 28.35%)
+  const _cuRaw     = kpiRows.length?kpiRows.reduce((a,r)=>a+gf(r,'Capacity Utilization Rate,%'),0)/kpiRows.length:0;
   const totCapUtil = _cuRaw*100;
-  // UDT col H — already in hours
-  const totUDT     = siteWkRows.reduce((a,r)=>a+gf(r,'Unscheduled Down Time, hr'),0);
-  // SDT col G — already in hours
-  const totSDT     = siteWkRows.reduce((a,r)=>a+gf(r,'Scheduled Down Time, hr'),0);
-  // OEE col CR — decimal 0.47 → multiply ×100
-  const _rawOEE    = siteWkRows.length?siteWkRows.reduce((a,r)=>a+gf(r,'OEE'),0)/siteWkRows.length:0;
+  // UDT col H
+  const totUDT     = kpiRows.reduce((a,r)=>a+gf(r,'Unscheduled Down Time, hr'),0);
+  // SDT col G
+  const totSDT     = kpiRows.reduce((a,r)=>a+gf(r,'Scheduled Down Time, hr'),0);
+  // OEE col CR — stored as decimal in GAS (0.3927 = 39.27%)
+  const _rawOEE    = kpiRows.length?kpiRows.reduce((a,r)=>a+gf(r,'OEE'),0)/kpiRows.length:0;
   const avgOEE     = _rawOEE*100;
-  // Plant Daily Rate col BG
-  const totPDR     = siteWkRows.reduce((a,r)=>a+gf(r,'Plant Daily Pelleting Rate,ton/day'),0);
+  // Plant Daily Rate col BG — tons/day
+  const totPDR     = kpiRows.reduce((a,r)=>a+gf(r,'Plant Daily Pelleting Rate,ton/day'),0);
   // Plan col
-  const totPlan    = siteWkRows.reduce((a,r)=>a+gf(r,'Planned, mt','Total Plant Input, mt'),0);
+  const totPlan    = kpiRows.reduce((a,r)=>a+gf(r,'Planned, mt','Total Plant Input, mt'),0);
   const pp=totPlan>0?(totOut/totPlan*100):0;
   const pC=pp>=100?'var(--green-b)':pp>=85?'var(--amber)':'var(--red)';
   const oC=avgOEE>=85?'var(--green-b)':avgOEE>=70?'var(--amber)':'var(--red)';
@@ -426,7 +432,7 @@ function render() {
     </div>
     <div class="kc" style="--kc-color:var(--teal)">
       <div class="kc-lbl">Plant Daily Rate</div>
-      <div class="kc-val" style="font-size:22px;color:var(--teal)">${totPDR>0?totPDR.toFixed(2):'—'}<span style="font-size:12px;color:var(--text2)"> tph</span></div>
+      <div class="kc-val" style="font-size:22px;color:var(--teal)">${totPDR>0?totPDR.toFixed(2):'—'}<span style="font-size:12px;color:var(--text2)"> t/day</span></div>
       <div class="kc-sub">Plant Daily Pelleting Rate</div>
     </div>
   </div>
@@ -436,7 +442,7 @@ function render() {
   <div class="sec-hdr"><div class="sec-title">Site Detail Table — Week ${activeWeek}</div><div class="sec-line"></div></div>
   <div class="cc"><div class="tbl-wrap"><table>
     <thead><tr><th>Site</th><th>Cap Util%</th><th>UDT Hr (H)</th><th>SDT Hr (G)</th><th>Total DT Hr</th><th>Output mt (AM)</th><th>Plan mt</th><th>Plan%</th><th>OEE% (CR)</th><th>PDR tph (BG)</th></tr></thead>
-    <tbody>${wkRows.map(r=>{
+    <tbody>${wkRows.filter(r=>(r.Plant||r.plant||'').toUpperCase()!=='NATIONAL').map(r=>{
       const s=(r.Plant||r.plant||'').toUpperCase();
       const out  = gf(r,'Total Plant Output,mt w/o toll');
       const plan = gf(r,'Planned, mt','Total Plant Input, mt');
