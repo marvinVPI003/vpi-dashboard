@@ -144,6 +144,8 @@ tr:hover td{background:rgba(255,255,255,.02)}
 const GAS = 'https://script.google.com/macros/s/AKfycbznHnsf5gs6NT5Ps4s7PDj1HlbXRjcCF8F0713Q752pGBlBZwPvDVY0Y2zeX2w_5qgrEQ/exec';
 const SITES = ['NATIONAL','AC','PFMIS','HOREB','BUKID','ARGAO','CCPC','SOUTH'];
 const PROD_SITES = ['AC','PFMIS','HOREB','BUKID','ARGAO','CCPC','SOUTH'];
+const WEEKLY_TARGET = {AC:1375,PFMIS:1000,HOREB:875,BUKID:1750,CCPC:125,ARGAO:875,SOUTH:1000,NATIONAL:7000};
+const DAILY_TARGET  = {AC:230,PFMIS:165,HOREB:145,BUKID:290,CCPC:20,ARGAO:145,SOUTH:165,NATIONAL:1160};
 const SL = {NATIONAL:'National',AC:'AC · Bulacan',PFMIS:'PFMIS · Isabela',HOREB:'Horeb · Cebu',BUKID:'Bukidnon',ARGAO:'Argao · Cebu',CCPC:'CCPC · CDO',SOUTH:'South · Davao'};
 const SC = {NATIONAL:'#3fb950',AC:'#388bfd',PFMIS:'#d29922',HOREB:'#1abc9c',BUKID:'#f85149',ARGAO:'#a371f7',CCPC:'#58a6ff',SOUTH:'#ffa657'};
 const DT_CATS = {'Mechanical':'cat-mech','Electrical':'cat-elec','PLC':'cat-elec','Process':'cat-proc','Warehouse':'cat-proc','Raw Materials':'cat-rm','Change Over':'cat-co','Change Die':'cat-co','Change Screen':'cat-co','Power Interruption':'cat-pwr'};
@@ -637,13 +639,24 @@ function render() {
     }
   });
 
+  const wkTarget = WEEKLY_TARGET[activeSite] || WEEKLY_TARGET.NATIONAL;
+  const wkPointColors = weeklyOutData.map((v,i)=>{
+    if(+allWeeks[i]===+activeWeek) return '#ffffff';
+    return v>0&&v<wkTarget ? '#f85149' : '#3fb950';
+  });
+  const wkPointSizes = weeklyOutData.map((_,i)=>+allWeeks[i]===+activeWeek?7:4);
+
   mkChart('c-out','line',lbl,[
-    {label:'Output mt',data:weeklyOutData,
-     borderColor:'#388bfd',backgroundColor:'rgba(56,139,253,0.1)',
-     fill:true,tension:.3,pointRadius:4,pointBackgroundColor:weeklyOutData.map((_,i)=>+allWeeks[i]===+activeWeek?'#3fb950':'#388bfd'),
-     pointRadius:weeklyOutData.map((_,i)=>+allWeeks[i]===+activeWeek?6:3),
-     spanGaps:true}
-  ],{plugins:{legend:{display:false},tooltip:{backgroundColor:'#1f2631',borderColor:'rgba(255,255,255,.1)',borderWidth:1,bodyFont:{family:"'DM Mono',monospace",size:10}}}});
+    {label:'Output mt', data:weeklyOutData,
+     borderColor:'#388bfd', backgroundColor:'rgba(56,139,253,0.08)',
+     fill:true, tension:.3, pointRadius:wkPointSizes,
+     pointBackgroundColor:wkPointColors, pointBorderColor:wkPointColors,
+     spanGaps:true},
+    {label:'Target '+wkTarget+' mt', data:allWeeks.map(()=>wkTarget),
+     borderColor:'rgba(248,81,73,0.5)', borderDash:[4,4],
+     borderWidth:1.5, pointRadius:0, fill:false}
+  ],{plugins:{legend:{display:true,labels:{color:'#8b949e',font:{size:9},boxWidth:12}},
+     tooltip:{backgroundColor:'#1f2631',borderColor:'rgba(255,255,255,.1)',borderWidth:1,bodyFont:{family:"'DM Mono',monospace",size:10}}}});
 
   // ── CHART 2: Daily Output LINE — render now if data ready, else render when loaded ──
   function buildDailyChart(){
@@ -674,13 +687,20 @@ function render() {
       setTimeout(()=>{if(DATA.daily_detail&&DATA.daily_detail.rows&&DATA.daily_detail.rows.length)buildDailyChart();},3000);
       return;
     }
+    const dayTarget = DAILY_TARGET[activeSite] || DAILY_TARGET.NATIONAL;
+    const dayPointColors = vals.map(v=>v>0&&v<dayTarget?'#f85149':'#3fb950');
     charts['c-daily-out']=new Chart(document.getElementById('c-daily-out').getContext('2d'),{
       type:'line',
-      data:{labels:lbls,datasets:[{
-        label:'Output mt',data:vals,
-        borderColor:'#3fb950',backgroundColor:'rgba(63,185,80,0.1)',
-        fill:true,tension:.3,pointRadius:4,spanGaps:true
-      }]},
+      data:{labels:lbls,datasets:[
+        {label:'Output mt', data:vals,
+         borderColor:'#3fb950', backgroundColor:'rgba(63,185,80,0.08)',
+         fill:true, tension:.3, pointRadius:5,
+         pointBackgroundColor:dayPointColors, pointBorderColor:dayPointColors,
+         spanGaps:true},
+        {label:'Target '+dayTarget+' mt', data:vals.map(()=>dayTarget),
+         borderColor:'rgba(248,81,73,0.5)', borderDash:[4,4],
+         borderWidth:1.5, pointRadius:0, fill:false}
+      ]},
       options:{responsive:true,maintainAspectRatio:false,animation:{duration:200},
         plugins:{legend:{display:false},tooltip:{backgroundColor:'#1f2631',borderColor:'rgba(255,255,255,.1)',borderWidth:1,bodyFont:{family:"'DM Mono',monospace",size:10}}},
         scales:{x:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'#484f58',font:{size:9}}},
