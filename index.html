@@ -310,24 +310,27 @@ function render() {
   const siteWkRows=activeSite==='NATIONAL'?wkRows:wkRows.filter(r=>(r.Plant||r.plant||'').toString().toUpperCase()===activeSite);
 
   // KPIs
-  // Output col AM — sum across sites (no doubling: one row per plant per week)
-  const totOut  = siteWkRows.reduce((a,r)=>a+gf(r,'Total Plant Output,mt w/o toll'),0);
-  // CF/MG/VT breakdown badges (cols AP, AR, AZ)
-  const totCF   = siteWkRows.reduce((a,r)=>a+gf(r,'Total Plant Output EXC MIXGRAIN & VIETOP'),0);
-  const totMG   = siteWkRows.reduce((a,r)=>a+gf(r,'Mixgrain'),0);
-  const totVT   = siteWkRows.reduce((a,r)=>a+gf(r,'Vietop'),0);
-  // Cap Util col CQ
-  const cuRaw   = siteWkRows.length?siteWkRows.reduce((a,r)=>a+gf(r,'Capacity Utilization Rate,%'),0)/siteWkRows.length:0;
-  const totCapUtil = cuRaw>1?cuRaw:cuRaw*100;
-  // UDT col H, SDT col G
-  const totUDT  = siteWkRows.reduce((a,r)=>a+gf(r,'Unscheduled Down Time, hr'),0);
-  const totSDT  = siteWkRows.reduce((a,r)=>a+gf(r,'Scheduled Down Time, hr'),0);
-  // OEE col CR
-  const _rawOEE = siteWkRows.length?siteWkRows.reduce((a,r)=>a+gf(r,'OEE'),0)/siteWkRows.length:0;
-  const avgOEE  = _rawOEE>1?_rawOEE:_rawOEE*100;
+  // ── CONFIRMED FIELD NAMES FROM DEBUG ──
+  // Output col AM
+  const totOut     = siteWkRows.reduce((a,r)=>a+gf(r,'Total Plant Output,mt w/o toll'),0);
+  // CF/MG/VT badges cols AP, AR, AZ
+  const totCF      = siteWkRows.reduce((a,r)=>a+gf(r,'Total Plant Output EXC MIXGRAIN & VIETOP'),0);
+  const totMG      = siteWkRows.reduce((a,r)=>a+gf(r,'Mixgrain'),0);
+  const totVT      = siteWkRows.reduce((a,r)=>a+gf(r,'Vietop'),0);
+  // Cap Util col CQ — decimal 0.43 → multiply ×100
+  const _cuRaw     = siteWkRows.length?siteWkRows.reduce((a,r)=>a+gf(r,'Capacity Utilization Rate,%'),0)/siteWkRows.length:0;
+  const totCapUtil = _cuRaw*100;
+  // UDT col H — already in hours
+  const totUDT     = siteWkRows.reduce((a,r)=>a+gf(r,'Unscheduled Down Time, hr'),0);
+  // SDT col G — already in hours
+  const totSDT     = siteWkRows.reduce((a,r)=>a+gf(r,'Scheduled Down Time, hr'),0);
+  // OEE col CR — decimal 0.47 → multiply ×100
+  const _rawOEE    = siteWkRows.length?siteWkRows.reduce((a,r)=>a+gf(r,'OEE'),0)/siteWkRows.length:0;
+  const avgOEE     = _rawOEE*100;
   // Plant Daily Rate col BG
-  const totPDR  = siteWkRows.reduce((a,r)=>a+gf(r,'Plant Daily Pelleting Rate,ton/day'),0);
-  const totPlan = siteWkRows.reduce((a,r)=>a+gf(r,'Planned, mt','Total Plant Input, mt'),0);
+  const totPDR     = siteWkRows.reduce((a,r)=>a+gf(r,'Plant Daily Pelleting Rate,ton/day'),0);
+  // Plan col
+  const totPlan    = siteWkRows.reduce((a,r)=>a+gf(r,'Planned, mt','Total Plant Input, mt'),0);
   const pp=totPlan>0?(totOut/totPlan*100):0;
   const pC=pp>=100?'var(--green-b)':pp>=85?'var(--amber)':'var(--red)';
   const oC=avgOEE>=85?'var(--green-b)':avgOEE>=70?'var(--amber)':'var(--red)';
@@ -343,11 +346,11 @@ function render() {
       const mg  = sr.reduce((a,r)=>a+gf(r,'Mixgrain'),0);
       const vt  = sr.reduce((a,r)=>a+gf(r,'Vietop'),0);
       const tot = cf+mg+vt;
-      const cuRaw = sr.length?sr.reduce((a,r)=>a+gf(r,'Capacity Utilization Rate,%'),0)/sr.length:0;
-      const cu  = cuRaw>1?cuRaw:cuRaw*100;
-      const oeeRaw = sr.length?sr.reduce((a,r)=>a+gf(r,'OEE'),0)/sr.length:0;
-      const oee = oeeRaw>1?oeeRaw:oeeRaw*100;
-      const udt = sr.reduce((a,r)=>a+gf(r,'Unscheduled Down Time, hr'),0);
+      const _cu  = sr.length?sr.reduce((a,r)=>a+gf(r,'Capacity Utilization Rate,%'),0)/sr.length:0;
+      const cu   = _cu*100;
+      const _oee = sr.length?sr.reduce((a,r)=>a+gf(r,'OEE'),0)/sr.length:0;
+      const oee  = _oee*100;
+      const udt  = sr.reduce((a,r)=>a+gf(r,'Unscheduled Down Time, hr'),0);
       const cuC = cu>=80?'var(--green)':cu>=60?'var(--amber)':'var(--red)';
       const oeeC= oee>=85?'var(--green-b)':oee>=70?'var(--amber)':'var(--red)';
       const udtC= udt>20?'var(--red)':udt>10?'var(--amber)':'var(--text3)';
@@ -385,7 +388,7 @@ function render() {
   <div class="sec-hdr"><div class="sec-title">${SL[activeSite]} · Week ${activeWeek}</div><div class="sec-line"></div></div>
   <div class="g5">
     <div class="kc" style="--kc-color:${pC}">
-      <div class="kc-lbl">Output (col AM)</div>
+      <div class="kc-lbl">Output</div>
       <div class="kc-val" style="color:${pC}">${totOut>0?totOut.toFixed(1):'—'}<span style="font-size:12px;color:var(--text2)"> mt</span></div>
       <div style="display:flex;gap:3px;flex-wrap:wrap;margin-bottom:5px;margin-top:2px">
         ${totCF>0?`<span style="font-size:8px;background:rgba(56,139,253,0.15);color:#388bfd;padding:1px 5px;border-radius:3px">CF ${totCF.toFixed(1)}</span>`:''}
@@ -395,7 +398,7 @@ function render() {
       <span class="bdg ${bsc(pp,100,85)}">${pp>0?pp.toFixed(1)+'% of plan':'No data'}</span>
     </div>
     <div class="kc" style="--kc-color:${totCapUtil>=80?'var(--green)':totCapUtil>=60?'var(--amber)':'var(--red)'}">
-      <div class="kc-lbl">Capacity Utilization (col CQ)</div>
+      <div class="kc-lbl">Capacity Utilization</div>
       <div class="kc-val" style="color:${totCapUtil>=80?'var(--green-b)':totCapUtil>=60?'var(--amber)':'var(--red)'}">${totCapUtil>0?totCapUtil.toFixed(1):'—'}<span style="font-size:12px;color:var(--text2)">%</span></div>
       <div class="kc-sub">vs Demo Capacity</div>
       <span class="bdg ${bsc(totCapUtil,80,60)}">${totCapUtil>=80?'On Track':totCapUtil>=60?'Moderate':'Low'}</span>
@@ -404,12 +407,12 @@ function render() {
       <div class="kc-lbl">Downtime</div>
       <div style="display:flex;gap:8px;align-items:flex-end;margin-bottom:4px">
         <div>
-          <div style="font-size:9px;color:var(--red);font-weight:600;letter-spacing:1px">UDT <span style="color:var(--text3);font-weight:400">col H</span></div>
+          <div style="font-size:9px;color:var(--red);font-weight:600;letter-spacing:1px">UDT</div>
           <div style="font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:700;color:${totUDT>20?'var(--red)':totUDT>10?'var(--amber)':'var(--text)'}">${totUDT>0?totUDT.toFixed(2):'—'}<span style="font-size:11px;color:var(--text2)"> hr</span></div>
         </div>
         <div style="width:1px;height:32px;background:var(--border)"></div>
         <div>
-          <div style="font-size:9px;color:var(--text3);font-weight:600;letter-spacing:1px">SDT <span style="font-weight:400">col G</span></div>
+          <div style="font-size:9px;color:var(--text3);font-weight:600;letter-spacing:1px">SDT</div>
           <div style="font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:700;color:var(--text2)">${totSDT>0?totSDT.toFixed(2):'—'}<span style="font-size:11px;color:var(--text3)"> hr</span></div>
         </div>
       </div>
@@ -422,7 +425,7 @@ function render() {
       <span class="bdg ${avgOEE>=85?'g':avgOEE>=70?'a':avgOEE>0?'r':'b'}">${avgOEE>=85?'World Class':avgOEE>=70?'Acceptable':avgOEE>0?'Needs Attn':'N/A'}</span>
     </div>
     <div class="kc" style="--kc-color:var(--teal)">
-      <div class="kc-lbl">Plant Daily Rate (col BG)</div>
+      <div class="kc-lbl">Plant Daily Rate</div>
       <div class="kc-val" style="font-size:22px;color:var(--teal)">${totPDR>0?totPDR.toFixed(2):'—'}<span style="font-size:12px;color:var(--text2)"> tph</span></div>
       <div class="kc-sub">Plant Daily Pelleting Rate</div>
     </div>
@@ -435,14 +438,14 @@ function render() {
     <thead><tr><th>Site</th><th>Cap Util%</th><th>UDT Hr (H)</th><th>SDT Hr (G)</th><th>Total DT Hr</th><th>Output mt (AM)</th><th>Plan mt</th><th>Plan%</th><th>OEE% (CR)</th><th>PDR tph (BG)</th></tr></thead>
     <tbody>${wkRows.map(r=>{
       const s=(r.Plant||r.plant||'').toUpperCase();
-      const out=gf(r,'Total Plant Output,mt w/o toll');
-      const plan=gf(r,'Planned, mt','Total Plant Input, mt');
-      const p2=plan>0?(out/plan*100):0;
-      const udt=gf(r,'Unscheduled Down Time, hr');
-      const sdt=gf(r,'Scheduled Down Time, hr');
-      const _roee=gf(r,'OEE');const oee=_roee>1?_roee:_roee*100;
-      const cuRaw2=gf(r,'Capacity Utilization Rate,%');const cuRow=cuRaw2>1?cuRaw2:cuRaw2*100;
-      const pdr=gf(r,'Plant Daily Pelleting Rate,ton/day');
+      const out  = gf(r,'Total Plant Output,mt w/o toll');
+      const plan = gf(r,'Planned, mt','Total Plant Input, mt');
+      const p2   = plan>0?(out/plan*100):0;
+      const udt  = gf(r,'Unscheduled Down Time, hr');
+      const sdt  = gf(r,'Scheduled Down Time, hr');
+      const oee  = gf(r,'OEE')*100;
+      const cuRow= gf(r,'Capacity Utilization Rate,%')*100;
+      const pdr  = gf(r,'Plant Daily Pelleting Rate,ton/day');
 
       return `<tr>
         <td>${dot(s)}${SL[s]||s}</td>
@@ -471,39 +474,7 @@ function render() {
 
   ct.className='content fade';
 
-  // Insert debug panel at top
-  const dbDiv = document.createElement('div');
-  dbDiv.id = '_debug_panel';
-  dbDiv.style.cssText = 'background:#0d1117;border:1px solid #d29922;border-radius:6px;padding:12px 16px;margin-bottom:12px;font-family:DM Mono,monospace;font-size:10px;color:#8b949e;line-height:2';
-  if(rows.length>0){
-    const acR = wkRows.filter(r=>(r.Plant||r.plant||'').toUpperCase()==='AC');
-    const pfR = wkRows.filter(r=>(r.Plant||r.plant||'').toUpperCase()==='PFMIS');
-    const r0 = acR[0]||{};
-    dbDiv.innerHTML =
-      '<span style="color:#d29922;font-weight:700">⚙ DEBUG PANEL — Week '+activeWeek+'</span> &nbsp;|&nbsp; '+
-      'Total rows: <b style="color:#e6edf3">'+rows.length+'</b> &nbsp;|&nbsp; '+
-      'Week '+activeWeek+' rows: <b style="color:#e6edf3">'+wkRows.length+'</b> &nbsp;|&nbsp; '+
-      'AC rows: <b style="color:#388bfd">'+acR.length+'</b> &nbsp;|&nbsp; '+
-      'PFMIS rows: <b style="color:#d29922">'+pfR.length+'</b><br>'+
-      '<span style="color:#3fb950">AC Field Values →</span> '+
-      'Output(AM): <b style="color:#fff">'+r0['Total Plant Output,mt w/o toll']+'</b> | '+
-      'OEE(CR): <b style="color:#fff">'+r0['OEE']+'</b> | '+
-      'CapUtil(CQ): <b style="color:#fff">'+r0['Capacity Utilization Rate,%']+'</b> | '+
-      'UDT(H): <b style="color:#fff">'+r0['Unscheduled Down Time, hr']+'</b> | '+
-      'SDT(G): <b style="color:#fff">'+r0['Scheduled Down Time, hr']+'</b> | '+
-      'SDT alt1: <b style="color:#fff">'+r0['Scheduled Down Time, %']+'</b> | '+
-      'WrkHrs: <b style="color:#fff">'+r0['Working Hours']+'</b> | '+
-      'PDR(BG): <b style="color:#fff">'+r0['Plant Daily Pelleting Rate,ton/day']+'</b><br>'+
-      'All keys: <b style="color:#888">'+Object.keys(r0).slice(0,15).join(' | ')+'</b><br>'+
-      'Keys 15-30: <b style="color:#888">'+Object.keys(r0).slice(15,30).join(' | ')+'</b><br>'+
-      '<span style="color:#3fb950">AC Breakdown →</span> '+
-      'CF(AP): <b style="color:#388bfd">'+r0['Total Plant Output EXC MIXGRAIN & VIETOP']+'</b> | '+
-      'MG(AR): <b style="color:#a371f7">'+r0['Mixgrain']+'</b> | '+
-      'VT(AZ): <b style="color:#1abc9c">'+r0['Vietop']+'</b>';
-  } else {
-    dbDiv.innerHTML = '<span style="color:#f85149">No rows found for Week '+activeWeek+'</span>';
-  }
-  ct.insertBefore(dbDiv, ct.firstChild);
+  // debug removed
 
   const sf = activeSite==='NATIONAL' ? r=>true : r=>(r.Plant||r.plant||'').toUpperCase()===activeSite;
   const bw = w => rows.filter(r=>+(r.Week||r.week||0)===+w&&sf(r));
@@ -515,7 +486,7 @@ function render() {
   ],{plugins:{legend:{display:true,labels:{color:'#8b949e',font:{size:9},boxWidth:8}},tooltip:{backgroundColor:'#1f2631',borderColor:'rgba(255,255,255,.1)',borderWidth:1,bodyFont:{family:"'DM Mono',monospace",size:10}}}});
 
   mkChart('c-oee','line',lbl,[
-    {data:allWeeks.map(w=>{const v=bw(w);if(!v.length)return null;const raw=v.reduce((a,r)=>a+gf(r,'OEE'),0)/v.length;return +((raw>0&&raw<=1?raw*100:raw)).toFixed(1);}),borderColor:'#3fb950',backgroundColor:'rgba(63,185,80,0.08)',fill:true,tension:.3,pointRadius:3,spanGaps:true}
+    {data:allWeeks.map(w=>{const v=bw(w);if(!v.length)return null;return +(v.reduce((a,r)=>a+gf(r,'OEE'),0)/v.length*100).toFixed(1);}),borderColor:'#3fb950',backgroundColor:'rgba(63,185,80,0.08)',fill:true,tension:.3,pointRadius:3,spanGaps:true}
   ],{plugins:{legend:{display:false},tooltip:{backgroundColor:'#1f2631',borderColor:'rgba(255,255,255,.1)',borderWidth:1,bodyFont:{family:"'DM Mono',monospace",size:10}}},scales:{x:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'#484f58',font:{size:9}}},y:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'#484f58',font:{size:9}},min:0,max:120}}});
 
   mkChart('c-udt','bar',lbl,[
