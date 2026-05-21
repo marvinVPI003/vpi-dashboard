@@ -11,25 +11,49 @@ let DATA = {}, activeSite='NATIONAL', activeWeek=1, activePage='dashboard', char
 // ── FETCH ──────────────────────────────────────────────────
 // Fetch via iframe proxy — handles GAS redirect to googleusercontent.com
 function gasGet(tab, extra={}) {
-  const p = new URLSearchParams({tab, site:activeSite, week:activeWeek, ...extra});
-  const url = GAS + '?' + p.toString();
-  // Try fetch first (works in Edge with GAS CORS headers)
-  return fetch(url, {mode:'cors', credentials:'omit'})
-    .then(r => r.ok ? r.json() : Promise.reject('HTTP '+r.status))
-    .then(d => { if(d&&d.error) throw new Error(d.error); return d; })
-    .catch(() => new Promise((resolve, reject) => {
-      // Fallback to JSONP
-      const cb = '_vpi_' + Math.random().toString(36).slice(2);
-      const s = document.createElement('script');
-      const t = setTimeout(() => {
-        cleanup(); reject(new Error('Timeout — try refreshing'));
-      }, 30000);
-      function cleanup(){ clearTimeout(t); delete window[cb]; try{s.parentNode&&s.parentNode.removeChild(s);}catch(e){} }
-      window[cb] = d => { cleanup(); d&&d.error ? reject(new Error(d.error)) : resolve(d); };
-      s.onerror = () => { cleanup(); reject(new Error('Cannot reach GAS')); };
-      s.src = url + '&callback=' + cb;
-      document.head.appendChild(s);
-    }));
+  return new Promise(function(resolve, reject) {
+    var cb = '_vpi_' + Math.random().toString(36).slice(2);
+    var p = new URLSearchParams({tab:tab, site:activeSite, week:activeWeek, callback:cb});
+    if(extra) Object.keys(extra).forEach(function(k){ p.set(k, extra[k]); });
+    var s = document.createElement('script');
+    var done = false;
+    var t = setTimeout(function() {
+      if(done) return;
+      done = true;
+      cleanup();
+      setStatus('error');
+      var el = document.getElementById('loading');
+      if(el) el.innerHTML = '<div style="font-size:24px;color:#f85149">⏱ Timeout</div>' +
+        '<div style="font-size:11px;color:#8b949e;font-family:DM Mono,monospace;text-align:center;padding:8px">Tab: '+tab+'<br>The request timed out after 30s.<br><br>Please try refreshing.</div>' +
+        '<button onclick="location.reload()" style="padding:8px 20px;border:1px solid #f85149;border-radius:4px;background:none;color:#f85149;cursor:pointer;font-family:DM Mono,monospace">⟳ Refresh</button>';
+      reject(new Error('Timeout after 30s for tab: '+tab));
+    }, 30000);
+    function cleanup(){
+      clearTimeout(t);
+      delete window[cb];
+      if(s.parentNode) s.parentNode.removeChild(s);
+    }
+    window[cb] = function(d) {
+      if(done) return;
+      done = true;
+      cleanup();
+      if(d && d.error) reject(new Error(d.error));
+      else resolve(d);
+    };
+    s.addEventListener('error', function() {
+      if(done) return;
+      done = true;
+      cleanup();
+      setStatus('error');
+      var el = document.getElementById('loading');
+      if(el) el.innerHTML = '<div style="font-size:24px;color:#f85149">✕ Blocked</div>' +
+        '<div style="font-size:11px;color:#8b949e;font-family:DM Mono,monospace;text-align:center;padding:8px">Tab: '+tab+'<br>JSONP script was blocked by browser.<br><br>In Edge: Settings → Privacy → turn off Tracking Prevention<br>Or try Chrome/Firefox.</div>' +
+        '<button onclick="location.reload()" style="padding:8px 20px;border:1px solid #f85149;border-radius:4px;background:none;color:#f85149;cursor:pointer;font-family:DM Mono,monospace">⟳ Refresh</button>';
+      reject(new Error('Script blocked by browser for tab: '+tab));
+    });
+    s.src = GAS + '?' + p.toString();
+    document.head.appendChild(s);
+  });
 }
 // ── BOOT ──────────────────────────────────────────────────
 async function loadData(isRefresh=false) {
