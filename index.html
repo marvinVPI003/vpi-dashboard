@@ -395,10 +395,13 @@ function render() {
     ${PROD_SITES.map(s=>{
       const sr=wkRows.filter(r=>(r.Plant||r.plant||'').toUpperCase()===s);
       // MR Weekly: AP=CF Output, AR=Mixgrain, AZ=Vietop, CQ=Cap Util%, CR=OEE, H=UDT
-      const cf  = sr.reduce((a,r)=>a+gf(r,'Total Plant Output EXC MIXGRAIN & VIETOP'),0);
+      const cf  = sr.reduce((a,r)=>a+gf(r,'Total Plant Output EXC MIXGRAIN & VIETOP','Total Plant Output, mt EXC MIXGRAIN & VIETOP'),0);
       const mg  = sr.reduce((a,r)=>a+gf(r,'Mixgrain'),0);
       const vt  = sr.reduce((a,r)=>a+gf(r,'Vietop'),0);
-      const tot = cf+mg+vt;
+      // If CF=0 but MG>0, use total output minus MG/VT
+      const rawTot = sr.reduce((a,r)=>a+gf(r,'Total Plant Output,mt w/o toll'),0);
+      const tot = (cf+mg+vt)>0 ? cf+mg+vt : rawTot;
+      const cfDisplay = cf>0?cf:(rawTot-mg-vt);
       const _cu  = sr.length?sr.reduce((a,r)=>a+gf(r,'Capacity Utilization Rate,%'),0)/sr.length:0;
       const cu   = _cu*100;
       const _oee = sr.length?sr.reduce((a,r)=>a+gf(r,'OEE'),0)/sr.length:0;
@@ -631,47 +634,69 @@ function render() {
   const bw = w => rows.filter(r=>+(r.Week||r.week||0)===+w&&sf(r));
   const lbl = allWeeks.map(w=>'W'+w);
 
-  // ── CHART 1: Weekly Output (all weeks, national or site) ──
+  // ── CHART 1: Weekly Output LINE — uses NATIONAL row for national, site row for sites ──
   const weeklyOutData = allWeeks.map(w=>{
-    const wr = activeSite==='NATIONAL'
-      ? rows.filter(r=>+(r.Week||r.week||0)===+w && (r.Plant||r.plant||'').toUpperCase()==='NATIONAL')
-      : bw(w);
-    return +wr.reduce((a,r)=>a+gf(r,'Total Plant Output EXC MIXGRAIN & VIETOP')+gf(r,'Mixgrain')+gf(r,'Vietop'),0).toFixed(1);
+    if(activeSite==='NATIONAL'){
+      // Use the NATIONAL aggregated row directly
+      const natR=rows.filter(r=>+(r.Week||r.week||0)===+w&&(r.Plant||r.plant||'').toUpperCase()==='NATIONAL');
+      return +natR.reduce((a,r)=>a+gf(r,'Total Plant Output EXC MIXGRAIN & VIETOP')+gf(r,'Mixgrain')+gf(r,'Vietop'),0).toFixed(1);
+    } else {
+      const siteR=rows.filter(r=>+(r.Week||r.week||0)===+w&&(r.Plant||r.plant||'').toUpperCase()===activeSite);
+      return +siteR.reduce((a,r)=>a+gf(r,'Total Plant Output EXC MIXGRAIN & VIETOP')+gf(r,'Mixgrain')+gf(r,'Vietop'),0).toFixed(1);
+    }
   });
 
-  mkChart('c-out','bar',lbl,[
+  mkChart('c-out','line',lbl,[
     {label:'Output mt',data:weeklyOutData,
-     backgroundColor:weeklyOutData.map((v,i)=>+allWeeks[i]===+activeWeek?'#3fb950':'#388bfd'),
-     borderRadius:3}
+     borderColor:'#388bfd',backgroundColor:'rgba(56,139,253,0.1)',
+     fill:true,tension:.3,pointRadius:4,pointBackgroundColor:weeklyOutData.map((_,i)=>+allWeeks[i]===+activeWeek?'#3fb950':'#388bfd'),
+     pointRadius:weeklyOutData.map((_,i)=>+allWeeks[i]===+activeWeek?6:3),
+     spanGaps:true}
   ],{plugins:{legend:{display:false},tooltip:{backgroundColor:'#1f2631',borderColor:'rgba(255,255,255,.1)',borderWidth:1,bodyFont:{family:"'DM Mono',monospace",size:10}}}});
 
-  // ── CHART 2: Daily Output for selected week (from MR Daily) ──
-  const dailyRows = (DATA.daily_detail&&DATA.daily_detail.rows||[]).filter(r=>{
-    const rSite=(r.Plant||r.plant||'').toUpperCase();
-    const rWeek=String(r['Week Num']||r['Week']||r['week']||'').trim();
-    const siteMatch = activeSite==='NATIONAL' ? true : rSite===activeSite;
-    return siteMatch && rWeek===String(activeWeek);
-  }).sort((a,b)=>new Date(a.Date||a.date||0)-new Date(b.Date||b.date||0));
+  // ── CHART 2: Daily Output LINE — render now if data ready, else render when loaded ──
+  function buildDailyChart(){
+    const dRows=(DATA.daily_detail&&DATA.daily_detail.rows||[]).filter(r=>{
+      const rSite=(r.Plant||r.plant||'').toUpperCase();
+      const rWeek=String(r['Week Num']||r['Week']||r['week']||'').trim();
+      const siteMatch=activeSite==='NATIONAL'?true:rSite===activeSite;
+      return siteMatch&&rWeek===String(activeWeek);
+    }).sort((a,b)=>new Date(a.Date||a.date||0)-new Date(b.Date||b.date||0));
 
-  // Group by date for National (sum across sites)
-  const dailyByDate={};
-  dailyRows.forEach(r=>{
-    const raw=String(r['_dateFormatted']||r.Date||r.date||'').split('T')[0];
-    const d=raw||'?';
-    dailyByDate[d]=(dailyByDate[d]||0)+gf(r,'Total Plant Output,mt w/o toll');
-  });
-  const dailyDates=Object.keys(dailyByDate).sort();
-  const dailyVals=dailyDates.map(d=>+dailyByDate[d].toFixed(2));
-  // Clean date labels — show Mon DD
-  const dailyLabels=dailyDates.map(d=>{
-    if(d.includes('T'))return d.split('T')[0];
-    try{const dt=new Date(d);return dt.toLocaleDateString('en-PH',{month:'short',day:'numeric',weekday:'short'});}catch(e){return d;}
-  });
+    // Group by date
+    const byDate={};
+    dRows.forEach(r=>{
+      const raw=String(r.Date||r.date||'').split('T')[0];
+      if(!raw||raw==='undefined')return;
+      byDate[raw]=(byDate[raw]||0)+gf(r,'Total Plant Output,mt w/o toll');
+    });
+    const dates=Object.keys(byDate).sort();
+    const vals=dates.map(d=>+byDate[d].toFixed(2));
+    const lbls=dates.map(d=>{
+      try{const dt=new Date(d+'T12:00:00');return dt.toLocaleDateString('en-PH',{month:'short',day:'numeric',weekday:'short'});}
+      catch(e){return d;}
+    });
 
-  mkChart('c-daily-out','bar',dailyLabels,[
-    {label:'Output mt',data:dailyVals,
-     backgroundColor:'#388bfd',borderRadius:3}
-  ],{plugins:{legend:{display:false},tooltip:{backgroundColor:'#1f2631',borderColor:'rgba(255,255,255,.1)',borderWidth:1,bodyFont:{family:"'DM Mono',monospace",size:10}}}});
+    if(charts['c-daily-out']){try{charts['c-daily-out'].destroy();}catch(e){}}
+    if(!dates.length){
+      // No data yet — retry after 3s
+      setTimeout(()=>{if(DATA.daily_detail&&DATA.daily_detail.rows&&DATA.daily_detail.rows.length)buildDailyChart();},3000);
+      return;
+    }
+    charts['c-daily-out']=new Chart(document.getElementById('c-daily-out').getContext('2d'),{
+      type:'line',
+      data:{labels:lbls,datasets:[{
+        label:'Output mt',data:vals,
+        borderColor:'#3fb950',backgroundColor:'rgba(63,185,80,0.1)',
+        fill:true,tension:.3,pointRadius:4,spanGaps:true
+      }]},
+      options:{responsive:true,maintainAspectRatio:false,animation:{duration:200},
+        plugins:{legend:{display:false},tooltip:{backgroundColor:'#1f2631',borderColor:'rgba(255,255,255,.1)',borderWidth:1,bodyFont:{family:"'DM Mono',monospace",size:10}}},
+        scales:{x:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'#484f58',font:{size:9}}},
+                y:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'#484f58',font:{size:9}}}}}
+    });
+  }
+  buildDailyChart();
 }
 
 // ── MONTHLY ───────────────────────────────────────────────
