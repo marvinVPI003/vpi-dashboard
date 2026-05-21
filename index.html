@@ -447,10 +447,13 @@ function render() {
 <div class="sec">
   <div class="sec-hdr"><div class="sec-title">Site Detail Table — Week ${activeWeek}</div><div class="sec-line"></div></div>
   <div class="cc"><div class="tbl-wrap"><table>
-    <thead><tr><th>Site</th><th>OEE%</th><th>UDT Hr</th><th>SDT Hr</th><th>Cap Util%</th><th>Output mt</th><th>PDR t/day</th><th>Proj Volume mt</th></tr></thead>
+    <thead><tr><th>Site</th><th>Output mt</th><th>PDR t/day</th><th>Cap Util%</th><th>SDT Hr</th><th>UDT Hr</th><th>OEE%</th><th>kWh/ton</th><th>Fuel L/ton</th><th>Coal kg/ton</th><th>RM Var%</th><th>RM Var w/o Sacks%</th></tr></thead>
     <tbody>${wkRows.filter(r=>(r.Plant||r.plant||'').toUpperCase()!=='NATIONAL').map(r=>{
       const s=(r.Plant||r.plant||'').toUpperCase();
-      const out  = gf(r,'Total Plant Output,mt w/o toll');
+      const cf3  = gf(r,'Total Plant Output EXC MIXGRAIN & VIETOP');
+      const mg3  = gf(r,'Mixgrain');
+      const vt3  = gf(r,'Vietop');
+      const out  = cf3+mg3+vt3;
       const plan = gf(r,'Planned, mt','Total Plant Input, mt');
       const p2   = plan>0?(out/plan*100):0;
       const udt  = gf(r,'Unscheduled Down Time, hr');
@@ -458,16 +461,29 @@ function render() {
       const oee  = gf(r,'OEE')*100;
       const cuRow= gf(r,'Capacity Utilization Rate,%')*100;
       const pdr  = gf(r,'Plant Daily Pelleting Rate,ton/day');
+      // Energy cols BV=kWh/ton, BX=Li/ton, BZ=kg/ton
+      const kwh  = gf(r,'kWh/ton');
+      const fuel = gf(r,'Li/ton');
+      const coal = gf(r,'kg/ton');
+      // RM Variance cols CE=%, CL=w/o sacks %
+      const rmvRaw  = gf(r,'RM Variance, %');
+      const rmv     = rmvRaw*100;  // stored as decimal
+      const rmvwsRaw= gf(r,'RM Variance (w/o used sacks), %');
+      const rmvws   = rmvwsRaw*100; // stored as decimal
 
       return `<tr>
         <td>${dot(s)}${SL[s]||s}</td>
-        <td class="${oee>=85?'tg':oee>=70?'ta':oee>0?'tr':''}">${oee>0?oee.toFixed(1)+'%':'—'}</td>
-        <td class="${udt>20?'tr':udt>10?'ta':''}">${udt>0?udt.toFixed(2):'—'}</td>
-        <td>${sdt>0?sdt.toFixed(2):'—'}</td>
-        <td class="${cuRow>=80?'tg':cuRow>=60?'ta':'tr'}">${cuRow>0?cuRow.toFixed(1)+'%':'—'}</td>
-        <td class="${p2>=100?'tg':p2>=85?'ta':'tr'}">${out>0?out.toFixed(1):'—'}</td>
+        <td>${out>0?out.toFixed(1):'—'}</td>
         <td>${pdr>0?pdr.toFixed(2):'—'}</td>
-        <td class="tg">${pdr>0&&remainDays>0?(pdr*remainDays).toFixed(1):'—'}</td>
+        <td class="${cuRow>=80?'tg':cuRow>=60?'ta':'tr'}">${cuRow>0?cuRow.toFixed(1)+'%':'—'}</td>
+        <td>${sdt>0?sdt.toFixed(2):'—'}</td>
+        <td class="${udt>20?'tr':udt>10?'ta':''}">${udt>0?udt.toFixed(2):'—'}</td>
+        <td class="${oee>=85?'tg':oee>=70?'ta':oee>0?'tr':''}">${oee>0?oee.toFixed(1)+'%':'—'}</td>
+        <td>${kwh>0?kwh.toFixed(2):'—'}</td>
+        <td>${fuel>0?fuel.toFixed(2):'—'}</td>
+        <td>${coal>0?coal.toFixed(2):'—'}</td>
+        <td class="${rmv<0?'tr':rmv>0?'tg':''}">${rmvRaw!==0?rmv.toFixed(3)+'%':'—'}</td>
+        <td class="${rmvws<0?'tr':rmvws>0?'tg':''}">${rmvwsRaw!==0?rmvws.toFixed(3)+'%':'—'}</td>
       </tr>`;
     }).join('')||'<tr><td colspan="10" class="no-data">No data for Week '+activeWeek+'</td></tr>'}</tbody>
   </table></div></div>
