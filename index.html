@@ -364,12 +364,12 @@ function render() {
   // For individual sites, use that site's single row
   const kpiRows = activeSite==='NATIONAL' ? natRow : siteWkRows;
 
-  // CF/MG/VT badges cols AP, AR, AZ
-  const totCF      = kpiRows.reduce((a,r)=>a+gf(r,'Total Plant Output EXC MIXGRAIN & VIETOP'),0);
-  const totMG      = kpiRows.reduce((a,r)=>a+gf(r,'Mixgrain'),0);
-  const totVT      = kpiRows.reduce((a,r)=>a+gf(r,'Vietop'),0);
-  // Output col AM = CF + MG + VT (matches sheet exactly)
-  const totOut     = totCF + totMG + totVT;
+  // Output col AM
+  const totOut = kpiRows.reduce((a,r)=>a+gf(r,'Total Plant Output,mt w/o toll'),0);
+  // Badges: AP=COMPLETE FEEDS, AR=Mixgrain, AZ=Vietop
+  const totCF  = kpiRows.reduce((a,r)=>a+gf(r,'COMPLETE FEEDS, mt'),0);
+  const totMG  = kpiRows.reduce((a,r)=>a+gf(r,'Mixgrain'),0);
+  const totVT  = kpiRows.reduce((a,r)=>a+gf(r,'Vietop'),0);
   // Cap Util col CQ — stored as decimal in GAS (0.2835 = 28.35%)
   const _cuRaw     = kpiRows.length?kpiRows.reduce((a,r)=>a+gf(r,'Capacity Utilization Rate,%'),0)/kpiRows.length:0;
   const totCapUtil = _cuRaw*100;
@@ -395,13 +395,11 @@ function render() {
     ${PROD_SITES.map(s=>{
       const sr=wkRows.filter(r=>(r.Plant||r.plant||'').toUpperCase()===s);
       // MR Weekly: AP=CF Output, AR=Mixgrain, AZ=Vietop, CQ=Cap Util%, CR=OEE, H=UDT
-      const cf  = sr.reduce((a,r)=>a+gf(r,'Total Plant Output EXC MIXGRAIN & VIETOP','Total Plant Output, mt EXC MIXGRAIN & VIETOP'),0);
+      const cf  = sr.reduce((a,r)=>a+gf(r,'COMPLETE FEEDS, mt'),0);
       const mg  = sr.reduce((a,r)=>a+gf(r,'Mixgrain'),0);
       const vt  = sr.reduce((a,r)=>a+gf(r,'Vietop'),0);
-      // If CF=0 but MG>0, use total output minus MG/VT
-      const rawTot = sr.reduce((a,r)=>a+gf(r,'Total Plant Output,mt w/o toll'),0);
-      const tot = (cf+mg+vt)>0 ? cf+mg+vt : rawTot;
-      const cfDisplay = cf>0?cf:(rawTot-mg-vt);
+      const tot = sr.reduce((a,r)=>a+gf(r,'Total Plant Output,mt w/o toll'),0);
+      const cfDisplay = cf>0?cf:tot-mg-vt;
       const _cu  = sr.length?sr.reduce((a,r)=>a+gf(r,'Capacity Utilization Rate,%'),0)/sr.length:0;
       const cu   = _cu*100;
       const _oee = sr.length?sr.reduce((a,r)=>a+gf(r,'OEE'),0)/sr.length:0;
@@ -637,12 +635,11 @@ function render() {
   // ── CHART 1: Weekly Output LINE — uses NATIONAL row for national, site row for sites ──
   const weeklyOutData = allWeeks.map(w=>{
     if(activeSite==='NATIONAL'){
-      // Use the NATIONAL aggregated row directly
       const natR=rows.filter(r=>+(r.Week||r.week||0)===+w&&(r.Plant||r.plant||'').toUpperCase()==='NATIONAL');
-      return +natR.reduce((a,r)=>a+gf(r,'Total Plant Output EXC MIXGRAIN & VIETOP')+gf(r,'Mixgrain')+gf(r,'Vietop'),0).toFixed(1);
+      return +natR.reduce((a,r)=>a+gf(r,'Total Plant Output,mt w/o toll'),0).toFixed(1);
     } else {
       const siteR=rows.filter(r=>+(r.Week||r.week||0)===+w&&(r.Plant||r.plant||'').toUpperCase()===activeSite);
-      return +siteR.reduce((a,r)=>a+gf(r,'Total Plant Output EXC MIXGRAIN & VIETOP')+gf(r,'Mixgrain')+gf(r,'Vietop'),0).toFixed(1);
+      return +siteR.reduce((a,r)=>a+gf(r,'Total Plant Output,mt w/o toll'),0).toFixed(1);
     }
   });
 
