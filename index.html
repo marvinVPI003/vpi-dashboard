@@ -296,6 +296,43 @@ const gf = (r,...keys) => {
 const gs = (r,...keys) => { for(const k of keys){if(r[k]!==undefined&&r[k]!==null&&r[k]!=='')return String(r[k]);} return ''; };
 const oeeNorm = v => v>1?v:v>0?v*100:0;
 
+// ── NATIONAL SUMMARY TABLE BUILDER ───────────────────────
+function buildNatTable(wkRows) {
+  const siteRows = wkRows.filter(r=>(r.Plant||r.plant||'').toUpperCase()!=='NATIONAL');
+  if(!siteRows.length) return '<div class="no-data">No data</div>';
+  return '<div class="tbl-wrap"><table>'+
+    '<thead><tr><th>Site</th><th>Output mt</th><th>PDR t/day</th><th>Cap Util%</th><th>SDT Hr</th><th>UDT Hr</th><th>OEE%</th><th>kWh/ton</th><th>Fuel L/ton</th><th>Coal kg/ton</th><th>RM Var%</th><th>RM Var w/o Sacks%</th></tr></thead>'+
+    '<tbody>'+siteRows.map(r=>{
+      const s=(r.Plant||r.plant||'').toString().toUpperCase();
+      const cf=gf(r,'Total Plant Output EXC MIXGRAIN & VIETOP');
+      const mg=gf(r,'Mixgrain');const vt=gf(r,'Vietop');
+      const out=cf+mg+vt;
+      const udt=gf(r,'Unscheduled Down Time, hr');
+      const sdt=gf(r,'Scheduled Down Time, hr');
+      const oee=gf(r,'OEE')*100;
+      const cu=gf(r,'Capacity Utilization Rate,%')*100;
+      const pdr=gf(r,'Plant Daily Pelleting Rate,ton/day');
+      const kwh=gf(r,'kWh/ton');const fuel=gf(r,'Li/ton');const coal=gf(r,'kg/ton');
+      const rmvR=gf(r,'RM Variance, %');const rmv=rmvR*100;
+      const rmvwR=gf(r,'RM Variance (w/o used sacks), %');const rmvw=rmvwR*100;
+      return '<tr>'+
+        '<td>'+dot(s)+SL[s]+'</td>'+
+        '<td>'+(out>0?out.toFixed(1):'—')+'</td>'+
+        '<td>'+(pdr>0?pdr.toFixed(2):'—')+'</td>'+
+        '<td class="'+(cu>=80?'tg':cu>=60?'ta':'tr')+'">'+(cu>0?cu.toFixed(1)+'%':'—')+'</td>'+
+        '<td>'+(sdt>0?sdt.toFixed(2):'—')+'</td>'+
+        '<td class="'+(udt>20?'tr':udt>10?'ta':'')+'">'+(udt>0?udt.toFixed(2):'—')+'</td>'+
+        '<td class="'+(oee>=85?'tg':oee>=70?'ta':oee>0?'tr':'')+'">'+(oee>0?oee.toFixed(1)+'%':'—')+'</td>'+
+        '<td>'+(kwh>0?kwh.toFixed(2):'—')+'</td>'+
+        '<td>'+(fuel>0?fuel.toFixed(2):'—')+'</td>'+
+        '<td>'+(coal>0?coal.toFixed(2):'—')+'</td>'+
+        '<td class="'+(rmv<0?'tr':rmv>0?'tg':'')+'">'+(rmvR!==0?rmv.toFixed(3)+'%':'—')+'</td>'+
+        '<td class="'+(rmvw<0?'tr':rmvw>0?'tg':'')+'">'+(rmvwR!==0?rmvw.toFixed(3)+'%':'—')+'</td>'+
+        '</tr>';
+    }).join('')+
+    '</tbody></table></div>';
+}
+
 // ── WEEKLY PULSE ──────────────────────────────────────────
 function render() {
   destroyCharts();
@@ -485,48 +522,10 @@ function render() {
 </div>
 
 <div class="sec">
-  <div class="sec-hdr"><div class="sec-title">Site Detail Table — Week ${activeWeek}</div><div class="sec-line"></div></div>
-  <div class="cc"><div class="tbl-wrap"><table>
-    <thead><tr><th>Site</th><th>Output mt</th><th>PDR t/day</th><th>Cap Util%</th><th>SDT Hr</th><th>UDT Hr</th><th>OEE%</th><th>kWh/ton</th><th>Fuel L/ton</th><th>Coal kg/ton</th><th>RM Var%</th><th>RM Var w/o Sacks%</th></tr></thead>
-    <tbody>${wkRows.filter(r=>(r.Plant||r.plant||'').toUpperCase()!=='NATIONAL').map(r=>{
-      const s=(r.Plant||r.plant||'').toUpperCase();
-      const cf3  = gf(r,'Total Plant Output EXC MIXGRAIN & VIETOP');
-      const mg3  = gf(r,'Mixgrain');
-      const vt3  = gf(r,'Vietop');
-      const out  = cf3+mg3+vt3;
-      const plan = gf(r,'Planned, mt','Total Plant Input, mt');
-      const p2   = plan>0?(out/plan*100):0;
-      const udt  = gf(r,'Unscheduled Down Time, hr');
-      const sdt  = gf(r,'Scheduled Down Time, hr');
-      const oee  = gf(r,'OEE')*100;
-      const cuRow= gf(r,'Capacity Utilization Rate,%')*100;
-      const pdr  = gf(r,'Plant Daily Pelleting Rate,ton/day');
-      // Energy cols BV=kWh/ton, BX=Li/ton, BZ=kg/ton
-      const kwh  = gf(r,'kWh/ton');
-      const fuel = gf(r,'Li/ton');
-      const coal = gf(r,'kg/ton');
-      // RM Variance cols CE=%, CL=w/o sacks %
-      const rmvRaw  = gf(r,'RM Variance, %');
-      const rmv     = rmvRaw*100;  // stored as decimal
-      const rmvwsRaw= gf(r,'RM Variance (w/o used sacks), %');
-      const rmvws   = rmvwsRaw*100; // stored as decimal
-
-      return `<tr>
-        <td>${dot(s)}${SL[s]||s}</td>
-        <td>${out>0?out.toFixed(1):'—'}</td>
-        <td>${pdr>0?pdr.toFixed(2):'—'}</td>
-        <td class="${cuRow>=80?'tg':cuRow>=60?'ta':'tr'}">${cuRow>0?cuRow.toFixed(1)+'%':'—'}</td>
-        <td>${sdt>0?sdt.toFixed(2):'—'}</td>
-        <td class="${udt>20?'tr':udt>10?'ta':''}">${udt>0?udt.toFixed(2):'—'}</td>
-        <td class="${oee>=85?'tg':oee>=70?'ta':oee>0?'tr':''}">${oee>0?oee.toFixed(1)+'%':'—'}</td>
-        <td>${kwh>0?kwh.toFixed(2):'—'}</td>
-        <td>${fuel>0?fuel.toFixed(2):'—'}</td>
-        <td>${coal>0?coal.toFixed(2):'—'}</td>
-        <td class="${rmv<0?'tr':rmv>0?'tg':''}">${rmvRaw!==0?rmv.toFixed(3)+'%':'—'}</td>
-        <td class="${rmvws<0?'tr':rmvws>0?'tg':''}">${rmvwsRaw!==0?rmvws.toFixed(3)+'%':'—'}</td>
-      </tr>`;
-    }).join('')||'<tr><td colspan="10" class="no-data">No data for Week '+activeWeek+'</td></tr>'}</tbody>
-  </table></div></div>
+  <div class="sec-hdr"><div class="sec-title">${activeSite==='NATIONAL'?'Site Summary — Week '+activeWeek:SL[activeSite]+' · Daily Detail — Week '+activeWeek}</div><div class="sec-line"></div></div>
+  <div class="cc" id="detail-table-wrap">
+    ${activeSite==='NATIONAL' ? buildNatTable(wkRows) : '<div class="no-data" style="padding:20px">⟳ Loading daily data...</div>'}
+  </div>
 </div>
 
 <div class="sec">
@@ -541,6 +540,37 @@ function render() {
   ct.className='content fade';
 
   // debug removed
+
+  // If specific site selected, load daily data from MR Daily
+  if(activeSite!=='NATIONAL'){
+    const wrap=document.getElementById('detail-table-wrap');
+    gasGet('daily_detail',{site:activeSite,week:activeWeek}).then(d=>{
+      const drows=d.rows||[];
+      if(!wrap)return;
+      if(!drows.length){wrap.innerHTML='<div class="no-data">No daily data found for '+SL[activeSite]+' Week '+activeWeek+'</div>';return;}
+      wrap.innerHTML='<div class="tbl-wrap"><table>'+
+        '<thead><tr><th>Date</th><th>Output mt</th><th>SDT Hr</th><th>UDT Hr</th><th>kWh/ton</th><th>Fuel L/ton</th><th>Coal kg/ton</th></tr></thead>'+
+        '<tbody>'+drows.map(r=>{
+          const date=r['Date']||r['date']||'—';
+          const out=gf(r,'Total Plant Output,mt w/o toll')||gf(r,'Total Production')||gf(r,'output')||0;
+          const sdt=gf(r,'Scheduled Operating Time, hr')||gf(r,'Scheduled Down Time, hr')||0;
+          const udt=gf(r,'Unscheduled Down Time, hr')||gf(r,'Unscheduled Dc')||0;
+          const kwh=gf(r,'kWh/ton')||0;
+          const fuel=gf(r,'Li/ton')||0;
+          const coal=gf(r,'kg/ton')||0;
+          return '<tr>'+
+            '<td style="text-align:left;color:var(--text2)">'+date+'</td>'+
+            '<td>'+(out>0?out.toFixed(2):'—')+'</td>'+
+            '<td>'+(sdt>0?sdt.toFixed(2):'—')+'</td>'+
+            '<td class="'+(udt>8?'tr':udt>4?'ta':'')+'">'+(udt>0?udt.toFixed(2):'—')+'</td>'+
+            '<td>'+(kwh>0?kwh.toFixed(2):'—')+'</td>'+
+            '<td>'+(fuel>0?fuel.toFixed(2):'—')+'</td>'+
+            '<td>'+(coal>0?coal.toFixed(2):'—')+'</td>'+
+            '</tr>';
+        }).join('')+
+        '</tbody></table></div>';
+    }).catch(e=>{if(wrap)wrap.innerHTML='<div class="no-data">Error loading daily data: '+e.message+'</div>';});
+  }
 
   const sf = activeSite==='NATIONAL' ? r=>true : r=>(r.Plant||r.plant||'').toUpperCase()===activeSite;
   const bw = w => rows.filter(r=>+(r.Week||r.week||0)===+w&&sf(r));
