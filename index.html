@@ -168,8 +168,8 @@ function gasGet(tab, extra={}) {
     const s = document.createElement('script');
     const t = setTimeout(() => {
       cleanup();
-      reject(new Error('Timeout after 30s'));
-    }, 30000);
+      reject(new Error('Timeout — GAS took too long. Try refreshing.'));
+    }, 60000);
     function cleanup(){ clearTimeout(t); delete window[cb]; try{s.parentNode&&s.parentNode.removeChild(s);}catch(e){} }
     window[cb] = d => { cleanup(); d&&d.error ? reject(new Error(d.error)) : resolve(d); };
     s.onerror = () => { cleanup(); reject(new Error('GAS load failed')); };
@@ -182,6 +182,10 @@ function gasGet(tab, extra={}) {
 async function loadData(isRefresh=false) {
   setStatus('fetching');
   setMsg(isRefresh ? 'Syncing...' : 'Connecting to Google Sheets...');
+  if(!isRefresh){
+    setTimeout(()=>setMsg('Loading weekly data...'),3000);
+    setTimeout(()=>setMsg('Almost ready...'),8000);
+  }
   if (!isRefresh) show('loading');
 
   try {
