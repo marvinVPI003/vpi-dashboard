@@ -594,34 +594,28 @@ function render() {
         return raw;
       };
 
+      // Transposed: metrics=rows, dates=columns
+      const dateCols=drows.map(r=>fmtDate(r));
+      const metrics=[
+        {label:'Output mt',   fn:r=>getOut(r),  cls:v=>''},
+        {label:'SDT Hr',      fn:r=>getSdt(r),  cls:v=>''},
+        {label:'UDT Hr',      fn:r=>getUdt(r),  cls:v=>v>8?'tr':v>4?'ta':''},
+        {label:'kWh/ton',     fn:r=>getKwh(r),  cls:v=>''},
+        {label:'Fuel L/ton',  fn:r=>getFuel(r), cls:v=>''},
+        {label:'Coal kg/ton', fn:r=>getCoal(r), cls:v=>''},
+      ];
       wrap.innerHTML='<div class="tbl-wrap"><table>'+
         '<thead><tr>'+
-          '<th style="text-align:left">Date</th>'+
-          '<th>Output mt</th><th>SDT Hr</th><th>UDT Hr</th>'+
-          '<th>kWh/ton</th><th>Fuel L/ton</th><th>Coal kg/ton</th>'+
+          '<th style="text-align:left;min-width:100px">Metric</th>'+
+          dateCols.map(d=>'<th style="white-space:nowrap">'+d+'</th>').join('')+
         '</tr></thead>'+
-        '<tbody>'+drows.map(r=>{
-
-          const out=getOut(r);
-          const sdt=getSdt(r);
-          const udt=getUdt(r);
-          const kwh=getKwh(r);
-          const fuel=getFuel(r);
-          const coal=getCoal(r);
-          return '<tr>'+
-            '<td style="text-align:left;font-family:Barlow,sans-serif;color:var(--text)">'+fmtDate(r)+'</td>'+
-            '<td>'+(out>0?out.toFixed(2):'—')+'</td>'+
-            '<td>'+(sdt>0?sdt.toFixed(2):'—')+'</td>'+
-            '<td class="'+(udt>8?'tr':udt>4?'ta':'')+'">'+(udt>0?udt.toFixed(2):'—')+'</td>'+
-            '<td>'+(kwh>0?kwh.toFixed(2):'—')+'</td>'+
-            '<td>'+(fuel>0?fuel.toFixed(2):'—')+'</td>'+
-            '<td>'+(coal>0?coal.toFixed(2):'—')+'</td>'+
-            '</tr>';
-        }).join('')+
-        '</tbody></table>'+
-        '<div style="font-size:9px;color:var(--text3);margin-top:6px;font-family:DM Mono,monospace">'+
-          drows.length+' daily records · Fields: '+keys.slice(0,8).join(', ')+'...'+
-        '</div></div>';
+        '<tbody>'+metrics.map(m=>
+          '<tr>'+
+          '<td style="text-align:left;font-family:Barlow,sans-serif;color:var(--text);white-space:nowrap">'+m.label+'</td>'+
+          drows.map(r=>{const v=m.fn(r);return '<td class="'+m.cls(v)+'">'+(v>0?+v.toFixed(2):'—')+'</td>';}).join('')+
+          '</tr>'
+        ).join('')+
+        '</tbody></table></div>';
     }).catch(e=>{
       if(wrap)wrap.innerHTML='<div class="no-data" style="color:var(--red)">Error: '+e.message+
         '<br><small>Make sure GAS is redeployed</small></div>';
