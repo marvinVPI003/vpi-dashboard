@@ -529,9 +529,20 @@ function render() {
   </div>
 </div>
 
-<!-- ROW 2: Operational KPI Graphs -->
 <div class="sec">
   <div class="sec-hdr"><div class="sec-title">Operational KPI Trends — ${activeSite==='NATIONAL'?'National':SL[activeSite]}</div><div class="sec-line"></div></div>
+  <!-- Row 1: Output Charts -->
+  <div class="g2" style="margin-bottom:8px">
+    <div class="cc">
+      <div class="cc-title">Weekly Output — ${activeSite==='NATIONAL'?'National':SL[activeSite]} (mt)</div>
+      <div style="position:relative;height:160px"><canvas id="c-out"></canvas></div>
+    </div>
+    <div class="cc">
+      <div class="cc-title">Daily Output — Week ${activeWeek} · ${activeSite==='NATIONAL'?'National':SL[activeSite]} (mt)</div>
+      <div style="position:relative;height:160px"><canvas id="c-daily-out"></canvas></div>
+    </div>
+  </div>
+  <!-- Row 2: UDT + Power -->
   <div class="g2" style="margin-bottom:8px">
     <div class="cc">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
@@ -571,102 +582,16 @@ function render() {
   <div class="cc" id="detail-table-wrap">
     ${activeSite==='NATIONAL' ? buildNatTable(wkRows) : '<div class="no-data" style="padding:20px">⟳ Loading daily data...</div>'}
   </div>
-</div>
-
-<div class="sec">
-  <div class="sec-hdr"><div class="sec-title">Trends</div><div class="sec-line"></div></div>
-  <div class="g2">
-    <div class="cc">
-      <div class="cc-title">Weekly Output — ${activeSite==='NATIONAL'?'National':SL[activeSite]} (mt)</div>
-      <div style="position:relative;height:180px"><canvas id="c-out"></canvas></div>
-    </div>
-    <div class="cc">
-      <div class="cc-title">Daily Output — Week ${activeWeek} · ${activeSite==='NATIONAL'?'National':SL[activeSite]} (mt)</div>
-      <div style="position:relative;height:180px"><canvas id="c-daily-out"></canvas></div>
-    </div>
-  </div>
-</div>`;
+</div>\`;
 
   ct.className='content fade';
 
-  // debug removed
-
-  // If specific site selected, load daily data from MR Daily
-  if(activeSite!=='NATIONAL'){
-    const wrap=document.getElementById('detail-table-wrap');
-    // Use preloaded data if available, otherwise fetch
-    const _dailyFetch = (DATA.daily_detail && DATA.daily_detail.rows && DATA.daily_detail.rows.length)
-      ? Promise.resolve(DATA.daily_detail)
-      : gasGet('daily_detail',{site:activeSite,week:activeWeek});
-    _dailyFetch.then(d=>{
-      // Filter by site and week client-side
-      const allDrows=d.rows||[];
-      const drows=allDrows.filter(r=>{
-        const rSite=(r.Plant||r.plant||'').toUpperCase();
-        const rWeek=String(r['Week Num']||r['Week']||r['week']||'').trim();
-        return rSite===activeSite && rWeek===String(activeWeek);
-      }).sort((a,b)=>{
-        // Sort by date - week starts Sunday
-        const da=new Date(a.Date||a.date||0), db=new Date(b.Date||b.date||0);
-        return da-db;
-      });
-      if(!wrap)return;
-      if(!drows.length){
-        wrap.innerHTML='<div class="no-data">No daily data found for '+SL[activeSite]+' Week '+activeWeek+
-          '<br><small style="color:var(--text3)">Check that GAS was redeployed with new code</small></div>';
-        return;
-      }
-      // Show first row keys for debugging
-      const keys=Object.keys(drows[0]);
-      // MR Daily confirmed field names from debug
-      const getOut =r=>gf(r,'Total Plant Output,mt w/o toll');
-      const getSdt =r=>gf(r,'Scheduled Down Time, hr');   // col G = actual SDT hours
-      const getUdt =r=>gf(r,'Unscheduled Down Time, hr'); // col H = actual UDT hours
-      const getKwh =r=>gf(r,'kWh/ton');
-      const getFuel=r=>gf(r,'Li/ton');
-      const getCoal=r=>gf(r,'kg/ton');
-      // Format date — use preformatted or clean up ISO string
-      const fmtDate=r=>{
-        const fd=r['_dateFormatted']||'';
-        if(fd) return fd;
-        const raw=String(r['Date']||r['date']||'—');
-        if(raw.includes('T')) return raw.split('T')[0]; // 2026-05-17
-        return raw;
-      };
-
-      // Transposed: metrics=rows, dates=columns
-      const dateCols=drows.map(r=>fmtDate(r));
-      const metrics=[
-        {label:'Output mt',   fn:r=>getOut(r),  cls:v=>''},
-        {label:'SDT Hr',      fn:r=>getSdt(r),  cls:v=>''},
-        {label:'UDT Hr',      fn:r=>getUdt(r),  cls:v=>v>8?'tr':v>4?'ta':''},
-        {label:'kWh/ton',     fn:r=>getKwh(r),  cls:v=>''},
-        {label:'Fuel L/ton',  fn:r=>getFuel(r), cls:v=>''},
-        {label:'Coal kg/ton', fn:r=>getCoal(r), cls:v=>''},
-      ];
-      wrap.innerHTML='<div class="tbl-wrap"><table>'+
-        '<thead><tr>'+
-          '<th style="text-align:left;min-width:100px">Metric</th>'+
-          dateCols.map(d=>'<th style="white-space:nowrap">'+d+'</th>').join('')+
-        '</tr></thead>'+
-        '<tbody>'+metrics.map(m=>
-          '<tr>'+
-          '<td style="text-align:left;font-family:Barlow,sans-serif;color:var(--text);white-space:nowrap">'+m.label+'</td>'+
-          drows.map(r=>{const v=m.fn(r);return '<td class="'+m.cls(v)+'">'+(v>0?+v.toFixed(2):'—')+'</td>';}).join('')+
-          '</tr>'
-        ).join('')+
-        '</tbody></table></div>';
-    }).catch(e=>{
-      if(wrap)wrap.innerHTML='<div class="no-data" style="color:var(--red)">Error: '+e.message+
-        '<br><small>Make sure GAS is redeployed</small></div>';
-    });
-  }
-
+  // ── CHART RENDERING ───────────────────────────────────
   const sf = activeSite==='NATIONAL' ? r=>true : r=>(r.Plant||r.plant||'').toUpperCase()===activeSite;
   const bw = w => rows.filter(r=>+(r.Week||r.week||0)===+w&&sf(r));
   const lbl = allWeeks.map(w=>'W'+w);
 
-  // ── CHART 1: Weekly Output LINE — uses NATIONAL row for national, site row for sites ──
+  // Weekly Output Line Chart
   const weeklyOutData = allWeeks.map(w=>{
     if(activeSite==='NATIONAL'){
       const natR=rows.filter(r=>+(r.Week||r.week||0)===+w&&(r.Plant||r.plant||'').toUpperCase()==='NATIONAL');
@@ -682,21 +607,19 @@ function render() {
     if(+allWeeks[i]===+activeWeek) return '#ffffff';
     return v>0&&v<wkTarget ? '#f85149' : '#3fb950';
   });
-  const wkPointSizes = weeklyOutData.map((_,i)=>+allWeeks[i]===+activeWeek?7:4);
 
   mkChart('c-out','line',lbl,[
     {label:'Output mt', data:weeklyOutData,
      borderColor:'#388bfd', backgroundColor:'rgba(56,139,253,0.08)',
-     fill:true, tension:.3, pointRadius:wkPointSizes,
-     pointBackgroundColor:wkPointColors, pointBorderColor:wkPointColors,
-     spanGaps:true},
+     fill:true, tension:.3,
+     pointRadius:weeklyOutData.map((_,i)=>+allWeeks[i]===+activeWeek?7:4),
+     pointBackgroundColor:wkPointColors, pointBorderColor:wkPointColors, spanGaps:true},
     {label:'Target '+wkTarget+' mt', data:allWeeks.map(()=>wkTarget),
-     borderColor:'rgba(248,81,73,0.5)', borderDash:[4,4],
-     borderWidth:1.5, pointRadius:0, fill:false}
-  ],{plugins:{legend:{display:true,labels:{color:'#8b949e',font:{size:9},boxWidth:12}},
+     borderColor:'rgba(248,81,73,0.5)', borderDash:[4,4], borderWidth:1.5, pointRadius:0, fill:false}
+  ],{plugins:{legend:{display:true,labels:{color:'#8b949e',font:{size:9},boxWidth:10}},
      tooltip:{backgroundColor:'#1f2631',borderColor:'rgba(255,255,255,.1)',borderWidth:1,bodyFont:{family:"'DM Mono',monospace",size:10}}}});
 
-  // ── CHART 2: Daily Output LINE — render now if data ready, else render when loaded ──
+  // Daily Output Line Chart
   function buildDailyChart(){
     const dRows=(DATA.daily_detail&&DATA.daily_detail.rows||[]).filter(r=>{
       const rSite=(r.Plant||r.plant||'').toUpperCase();
@@ -704,8 +627,6 @@ function render() {
       const siteMatch=activeSite==='NATIONAL'?true:rSite===activeSite;
       return siteMatch&&rWeek===String(activeWeek);
     }).sort((a,b)=>new Date(a.Date||a.date||0)-new Date(b.Date||b.date||0));
-
-    // Group by date
     const byDate={};
     dRows.forEach(r=>{
       const raw=String(r.Date||r.date||'').split('T')[0];
@@ -718,29 +639,21 @@ function render() {
       try{const dt=new Date(d+'T12:00:00');return dt.toLocaleDateString('en-PH',{month:'short',day:'numeric',weekday:'short'});}
       catch(e){return d;}
     });
-
     if(charts['c-daily-out']){try{charts['c-daily-out'].destroy();}catch(e){}}
-    if(!dates.length){
-      // No data yet — retry after 3s
-      setTimeout(()=>{if(DATA.daily_detail&&DATA.daily_detail.rows&&DATA.daily_detail.rows.length)buildDailyChart();},3000);
-      return;
-    }
-    const dayTarget = DAILY_TARGET[activeSite] || DAILY_TARGET.NATIONAL;
-    const dayPointColors = vals.map(v=>v>0&&v<dayTarget?'#f85149':'#3fb950');
+    if(!dates.length){setTimeout(()=>{if(DATA.daily_detail&&DATA.daily_detail.rows&&DATA.daily_detail.rows.length)buildDailyChart();},3000);return;}
+    const dayTarget=DAILY_TARGET[activeSite]||DAILY_TARGET.NATIONAL;
+    const dayPtColors=vals.map(v=>v>0&&v<dayTarget?'#f85149':'#3fb950');
     charts['c-daily-out']=new Chart(document.getElementById('c-daily-out').getContext('2d'),{
       type:'line',
       data:{labels:lbls,datasets:[
-        {label:'Output mt', data:vals,
-         borderColor:'#3fb950', backgroundColor:'rgba(63,185,80,0.08)',
-         fill:true, tension:.3, pointRadius:5,
-         pointBackgroundColor:dayPointColors, pointBorderColor:dayPointColors,
-         spanGaps:true},
-        {label:'Target '+dayTarget+' mt', data:vals.map(()=>dayTarget),
-         borderColor:'rgba(248,81,73,0.5)', borderDash:[4,4],
-         borderWidth:1.5, pointRadius:0, fill:false}
+        {label:'Output mt',data:vals,borderColor:'#3fb950',backgroundColor:'rgba(63,185,80,0.08)',
+         fill:true,tension:.3,pointRadius:5,pointBackgroundColor:dayPtColors,pointBorderColor:dayPtColors,spanGaps:true},
+        {label:'Target '+dayTarget+' mt',data:vals.map(()=>dayTarget),
+         borderColor:'rgba(248,81,73,0.5)',borderDash:[4,4],borderWidth:1.5,pointRadius:0,fill:false}
       ]},
       options:{responsive:true,maintainAspectRatio:false,animation:{duration:200},
-        plugins:{legend:{display:false},tooltip:{backgroundColor:'#1f2631',borderColor:'rgba(255,255,255,.1)',borderWidth:1,bodyFont:{family:"'DM Mono',monospace",size:10}}},
+        plugins:{legend:{display:true,labels:{color:'#8b949e',font:{size:9},boxWidth:10}},
+                 tooltip:{backgroundColor:'#1f2631',borderColor:'rgba(255,255,255,.1)',borderWidth:1,bodyFont:{family:"'DM Mono',monospace",size:10}}},
         scales:{x:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'#484f58',font:{size:9}}},
                 y:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'#484f58',font:{size:9}}}}}
     });
@@ -748,383 +661,144 @@ function render() {
   buildDailyChart();
 
   // ── 4 OPERATIONAL KPI CHARTS ──────────────────────────
-  // Data source: MR Weekly rows for selected site
   const kpiWkRows = activeSite==='NATIONAL'
     ? rows.filter(r=>(r.Plant||r.plant||'').toUpperCase()==='NATIONAL')
     : rows.filter(r=>(r.Plant||r.plant||'').toUpperCase()===activeSite);
   const kpiWks = allWeeks;
-
-  // Helper: get value per week
   const perWk = (field) => kpiWks.map(w=>{
-    const r = kpiWkRows.find(x=>+(x.Week||x.week||0)===+w);
-    return r ? +gf(r,field).toFixed(2) : null;
+    const r=kpiWkRows.find(x=>+(x.Week||x.week||0)===+w);
+    return r?+gf(r,field).toFixed(2):null;
   });
-
-  // Status badge helper
-  const setBadge = (id, val, limit, unit) => {
-    const el = document.getElementById(id); if(!el) return;
-    const pct = limit>0?((val/limit-1)*100):0;
-    const over = val>limit;
-    const near = val>limit*0.9;
-    el.textContent = (over?'▲ ':near?'◉ ':'▼ ') + val.toFixed(2) + unit + (over?' +'+pct.toFixed(1)+'% over limit':near?' near limit':' within limit');
-    el.style.background = over?'rgba(248,81,73,0.15)':near?'rgba(210,153,34,0.15)':'rgba(46,160,67,0.15)';
-    el.style.color = over?'#f85149':near?'#d29922':'#3fb950';
-    el.style.border = '1px solid '+(over?'rgba(248,81,73,0.3)':near?'rgba(210,153,34,0.3)':'rgba(46,160,67,0.3)');
+  const setBadge=(id,val,limit,unit)=>{
+    const el=document.getElementById(id);if(!el)return;
+    const over=val>limit; const near=val>limit*0.9;
+    el.textContent=(over?'▲ ':near?'◉ ':'▼ ')+val.toFixed(2)+unit+(over?' +'+((val/limit-1)*100).toFixed(1)+'% over':near?' near limit':' within limit');
+    el.style.cssText='font-size:9px;font-family:DM Mono,monospace;padding:2px 8px;border-radius:10px;background:'+(over?'rgba(248,81,73,0.15)':near?'rgba(210,153,34,0.15)':'rgba(46,160,67,0.15)')+';color:'+(over?'#f85149':near?'#d29922':'#3fb950')+';border:1px solid '+(over?'rgba(248,81,73,0.3)':near?'rgba(210,153,34,0.3)':'rgba(46,160,67,0.3)')+';';
   };
+  const ptColor=(v,limit)=>{if(!v)return 'rgba(139,148,158,0.5)';return v>limit?'#f85149':v>limit*0.9?'#d29922':'#3fb950';};
 
-  // Color per point vs limit
-  const ptColor = (v, limit) => {
-    if(!v) return 'rgba(139,148,158,0.5)';
-    if(v > limit) return '#f85149';
-    if(v > limit*0.9) return '#d29922';
-    return '#3fb950';
-  };
-
-  // ── CHART 3: UDT Combo (bars=hrs, line=%) ──
-  const udtHrs = perWk('Unscheduled Down Time, hr');
-  const udtPct = kpiWks.map(w=>{
-    const r = kpiWkRows.find(x=>+(x.Week||x.week||0)===+w);
-    if(!r) return null;
-    const p = gf(r,'Unscheduled Down Time, %')||gf(r,'Total Downtime Rate, %');
-    return p>1 ? +p.toFixed(2) : +(p*100).toFixed(2);
+  // UDT Combo
+  const udtHrs=perWk('Unscheduled Down Time, hr');
+  const udtPct=kpiWks.map(w=>{
+    const r=kpiWkRows.find(x=>+(x.Week||x.week||0)===+w);
+    if(!r)return null;
+    const p=gf(r,'Unscheduled Down Time, %')||gf(r,'Total Downtime Rate, %');
+    return p>1?+p.toFixed(2):+(p*100).toFixed(2);
   });
-  const latestUDT = udtHrs.filter(v=>v!==null).slice(-1)[0]||0;
-  const latestUDTpct = udtPct.filter(v=>v!==null).slice(-1)[0]||0;
-  setBadge('udt-status', latestUDTpct, LIMITS.UDT_PCT, '%');
-
+  setBadge('udt-status',udtPct.filter(v=>v!==null).slice(-1)[0]||0,LIMITS.UDT_PCT,'%');
   if(charts['c-udt-combo']){try{charts['c-udt-combo'].destroy();}catch(e){}}
-  const udtCtx = document.getElementById('c-udt-combo');
-  if(udtCtx) charts['c-udt-combo'] = new Chart(udtCtx.getContext('2d'),{
-    data:{labels:lbl, datasets:[
-      {type:'bar', label:'UDT Hours', data:udtHrs,
-       backgroundColor:udtHrs.map(v=>v>0?'rgba(248,81,73,0.6)':'rgba(56,139,253,0.3)'),
-       borderRadius:3, yAxisID:'y'},
-      {type:'line', label:'UDT %', data:udtPct,
-       borderColor:udtPct.map(v=>ptColor(v,LIMITS.UDT_PCT)),
-       segment:{borderColor:ctx=>ptColor(ctx.p1.parsed.y,LIMITS.UDT_PCT)},
-       backgroundColor:'transparent', tension:.3, pointRadius:4,
-       pointBackgroundColor:udtPct.map(v=>ptColor(v,LIMITS.UDT_PCT)),
-       spanGaps:true, yAxisID:'y1'},
-      {type:'line', label:'5% Limit', data:kpiWks.map(()=>LIMITS.UDT_PCT),
-       borderColor:'rgba(248,81,73,0.6)', borderDash:[4,4], borderWidth:1.5,
-       pointRadius:0, fill:false, yAxisID:'y1'}
+  const udtCtx=document.getElementById('c-udt-combo');
+  if(udtCtx) charts['c-udt-combo']=new Chart(udtCtx.getContext('2d'),{
+    data:{labels:lbl,datasets:[
+      {type:'bar',label:'UDT Hours',data:udtHrs,backgroundColor:udtHrs.map(v=>v>0?'rgba(248,81,73,0.6)':'rgba(56,139,253,0.3)'),borderRadius:3,yAxisID:'y'},
+      {type:'line',label:'UDT %',data:udtPct,borderColor:'#f85149',segment:{borderColor:ctx=>ptColor(ctx.p1.parsed.y,LIMITS.UDT_PCT)},backgroundColor:'transparent',tension:.3,pointRadius:4,pointBackgroundColor:udtPct.map(v=>ptColor(v,LIMITS.UDT_PCT)),spanGaps:true,yAxisID:'y1'},
+      {type:'line',label:'5% Limit',data:kpiWks.map(()=>LIMITS.UDT_PCT),borderColor:'rgba(248,81,73,0.5)',borderDash:[4,4],borderWidth:1.5,pointRadius:0,fill:false,yAxisID:'y1'}
     ]},
     options:{responsive:true,maintainAspectRatio:false,animation:{duration:200},
-      plugins:{legend:{display:true,labels:{color:'#8b949e',font:{size:9},boxWidth:10}},
-               tooltip:{backgroundColor:'#1f2631',borderColor:'rgba(255,255,255,.1)',borderWidth:1,bodyFont:{family:"'DM Mono',monospace",size:10}}},
-      scales:{
-        x:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'#484f58',font:{size:9}}},
-        y:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'#484f58',font:{size:9}},title:{display:true,text:'Hours',color:'#484f58',font:{size:9}},position:'left'},
-        y1:{grid:{display:false},ticks:{color:'#484f58',font:{size:9},callback:v=>v+'%'},title:{display:true,text:'%',color:'#484f58',font:{size:9}},position:'right'}
-      }}
+      plugins:{legend:{display:true,labels:{color:'#8b949e',font:{size:9},boxWidth:10}},tooltip:{backgroundColor:'#1f2631',borderColor:'rgba(255,255,255,.1)',borderWidth:1,bodyFont:{family:"'DM Mono',monospace",size:10}}},
+      scales:{x:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'#484f58',font:{size:9}}},y:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'#484f58',font:{size:9}},title:{display:true,text:'Hours',color:'#484f58',font:{size:9}},position:'left'},y1:{grid:{display:false},ticks:{color:'#484f58',font:{size:9},callback:v=>v+'%'},position:'right'}}}
   });
 
-  // ── CHART 4: kWh/ton Line ──
-  const kwhData = perWk('kWh/ton');
-  const latestKwh = kwhData.filter(v=>v!==null).slice(-1)[0]||0;
-  setBadge('kwh-status', latestKwh, LIMITS.KWH_TON, ' kWh/t');
-
+  // kWh/ton
+  const kwhData=perWk('kWh/ton');
+  setBadge('kwh-status',kwhData.filter(v=>v!==null).slice(-1)[0]||0,LIMITS.KWH_TON,' kWh/t');
   if(charts['c-kwh-trend']){try{charts['c-kwh-trend'].destroy();}catch(e){}}
-  const kwhCtx = document.getElementById('c-kwh-trend');
-  if(kwhCtx) charts['c-kwh-trend'] = new Chart(kwhCtx.getContext('2d'),{
-    type:'line',
-    data:{labels:lbl, datasets:[
-      {label:'kWh/ton', data:kwhData,
-       borderColor:'#a371f7', backgroundColor:'rgba(163,113,247,0.08)',
-       fill:true, tension:.3, pointRadius:4, spanGaps:true,
-       pointBackgroundColor:kwhData.map(v=>ptColor(v,LIMITS.KWH_TON)),
-       pointBorderColor:kwhData.map(v=>ptColor(v,LIMITS.KWH_TON))},
-      {label:'Limit 35', data:kpiWks.map(()=>LIMITS.KWH_TON),
-       borderColor:'rgba(248,81,73,0.5)', borderDash:[4,4], borderWidth:1.5,
-       pointRadius:0, fill:false}
-    ]},
-    options:{responsive:true,maintainAspectRatio:false,animation:{duration:200},
-      plugins:{legend:{display:true,labels:{color:'#8b949e',font:{size:9},boxWidth:10}},
-               tooltip:{backgroundColor:'#1f2631',borderColor:'rgba(255,255,255,.1)',borderWidth:1,bodyFont:{family:"'DM Mono',monospace",size:10}}},
-      scales:{x:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'#484f58',font:{size:9}}},
-              y:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'#484f58',font:{size:9}}}}}
-  });
+  const kwhCtx=document.getElementById('c-kwh-trend');
+  if(kwhCtx) charts['c-kwh-trend']=new Chart(kwhCtx.getContext('2d'),{type:'line',data:{labels:lbl,datasets:[
+    {label:'kWh/ton',data:kwhData,borderColor:'#a371f7',backgroundColor:'rgba(163,113,247,0.08)',fill:true,tension:.3,pointRadius:4,spanGaps:true,pointBackgroundColor:kwhData.map(v=>ptColor(v,LIMITS.KWH_TON))},
+    {label:'Limit 35',data:kpiWks.map(()=>LIMITS.KWH_TON),borderColor:'rgba(248,81,73,0.5)',borderDash:[4,4],borderWidth:1.5,pointRadius:0,fill:false}
+  ]},options:{responsive:true,maintainAspectRatio:false,animation:{duration:200},plugins:{legend:{display:true,labels:{color:'#8b949e',font:{size:9},boxWidth:10}},tooltip:{backgroundColor:'#1f2631',borderColor:'rgba(255,255,255,.1)',borderWidth:1,bodyFont:{family:"'DM Mono',monospace",size:10}}},scales:{x:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'#484f58',font:{size:9}}},y:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'#484f58',font:{size:9}}}}}});
 
-  // ── CHART 5: Fuel L/ton Line ──
-  const fuelData = perWk('Li/ton');
-  const latestFuel = fuelData.filter(v=>v!==null).slice(-1)[0]||0;
-  setBadge('fuel-status', latestFuel, LIMITS.FUEL_TON, ' L/t');
-
+  // Fuel L/ton
+  const fuelData=perWk('Li/ton');
+  setBadge('fuel-status',fuelData.filter(v=>v!==null).slice(-1)[0]||0,LIMITS.FUEL_TON,' L/t');
   if(charts['c-fuel-trend']){try{charts['c-fuel-trend'].destroy();}catch(e){}}
-  const fuelCtx = document.getElementById('c-fuel-trend');
-  if(fuelCtx) charts['c-fuel-trend'] = new Chart(fuelCtx.getContext('2d'),{
-    type:'line',
-    data:{labels:lbl, datasets:[
-      {label:'L/ton', data:fuelData,
-       borderColor:'#d29922', backgroundColor:'rgba(210,153,34,0.08)',
-       fill:true, tension:.3, pointRadius:4, spanGaps:true,
-       pointBackgroundColor:fuelData.map(v=>ptColor(v,LIMITS.FUEL_TON)),
-       pointBorderColor:fuelData.map(v=>ptColor(v,LIMITS.FUEL_TON))},
-      {label:'Limit 3.5', data:kpiWks.map(()=>LIMITS.FUEL_TON),
-       borderColor:'rgba(248,81,73,0.5)', borderDash:[4,4], borderWidth:1.5,
-       pointRadius:0, fill:false}
-    ]},
-    options:{responsive:true,maintainAspectRatio:false,animation:{duration:200},
-      plugins:{legend:{display:true,labels:{color:'#8b949e',font:{size:9},boxWidth:10}},
-               tooltip:{backgroundColor:'#1f2631',borderColor:'rgba(255,255,255,.1)',borderWidth:1,bodyFont:{family:"'DM Mono',monospace",size:10}}},
-      scales:{x:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'#484f58',font:{size:9}}},
-              y:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'#484f58',font:{size:9}}}}}
-  });
+  const fuelCtx=document.getElementById('c-fuel-trend');
+  if(fuelCtx) charts['c-fuel-trend']=new Chart(fuelCtx.getContext('2d'),{type:'line',data:{labels:lbl,datasets:[
+    {label:'L/ton',data:fuelData,borderColor:'#d29922',backgroundColor:'rgba(210,153,34,0.08)',fill:true,tension:.3,pointRadius:4,spanGaps:true,pointBackgroundColor:fuelData.map(v=>ptColor(v,LIMITS.FUEL_TON))},
+    {label:'Limit 3.5',data:kpiWks.map(()=>LIMITS.FUEL_TON),borderColor:'rgba(248,81,73,0.5)',borderDash:[4,4],borderWidth:1.5,pointRadius:0,fill:false}
+  ]},options:{responsive:true,maintainAspectRatio:false,animation:{duration:200},plugins:{legend:{display:true,labels:{color:'#8b949e',font:{size:9},boxWidth:10}},tooltip:{backgroundColor:'#1f2631',borderColor:'rgba(255,255,255,.1)',borderWidth:1,bodyFont:{family:"'DM Mono',monospace",size:10}}},scales:{x:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'#484f58',font:{size:9}}},y:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'#484f58',font:{size:9}}}}}});
 
-  // ── CHART 6: Coal kg/ton Line ──
-  const coalData = perWk('kg/ton');
-  const latestCoal = coalData.filter(v=>v!==null).slice(-1)[0]||0;
-  setBadge('coal-status', latestCoal, LIMITS.COAL_TON, ' kg/t');
-
+  // Coal kg/ton
+  const coalData=perWk('kg/ton');
+  setBadge('coal-status',coalData.filter(v=>v!==null).slice(-1)[0]||0,LIMITS.COAL_TON,' kg/t');
   if(charts['c-coal-trend']){try{charts['c-coal-trend'].destroy();}catch(e){}}
-  const coalCtx = document.getElementById('c-coal-trend');
-  if(coalCtx) charts['c-coal-trend'] = new Chart(coalCtx.getContext('2d'),{
-    type:'line',
-    data:{labels:lbl, datasets:[
-      {label:'kg/ton', data:coalData,
-       borderColor:'#8b949e', backgroundColor:'rgba(139,148,158,0.08)',
-       fill:true, tension:.3, pointRadius:4, spanGaps:true,
-       pointBackgroundColor:coalData.map(v=>v&&v>0?ptColor(v,LIMITS.COAL_TON):'rgba(139,148,158,0.3)'),
-       pointBorderColor:coalData.map(v=>v&&v>0?ptColor(v,LIMITS.COAL_TON):'rgba(139,148,158,0.3)')},
-      {label:'Limit 12', data:kpiWks.map(()=>LIMITS.COAL_TON),
-       borderColor:'rgba(248,81,73,0.5)', borderDash:[4,4], borderWidth:1.5,
-       pointRadius:0, fill:false}
-    ]},
-    options:{responsive:true,maintainAspectRatio:false,animation:{duration:200},
-      plugins:{legend:{display:true,labels:{color:'#8b949e',font:{size:9},boxWidth:10}},
-               tooltip:{backgroundColor:'#1f2631',borderColor:'rgba(255,255,255,.1)',borderWidth:1,bodyFont:{family:"'DM Mono',monospace",size:10}}},
-      scales:{x:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'#484f58',font:{size:9}}},
-              y:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'#484f58',font:{size:9}}}}}
-  });
+  const coalCtx=document.getElementById('c-coal-trend');
+  if(coalCtx) charts['c-coal-trend']=new Chart(coalCtx.getContext('2d'),{type:'line',data:{labels:lbl,datasets:[
+    {label:'kg/ton',data:coalData,borderColor:'#8b949e',backgroundColor:'rgba(139,148,158,0.08)',fill:true,tension:.3,pointRadius:4,spanGaps:true,pointBackgroundColor:coalData.map(v=>v&&v>0?ptColor(v,LIMITS.COAL_TON):'rgba(139,148,158,0.3)')},
+    {label:'Limit 12',data:kpiWks.map(()=>LIMITS.COAL_TON),borderColor:'rgba(248,81,73,0.5)',borderDash:[4,4],borderWidth:1.5,pointRadius:0,fill:false}
+  ]},options:{responsive:true,maintainAspectRatio:false,animation:{duration:200},plugins:{legend:{display:true,labels:{color:'#8b949e',font:{size:9},boxWidth:10}},tooltip:{backgroundColor:'#1f2631',borderColor:'rgba(255,255,255,.1)',borderWidth:1,bodyFont:{family:"'DM Mono',monospace",size:10}}},scales:{x:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'#484f58',font:{size:9}}},y:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'#484f58',font:{size:9}}}}}});
 }
 
-// ── MONTHLY ───────────────────────────────────────────────
-function renderMonthly() {
+// ── PAGE NAVIGATION ───────────────────────────────────────
+function setPage(p){
+  activePage=p;
+  document.querySelectorAll('.page').forEach(x=>x.classList.remove('active'));
+  document.querySelectorAll('.page-tab').forEach(x=>x.classList.remove('active'));
+  const pg=document.getElementById('page-'+p);if(pg)pg.classList.add('active');
+  document.querySelectorAll('.page-tab').forEach(x=>{if(x.getAttribute('onclick')&&x.getAttribute('onclick').includes("'"+p+"'"))x.classList.add('active');});
+  const fns={dashboard:render,monthly:renderMonthly,cost:renderCost,downtime:renderDowntime,production:renderProduction,oee:renderOEE,cost_analytics:renderCostAnalytics,quality_energy:renderQualityEnergy};
+  if(fns[p]) fns[p]();
+}
+
+// ── MONTHLY ──────────────────────────────────────────────
+function renderMonthly(){
   const ct=document.getElementById('content-monthly');
   if(!DATA.monthly){ct.innerHTML='<div class="no-data">⟳ Loading...</div>';gasGet('monthly').then(d=>{DATA.monthly=d;renderMonthly();}).catch(e=>ct.innerHTML='<div class="no-data">Error: '+e.message+'</div>');return;}
   const rows=DATA.monthly.rows||[];
-  ct.innerHTML=`<div class="sec"><div class="sec-hdr"><div class="sec-title">Monthly Summary</div><div class="sec-line"></div></div>
-  <div class="cc"><div class="cc-title">MR Monthly Data</div><div class="tbl-wrap"><table>
-    <thead><tr><th>Site</th><th>Month</th><th>Calendar Days</th><th>Actual Days</th><th>Working Hrs</th><th>Sched OT Hr</th><th>UDT Hr</th><th>SDT Hr</th><th>Output mt</th><th>OEE%</th></tr></thead>
-    <tbody>${rows.map(r=>{
-      const s=(r.Plant||r.plant||'').toUpperCase();
-      const udt=gf(r,'Unscheduled Down Time, hr','Unscheduled Dc');
-      const _roee=gf(r,'OEE','oee');const oee=_roee>0&&_roee<=1?_roee*100:_roee;
-      return `<tr>
-        <td>${dot(s)}${SL[s]||s}</td>
-        <td>${r.MONTH||r.Month||r.month||'—'}</td>
-        <td>${fv(gf(r,'CALENDAR DA','Calendar Days','CALENDAR_DAY'),0)}</td>
-        <td>${fv(gf(r,'ACTUAL COUNT','Actual Days'),0)}</td>
-        <td>${fv(gf(r,'Working Hours'),1)}</td>
-        <td>${fv(gf(r,'Scheduled Oper','Scheduled Operating Time, hr'),1)}</td>
-        <td class="${udt>40?'tr':udt>20?'ta':''}">${udt>0?udt.toFixed(2):'—'}</td>
-        <td>${fv(gf(r,'Scheduled Dowr','Scheduled Down Time, hr'),2)}</td>
-        <td>${fv(gf(r,'Total Plant Output,mt w/o toll','output'),1)}</td>
-        <td class="${oee>=85?'tg':oee>=70?'ta':oee>0?'tr':''}">${oee>0?oee.toFixed(1)+'%':'—'}</td>
-      </tr>`;
-    }).join('')||'<tr><td colspan="10" class="no-data">No monthly data</td></tr>'}
-    </tbody></table></div></div></div>`;
+  ct.innerHTML='<div class="sec"><div class="sec-hdr"><div class="sec-title">Monthly Summary</div><div class="sec-line"></div></div><div class="cc"><div class="cc-title">MR Monthly Data</div><div class="tbl-wrap"><table><thead><tr><th>Site</th><th>Month</th><th>Calendar Days</th><th>Actual Days</th><th>Working Hrs</th><th>UDT Hr</th><th>SDT Hr</th><th>Output mt</th><th>OEE%</th></tr></thead><tbody>'+rows.map(r=>{const s=(r.Plant||r.plant||'').toUpperCase();const udt=gf(r,'Unscheduled Down Time, hr');const oee=gf(r,'OEE')*100;return '<tr><td>'+dot(s)+(SL[s]||s)+'</td><td>'+(r.MONTH||r.Month||r.month||'—')+'</td><td>'+fv(gf(r,'CALENDAR DA','Calendar Days'),0)+'</td><td>'+fv(gf(r,'ACTUAL COUNT','Actual Days'),0)+'</td><td>'+fv(gf(r,'Working Hours'),1)+'</td><td class="'+(udt>40?'tr':udt>20?'ta':'')+'">'+(udt>0?udt.toFixed(2):'—')+'</td><td>'+fv(gf(r,'Scheduled Down Time, hr'),2)+'</td><td>'+fv(gf(r,'Total Plant Output,mt w/o toll'),1)+'</td><td class="'+(oee>=85?'tg':oee>=70?'ta':oee>0?'tr':'')+'">'+(oee>0?oee.toFixed(1)+'%':'—')+'</td></tr>';}).join('')+'</tbody></table></div></div></div>';
 }
 
-// ── COST ──────────────────────────────────────────────────
-function renderCost() {
+// ── COST ─────────────────────────────────────────────────
+function renderCost(){
   const ct=document.getElementById('content-cost');
   if(!DATA.cost){ct.innerHTML='<div class="no-data">⟳ Loading...</div>';gasGet('cost').then(d=>{DATA.cost=d;renderCost();}).catch(e=>ct.innerHTML='<div class="no-data">Error: '+e.message+'</div>');return;}
   const rows=DATA.cost.rows||[];
-  ct.innerHTML=`<div class="sec"><div class="sec-hdr"><div class="sec-title">Cost — Week ${activeWeek}</div><div class="sec-line"></div></div>
-  <div class="cc"><div class="cc-title">Cost Breakdown</div><div class="tbl-wrap"><table>
-    <thead><tr><th>Site</th><th>Month</th><th>Volume mt</th><th>Rental</th><th>Spare Parts</th><th>Manpower</th><th>Diesel</th><th>Electricity</th><th>Agency</th><th>Others</th><th>Tolling</th><th>Total Cost</th><th>Cost/mt</th></tr></thead>
-    <tbody>${rows.map(r=>{
-      const s=(r.PLANT||r.Plant||r.plant||'').toUpperCase();
-      const vol=gf(r,'Volume, kg','volumeKg')/1000;
-      const tot=gf(r,'TOTAL COST','totalCost');
-      const cpt=vol>0?tot/vol:0;
-      return `<tr>
-        <td>${dot(s)}${SL[s]||s}</td>
-        <td>${r.MONTH||r.Month||'—'}</td>
-        <td>${vol>0?vol.toFixed(1):'—'}</td>
-        <td>${fKK(gf(r,'Rental/Amor kph','rental'))}</td>
-        <td>${fKK(gf(r,'Spare Parts. kph','spareParts'))}</td>
-        <td>${fKK(gf(r,'Manpower Direc','manpowerDirect'))}</td>
-        <td>${fKK(gf(r,'Diesel, kphp','diesel'))}</td>
-        <td>${fKK(gf(r,'Electricity Machi','electricity'))}</td>
-        <td>${fKK(gf(r,'Manpower Agen','manpowerAgency'))}</td>
-        <td>${fKK(gf(r,'Other, kphp','others'))}</td>
-        <td>${fKK(gf(r,'tollingFee'))}</td>
-        <td class="tg">${fKK(tot)}</td>
-        <td class="${cpt>2000?'tr':cpt>1500?'ta':'tg'}">₱${cpt>0?cpt.toFixed(0):'—'}</td>
-      </tr>`;
-    }).join('')||'<tr><td colspan="13" class="no-data">No cost data for Week '+activeWeek+'</td></tr>'}
-    </tbody></table></div></div></div>`;
+  ct.innerHTML='<div class="sec"><div class="sec-hdr"><div class="sec-title">Cost — Week '+activeWeek+'</div><div class="sec-line"></div></div><div class="cc"><div class="tbl-wrap"><table><thead><tr><th>Site</th><th>Month</th><th>Volume mt</th><th>Rental</th><th>Spare Parts</th><th>Manpower</th><th>Diesel</th><th>Electricity</th><th>Agency</th><th>Others</th><th>Tolling</th><th>Total Cost</th><th>Cost/mt</th></tr></thead><tbody>'+rows.map(r=>{const s=(r.PLANT||r.Plant||r.plant||'').toUpperCase();const vol=gf(r,'Volume, kg','volumeKg')/1000;const tot=gf(r,'TOTAL COST','totalCost');const cpt=vol>0?tot/vol:0;return '<tr><td>'+dot(s)+(SL[s]||s)+'</td><td>'+(r.MONTH||r.Month||'—')+'</td><td>'+(vol>0?vol.toFixed(1):'—')+'</td><td>'+fKK(gf(r,'Rental/Amor kph'))+'</td><td>'+fKK(gf(r,'Spare Parts. kph'))+'</td><td>'+fKK(gf(r,'Manpower Direc'))+'</td><td>'+fKK(gf(r,'Diesel, kphp'))+'</td><td>'+fKK(gf(r,'Electricity Machi'))+'</td><td>'+fKK(gf(r,'Manpower Agen'))+'</td><td>'+fKK(gf(r,'Other, kphp'))+'</td><td>'+fKK(gf(r,'tollingFee'))+'</td><td class="tg">'+fKK(tot)+'</td><td class="'+(cpt>2000?'tr':cpt>1500?'ta':'tg')+'">₱'+(cpt>0?cpt.toFixed(0):'—')+'</td></tr>';}).join('')+'</tbody></table></div></div>';
 }
 
-// ── DOWNTIME ──────────────────────────────────────────────
-function renderDowntime() {
+// ── DOWNTIME ─────────────────────────────────────────────
+function renderDowntime(){
   const ct=document.getElementById('content-downtime');
   if(!DATA.downtime){ct.innerHTML='<div class="no-data">⟳ Loading...</div>';gasGet('downtime').then(d=>{DATA.downtime=d;renderDowntime();}).catch(e=>ct.innerHTML='<div class="no-data">Error: '+e.message+'</div>');return;}
   const d=DATA.downtime;const rows=d.rows||[];const byReason=d.byReason||{};
   const reasons=Object.entries(byReason).sort((a,b)=>b[1]-a[1]);
   const totHrs=d.totals&&d.totals.total_hours||0;
-  ct.innerHTML=`<div class="sec"><div class="sec-hdr"><div class="sec-title">Downtime — Week ${activeWeek}</div><div class="sec-line"></div></div>
-  <div class="g4" style="margin-bottom:12px">
-    <div class="kc" style="--kc-color:var(--red)"><div class="kc-lbl">Total UDT Hours</div><div class="kc-val" style="color:var(--red)">${totHrs>0?totHrs.toFixed(1):'—'}<span style="font-size:12px;color:var(--text2)"> hr</span></div></div>
-    <div class="kc" style="--kc-color:var(--amber)"><div class="kc-lbl">Top Category</div><div class="kc-val" style="font-size:16px">${reasons[0]?reasons[0][0]:'—'}</div><div class="kc-sub">${reasons[0]?reasons[0][1].toFixed(1)+' hr':''}</div></div>
-    <div class="kc" style="--kc-color:var(--blue)"><div class="kc-lbl">Records</div><div class="kc-val">${rows.length}</div><div class="kc-sub">downtime entries</div></div>
-    <div class="kc" style="--kc-color:var(--purple)"><div class="kc-lbl">Sites Affected</div><div class="kc-val">${new Set(rows.map(r=>r.Plant||r.plant||'')).size}</div></div>
-  </div>
-  <div class="g2">
-    <div class="cc"><div class="cc-title">By Category (hours)</div>
-      ${reasons.slice(0,10).map(([reason,hrs])=>{const max=reasons[0]?reasons[0][1]:1;return `<div class="mbar-row"><div class="mbar-lbl" title="${reason}">${reason.slice(0,18)}</div><div class="mbar-bg"><div class="mbar-fill" style="width:${(hrs/max*100).toFixed(0)}%;background:var(--red)"></div></div><div class="mbar-val">${hrs.toFixed(1)}h</div></div>`;}).join('')||'<div class="no-data">No downtime</div>'}
-    </div>
-    <div class="cc"><div class="cc-title">Detail Records (top 30)</div><div class="tbl-wrap"><table>
-      <thead><tr><th style="text-align:left">Plant</th><th style="text-align:left">Category</th><th style="text-align:left">Sub-Cat</th><th>UDT hr</th></tr></thead>
-      <tbody>${rows.slice(0,30).map(r=>{
-        const s=(r.Plant||r.plant||'').toUpperCase();
-        const cat=r.Category||r.category||r['Machine Line']||'';
-        const hrs=gf(r,'Unscheduled Down Time, hr','udtHours','Hours');
-        return `<tr><td>${dot(s)}${s}</td><td><span class="cat-pill ${catCls(cat)}">${cat||'—'}</span></td><td style="text-align:left;color:var(--text3);font-size:10px">${r['Sub-Category']||r.subCategory||'—'}</td><td class="tr">${hrs>0?hrs.toFixed(2):'—'}</td></tr>`;
-      }).join('')||'<tr><td colspan="4" class="no-data">No records</td></tr>'}</tbody>
-    </table></div></div>
-  </div></div>`;
+  ct.innerHTML='<div class="sec"><div class="sec-hdr"><div class="sec-title">Downtime — Week '+activeWeek+'</div><div class="sec-line"></div></div><div class="g4" style="margin-bottom:12px"><div class="kc" style="--kc-color:var(--red)"><div class="kc-lbl">Total UDT Hours</div><div class="kc-val" style="color:var(--red)">'+(totHrs>0?totHrs.toFixed(1):'—')+'<span style="font-size:12px;color:var(--text2)"> hr</span></div></div><div class="kc" style="--kc-color:var(--amber)"><div class="kc-lbl">Top Category</div><div class="kc-val" style="font-size:16px">'+(reasons[0]?reasons[0][0]:'—')+'</div><div class="kc-sub">'+(reasons[0]?reasons[0][1].toFixed(1)+' hr':'')+'</div></div><div class="kc" style="--kc-color:var(--blue)"><div class="kc-lbl">Records</div><div class="kc-val">'+rows.length+'</div></div><div class="kc" style="--kc-color:var(--purple)"><div class="kc-lbl">Sites Affected</div><div class="kc-val">'+new Set(rows.map(r=>r.Plant||r.plant||'')).size+'</div></div></div><div class="g2"><div class="cc"><div class="cc-title">By Category</div>'+reasons.slice(0,10).map(([reason,hrs])=>{const max=reasons[0]?reasons[0][1]:1;return '<div class="mbar-row"><div class="mbar-lbl" title="'+reason+'">'+reason.slice(0,18)+'</div><div class="mbar-bg"><div class="mbar-fill" style="width:'+(hrs/max*100).toFixed(0)+'%;background:var(--red)"></div></div><div class="mbar-val">'+hrs.toFixed(1)+'h</div></div>';}).join('')+'</div><div class="cc"><div class="cc-title">Detail Records</div><div class="tbl-wrap"><table><thead><tr><th style="text-align:left">Plant</th><th style="text-align:left">Category</th><th style="text-align:left">Sub-Cat</th><th>UDT hr</th></tr></thead><tbody>'+rows.slice(0,30).map(r=>{const s=(r.Plant||r.plant||'').toUpperCase();const cat=r.Category||r.category||'';const hrs=gf(r,'Unscheduled Down Time, hr');return '<tr><td>'+dot(s)+s+'</td><td><span class="cat-pill '+(DT_CATS[cat]||'cat-other')+'">'+(cat||'—')+'</span></td><td style="text-align:left;color:var(--text3);font-size:10px">'+(r['Sub-Category']||r.subCategory||'—')+'</td><td class="tr">'+(hrs>0?hrs.toFixed(2):'—')+'</td></tr>';}).join('')+'</tbody></table></div></div></div></div>';
 }
 
-// ── PRODUCTION ────────────────────────────────────────────
-function renderProduction() {
+// ── PRODUCTION ───────────────────────────────────────────
+function renderProduction(){
   const ct=document.getElementById('content-production');
   if(!DATA.production){ct.innerHTML='<div class="no-data">⟳ Loading...</div>';gasGet('production').then(d=>{DATA.production=d;renderProduction();}).catch(e=>ct.innerHTML='<div class="no-data">Error: '+e.message+'</div>');return;}
   const d=DATA.production;const rows=d.weekly||d.rows||[];
-  ct.innerHTML=`<div class="sec"><div class="sec-hdr"><div class="sec-title">Production — Week ${activeWeek}</div><div class="sec-line"></div></div>
-  <div class="g3" style="margin-bottom:12px">
-    <div class="kc" style="--kc-color:var(--green)"><div class="kc-lbl">Total Output</div><div class="kc-val" style="color:var(--green-b)">${fv(d.totals&&d.totals.total_production||0,1)}<span style="font-size:12px;color:var(--text2)"> mt</span></div></div>
-    <div class="kc" style="--kc-color:var(--blue)"><div class="kc-lbl">Target</div><div class="kc-val" style="font-size:20px">${fv(d.totals&&d.totals.target_production||0,1)}<span style="font-size:12px;color:var(--text2)"> mt</span></div></div>
-    <div class="kc" style="--kc-color:var(--amber)"><div class="kc-lbl">vs Target</div><div class="kc-val">${d.totals&&d.totals.actual_vs_target?d.totals.actual_vs_target+'%':'—'}</div></div>
-  </div>
-  <div class="cc"><div class="cc-title">Production Detail</div><div class="tbl-wrap"><table>
-    <thead><tr><th>Site</th><th>Output mt</th><th>Plan mt</th><th>Plan%</th><th>Run Rate t/hr</th><th>Pellet mt</th><th>Crumble mt</th><th>Mash mt</th><th>Mixgrain mt</th></tr></thead>
-    <tbody>${rows.map(r=>{
-      const s=(r.Plant||r.plant||'').toUpperCase();
-      const out=gf(r,'Total Plant Output,mt w/o toll','Total Plant Output, mt w/o toll','output');
-      const plan=gf(r,'Planned, mt','Planned','Total Mash Input','plan','Total Plant Input, mt');
-      const p2=plan>0?(out/plan*100):0;
-      return `<tr>
-        <td>${dot(s)}${SL[s]||s}</td>
-        <td class="${p2>=100?'tg':p2>=85?'ta':'tr'}">${out>0?out.toFixed(1):'—'}</td>
-        <td>${plan>0?plan.toFixed(1):'—'}</td>
-        <td class="${p2>=100?'tg':p2>=85?'ta':'tr'}">${p2>0?p2.toFixed(1)+'%':'—'}</td>
-        <td>${fv(gf(r,'Run Rate, ton/hr (net of DT)','Plant Run Rate, Ton/hr'),2)}</td>
-        <td>${fv(gf(r,'Pellet Volume, mt','Pellet'),2)}</td>
-        <td>${fv(gf(r,'Crumble Volume, mt','Crumble'),2)}</td>
-        <td>${fv(gf(r,'Mash,mt','Mash'),2)}</td>
-        <td>${fv(gf(r,'Mixgrain'),2)}</td>
-      </tr>`;
-    }).join('')||'<tr><td colspan="9" class="no-data">No production data</td></tr>'}</tbody>
-  </table></div></div></div>`;
+  ct.innerHTML='<div class="sec"><div class="sec-hdr"><div class="sec-title">Production — Week '+activeWeek+'</div><div class="sec-line"></div></div><div class="cc"><div class="tbl-wrap"><table><thead><tr><th>Site</th><th>Output mt</th><th>Plan mt</th><th>Plan%</th><th>Run Rate t/hr</th><th>Pellet mt</th><th>Crumble mt</th><th>Mash mt</th></tr></thead><tbody>'+rows.map(r=>{const s=(r.Plant||r.plant||'').toUpperCase();const out=gf(r,'Total Plant Output,mt w/o toll');const plan=gf(r,'Planned, mt','Total Plant Input, mt');const p2=plan>0?(out/plan*100):0;return '<tr><td>'+dot(s)+(SL[s]||s)+'</td><td class="'+(p2>=100?'tg':p2>=85?'ta':'tr')+'">'+(out>0?out.toFixed(1):'—')+'</td><td>'+(plan>0?plan.toFixed(1):'—')+'</td><td class="'+(p2>=100?'tg':p2>=85?'ta':'tr')+'">'+(p2>0?p2.toFixed(1)+'%':'—')+'</td><td>'+fv(gf(r,'Run Rate, ton/hr (net of DT)'),2)+'</td><td>'+fv(gf(r,'Pellet Volume, mt'),1)+'</td><td>'+fv(gf(r,'Crumble Volume, mt'),1)+'</td><td>'+fv(gf(r,'Mash,mt'),1)+'</td></tr>';}).join('')+'</tbody></table></div></div>';
 }
 
-// ── OEE ───────────────────────────────────────────────────
-function renderOEE() {
+// ── OEE ──────────────────────────────────────────────────
+function renderOEE(){
   const ct=document.getElementById('content-oee');
   if(!DATA.oee){ct.innerHTML='<div class="no-data">⟳ Loading...</div>';gasGet('oee').then(d=>{DATA.oee=d;renderOEE();}).catch(e=>ct.innerHTML='<div class="no-data">Error: '+e.message+'</div>');return;}
   const d=DATA.oee;const rows=d.rows||[];const bySite=d.bySite||{};
-  const avgOEE=parseFloat(d.totals&&d.totals.avg_oee||0);
+  const avgOEE=parseFloat(d.totals&&d.totals.avg_oee||0)*100;
   const oC=avgOEE>=85?'var(--green-b)':avgOEE>=70?'var(--amber)':'var(--red)';
-  ct.innerHTML=`<div class="sec"><div class="sec-hdr"><div class="sec-title">OEE — Week ${activeWeek}</div><div class="sec-line"></div></div>
-  <div class="g4" style="margin-bottom:12px">
-    <div class="kc" style="--kc-color:${oC}"><div class="kc-lbl">Avg OEE</div><div class="kc-val" style="color:${oC}">${avgOEE>0?avgOEE.toFixed(1):'—'}<span style="font-size:12px;color:var(--text2)">%</span></div><span class="bdg ${avgOEE>=85?'g':avgOEE>=70?'a':avgOEE>0?'r':'b'}">${avgOEE>=85?'World Class':avgOEE>=70?'Acceptable':avgOEE>0?'Needs Attn':'N/A'}</span></div>
-    <div class="kc" style="--kc-color:var(--blue)"><div class="kc-lbl">Availability</div><div class="kc-val">${fv(parseFloat(d.totals&&d.totals.availability||0),1)}<span style="font-size:12px;color:var(--text2)">%</span></div></div>
-    <div class="kc" style="--kc-color:var(--teal)"><div class="kc-lbl">Performance</div><div class="kc-val">${fv(parseFloat(d.totals&&d.totals.performance||0),1)}<span style="font-size:12px;color:var(--text2)">%</span></div></div>
-    <div class="kc" style="--kc-color:var(--green)"><div class="kc-lbl">Quality Rate</div><div class="kc-val">${fv(parseFloat(d.totals&&d.totals.quality_rate||0),1)}<span style="font-size:12px;color:var(--text2)">%</span></div></div>
-  </div>
-  ${Object.keys(bySite).length?`<div class="cc" style="margin-bottom:10px"><div class="cc-title">OEE by Site</div>
-    ${Object.entries(bySite).map(([s,v])=>{const pv=parseFloat(v);return `<div class="mbar-row"><div class="mbar-lbl">${s}</div><div class="mbar-bg"><div class="mbar-fill" style="width:${clamp(pv,0,100).toFixed(0)}%;background:${pv>=85?'var(--green-b)':pv>=70?'var(--amber)':'var(--red)'}"></div></div><div class="mbar-val" style="color:${pv>=85?'var(--green-b)':pv>=70?'var(--amber)':'var(--red)'}">${pv>0?pv.toFixed(1)+'%':'—'}</div></div>`;}).join('')}
-  </div>`:''}
-  <div class="cc"><div class="cc-title">OEE Detail by Site</div><div class="tbl-wrap"><table>
-    <thead><tr><th>Site</th><th>OEE%</th><th>Availability%</th><th>Performance%</th><th>Quality%</th><th>Output mt</th><th>Adj Capacity</th></tr></thead>
-    <tbody>${rows.map(r=>{
-      const s=(r.Plant||r.plant||'').toUpperCase();
-      const _roee=gf(r,'OEE','oee');const oee=_roee>0&&_roee<=1?_roee*100:_roee;
-      const av=oeeNorm(gf(r,'AVAILABIILITY','AVAILABILITY','availability'));
-      const pf=oeeNorm(gf(r,'PERFORMANCE','performance'));
-      const ql=oeeNorm(gf(r,'QUALITY','quality'));
-      const out=gf(r,'Total Plant Output,mt w/o toll','output');
-      const adjCap=gf(r,'ADJ CAPACITY');
-      return `<tr>
-        <td>${dot(s)}${SL[s]||s}</td>
-        <td class="${oee>=85?'tg':oee>=70?'ta':oee>0?'tr':''}">${oee>0?oee.toFixed(1)+'%':'—'}</td>
-        <td class="${av>=90?'tg':av>=75?'ta':av>0?'tr':''}">${av>0?av.toFixed(1)+'%':'—'}</td>
-        <td class="${pf>=90?'tg':pf>=75?'ta':pf>0?'tr':''}">${pf>0?pf.toFixed(1)+'%':'—'}</td>
-        <td class="${ql>=98?'tg':ql>=95?'ta':ql>0?'tr':''}">${ql>0?ql.toFixed(1)+'%':'—'}</td>
-        <td>${out>0?out.toFixed(1):'—'}</td>
-        <td>${adjCap>0?adjCap.toFixed(1):'—'}</td>
-      </tr>`;
-    }).join('')||'<tr><td colspan="7" class="no-data">No OEE data</td></tr>'}</tbody>
-  </table></div></div></div>`;
+  ct.innerHTML='<div class="sec"><div class="sec-hdr"><div class="sec-title">OEE — Week '+activeWeek+'</div><div class="sec-line"></div></div><div class="g4" style="margin-bottom:12px"><div class="kc" style="--kc-color:'+oC+'"><div class="kc-lbl">Avg OEE</div><div class="kc-val" style="color:'+oC+'">'+(avgOEE>0?avgOEE.toFixed(1):'—')+'<span style="font-size:12px;color:var(--text2)">%</span></div></div></div><div class="cc"><div class="tbl-wrap"><table><thead><tr><th>Site</th><th>OEE%</th><th>Availability%</th><th>Performance%</th><th>Quality%</th><th>Output mt</th></tr></thead><tbody>'+rows.map(r=>{const s=(r.Plant||r.plant||'').toUpperCase();const oee=gf(r,'OEE')*100;const av=gf(r,'AVAILABIILITY','AVAILABILITY')*100;const pf=gf(r,'PERFORMANCE')*100;const ql=gf(r,'QUALITY')*100;const out=gf(r,'Total Plant Output,mt w/o toll');return '<tr><td>'+dot(s)+(SL[s]||s)+'</td><td class="'+(oee>=85?'tg':oee>=70?'ta':oee>0?'tr':'')+'">'+(oee>0?oee.toFixed(1)+'%':'—')+'</td><td>'+(av>0?av.toFixed(1)+'%':'—')+'</td><td>'+(pf>0?pf.toFixed(1)+'%':'—')+'</td><td>'+(ql>0?ql.toFixed(1)+'%':'—')+'</td><td>'+(out>0?out.toFixed(1):'—')+'</td></tr>';}).join('')+'</tbody></table></div></div>';
 }
 
-// ── COST ANALYTICS ────────────────────────────────────────
-function renderCostAnalytics() {
+// ── COST ANALYTICS ───────────────────────────────────────
+function renderCostAnalytics(){
   const ct=document.getElementById('content-cost_analytics');
   if(!DATA.cost_analytics){ct.innerHTML='<div class="no-data">⟳ Loading...</div>';gasGet('cost_analytics').then(d=>{DATA.cost_analytics=d;renderCostAnalytics();}).catch(e=>ct.innerHTML='<div class="no-data">Error: '+e.message+'</div>');return;}
   const d=DATA.cost_analytics;const rows=d.pc_daily||d.rows||[];
-  ct.innerHTML=`<div class="sec"><div class="sec-hdr"><div class="sec-title">Cost Analytics (PC Daily)</div><div class="sec-line"></div></div>
-  <div class="g4" style="margin-bottom:12px">
-    <div class="kc" style="--kc-color:var(--green)"><div class="kc-lbl">Total MCOS</div><div class="kc-val" style="font-size:20px;color:var(--green-b)">${fKK(d.totals&&d.totals.total_cost||0)}</div></div>
-    <div class="kc" style="--kc-color:var(--amber)"><div class="kc-lbl">Variable Cost</div><div class="kc-val" style="font-size:20px;color:var(--amber)">${fKK(d.totals&&d.totals.feed_cost||0)}</div></div>
-    <div class="kc" style="--kc-color:var(--purple)"><div class="kc-lbl">Fixed Cost</div><div class="kc-val" style="font-size:20px;color:var(--purple)">${fKK(d.totals&&d.totals.labor_cost||0)}</div></div>
-    <div class="kc" style="--kc-color:var(--blue)"><div class="kc-lbl">Records</div><div class="kc-val">${rows.length}</div><div class="kc-sub">PC Daily entries</div></div>
-  </div>
-  <div class="cc"><div class="cc-title">PC Daily — Cost Detail</div><div class="tbl-wrap"><table>
-    <thead><tr><th>Plant</th><th>Date</th><th>Week</th><th>Volume mt</th><th>Pellet mt</th><th>Variable Cost</th><th>Fixed Cost</th><th>MCOS Php</th><th>MCOS/Ton</th></tr></thead>
-    <tbody>${rows.slice(0,60).map(r=>{
-      const s=(r.PLANT||r.Plant||r.plant||'').toUpperCase();
-      const vol=gf(r,'Volume,MT','TOTAL VOLUME','totalVolume');
-      const mcos=gf(r,'MCOS (Php)','mcos');
-      return `<tr>
-        <td>${dot(s)}${SL[s]||s}</td>
-        <td style="text-align:left">${r.DATE||r.Date||r.date||'—'}</td>
-        <td>${r.WEEK||r.Week||r.week||'—'}</td>
-        <td>${vol>0?vol.toFixed(2):'—'}</td>
-        <td>${fv(gf(r,'PELLET VOLUME','pelletVolume'),2)}</td>
-        <td>${fKK(gf(r,'Variable Cost (P','variableCost'))}</td>
-        <td>${fKK(gf(r,'Fixed Cost (Php','fixedCost'))}</td>
-        <td class="${mcos>200000?'tr':''}">${fKK(mcos)}</td>
-        <td>${fv(gf(r,'MCOS / Ton','mcosPerTon'),2)}</td>
-      </tr>`;
-    }).join('')||'<tr><td colspan="9" class="no-data">No cost analytics data</td></tr>'}</tbody>
-  </table></div></div></div>`;
+  ct.innerHTML='<div class="sec"><div class="sec-hdr"><div class="sec-title">Cost Analytics (PC Daily)</div><div class="sec-line"></div></div><div class="cc"><div class="tbl-wrap"><table><thead><tr><th>Plant</th><th>Date</th><th>Week</th><th>Volume mt</th><th>Variable Cost</th><th>Fixed Cost</th><th>MCOS Php</th><th>MCOS/Ton</th></tr></thead><tbody>'+rows.slice(0,60).map(r=>{const s=(r.PLANT||r.Plant||r.plant||'').toUpperCase();const vol=gf(r,'Volume,MT','TOTAL VOLUME');const mcos=gf(r,'MCOS (Php)');return '<tr><td>'+dot(s)+(SL[s]||s)+'</td><td style="text-align:left">'+(r.DATE||r.Date||r.date||'—')+'</td><td>'+(r.WEEK||r.Week||r.week||'—')+'</td><td>'+(vol>0?vol.toFixed(2):'—')+'</td><td>'+fKK(gf(r,'Variable Cost (P'))+'</td><td>'+fKK(gf(r,'Fixed Cost (Php'))+'</td><td>'+fKK(mcos)+'</td><td>'+fv(gf(r,'MCOS / Ton'),2)+'</td></tr>';}).join('')+'</tbody></table></div></div>';
 }
 
-// ── QUALITY & ENERGY ──────────────────────────────────────
-function renderQualityEnergy() {
+// ── QUALITY & ENERGY ─────────────────────────────────────
+function renderQualityEnergy(){
   const ct=document.getElementById('content-quality_energy');
   if(!DATA.quality_energy){ct.innerHTML='<div class="no-data">⟳ Loading...</div>';gasGet('quality_energy').then(d=>{DATA.quality_energy=d;renderQualityEnergy();}).catch(e=>ct.innerHTML='<div class="no-data">Error: '+e.message+'</div>');return;}
   const d=DATA.quality_energy;const rows=d.rows||[];
-  ct.innerHTML=`<div class="sec"><div class="sec-hdr"><div class="sec-title">Quality &amp; Energy (MCOS Daily) — Week ${activeWeek}</div><div class="sec-line"></div></div>
-  <div class="g4" style="margin-bottom:12px">
-    <div class="kc" style="--kc-color:var(--purple)"><div class="kc-lbl">Records</div><div class="kc-val">${rows.length}</div><div class="kc-sub">MCOS daily entries</div></div>
-    <div class="kc" style="--kc-color:var(--green)"><div class="kc-lbl">Avg MCOS/Ton</div><div class="kc-val" style="color:var(--green-b)">${fv(d.totals&&d.totals.mcos||0,2)}</div></div>
-    <div class="kc" style="--kc-color:var(--amber)"><div class="kc-lbl">Total Variable Cost</div><div class="kc-val" style="font-size:20px;color:var(--amber)">${fKK(d.totals&&d.totals.energy_cost||0)}</div></div>
-    <div class="kc" style="--kc-color:var(--blue)"><div class="kc-lbl">Total Volume mt</div><div class="kc-val" style="font-size:20px">${fv(rows.reduce((a,r)=>a+gf(r,'Volume,MT'),0),1)}</div></div>
-  </div>
-  <div class="cc"><div class="cc-title">MCOS Daily Detail</div><div class="tbl-wrap"><table>
-    <thead><tr><th>Plant</th><th>Date</th><th>Week</th><th>Volume mt</th><th>Variable Cost</th><th>Fixed Cost</th><th>MCOS Php</th><th>MCOS/Ton</th><th>Rolls &amp; Die</th></tr></thead>
-    <tbody>${rows.slice(0,60).map(r=>{
-      const s=(r.PLANT||r.Plant||r.plant||'').toUpperCase();
-      const vol=gf(r,'Volume,MT','volume');
-      const mcos=gf(r,'MCOS (Php)','mcos');
-      return `<tr>
-        <td>${dot(s)}${SL[s]||s}</td>
-        <td style="text-align:left">${r.DATE||r.Date||r.date||'—'}</td>
-        <td>${r.WEEK||r.Week||r.week||'—'}</td>
-        <td>${vol>0?vol.toFixed(2):'—'}</td>
-        <td>${fKK(gf(r,'Variable Cost (P','variableCost'))}</td>
-        <td>${fKK(gf(r,'Fixed Cost (Php','fixedCost'))}</td>
-        <td>${fKK(mcos)}</td>
-        <td>${fv(gf(r,'MCOS / Ton','mcosPerTon'),2)}</td>
-        <td>${fv(gf(r,'Rolls & Die','rollsDie'),2)}</td>
-      </tr>`;
-    }).join('')||'<tr><td colspan="9" class="no-data">No MCOS data</td></tr>'}</tbody>
-  </table></div></div></div>`;
+  ct.innerHTML='<div class="sec"><div class="sec-hdr"><div class="sec-title">Quality &amp; Energy (MCOS Daily) — Week '+activeWeek+'</div><div class="sec-line"></div></div><div class="cc"><div class="tbl-wrap"><table><thead><tr><th>Plant</th><th>Date</th><th>Week</th><th>Volume mt</th><th>Variable Cost</th><th>Fixed Cost</th><th>MCOS Php</th><th>MCOS/Ton</th></tr></thead><tbody>'+rows.slice(0,60).map(r=>{const s=(r.PLANT||r.Plant||r.plant||'').toUpperCase();const vol=gf(r,'Volume,MT','volume');const mcos=gf(r,'MCOS (Php)');return '<tr><td>'+dot(s)+(SL[s]||s)+'</td><td style="text-align:left">'+(r.DATE||r.Date||r.date||'—')+'</td><td>'+(r.WEEK||r.Week||r.week||'—')+'</td><td>'+(vol>0?vol.toFixed(2):'—')+'</td><td>'+fKK(gf(r,'Variable Cost (P'))+'</td><td>'+fKK(gf(r,'Fixed Cost (Php'))+'</td><td>'+fKK(mcos)+'</td><td>'+fv(gf(r,'MCOS / Ton'),2)+'</td></tr>';}).join('')+'</tbody></table></div></div>';
 }
 
 // ── START ─────────────────────────────────────────────────
