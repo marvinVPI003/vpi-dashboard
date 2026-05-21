@@ -380,7 +380,7 @@ function render() {
     }).join('')}
     </div></div>` : '';
 
-  ct.innerHTML = scorecard + `
+  ct.innerHTML = `<div id="_debug_panel" style="background:#1a1a2e;border:1px solid var(--amber);border-radius:6px;padding:12px;margin:12px 20px;font-family:'DM Mono',monospace;font-size:10px;color:var(--text2);line-height:1.8">Loading debug info...</div>` + scorecard + `
 <div class="sec">
   <div class="sec-hdr"><div class="sec-title">${SL[activeSite]} · Week ${activeWeek}</div><div class="sec-line"></div></div>
   <div class="g5">
