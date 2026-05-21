@@ -1172,6 +1172,36 @@ function renderQualityEnergy(){
 }
 
 // ── START ─────────────────────────────────────────────────
+// Safety net: force hide loading after 20s no matter what
+setTimeout(function(){
+  var el = document.getElementById('loading');
+  if(el && el.style.display !== 'none'){
+    el.innerHTML = '<div style="font-size:20px;color:var(--red)">✕ Load Timeout</div>' +
+      '<div style="font-size:11px;color:var(--text2);font-family:DM Mono,monospace;margin:8px;text-align:center">GAS is not responding via JSONP.<br>Try opening in a different browser.</div>' +
+      '<button class="retry-btn" onclick="location.reload()">⟳ Reload</button>' +
+      '<button class="retry-btn" style="margin-left:8px;border-color:var(--blue);color:var(--blue)" onclick="forceLoad()">⚡ Force Load</button>';
+  }
+}, 20000);
+
+// Force load without JSONP - use iframe approach
+function forceLoad(){
+  var el = document.getElementById('loading');
+  if(el) el.innerHTML = '<div style="color:var(--amber);font-family:DM Mono,monospace">Trying alternate method...</div>';
+  // Try fetching directly (works if browser allows)
+  fetch(GAS + '?tab=weekly&site=National&week=0')
+    .then(r=>r.json())
+    .then(d=>{
+      DATA.weekly=d;
+      var weeks=(d.weeks||[]).map(w=>+w).filter(w=>w>0).sort((a,b)=>a-b);
+      activeWeek=weeks[weeks.length-1]||21;
+      if(el) el.style.display='none';
+      buildNav(); render(); scheduleRefresh();
+    })
+    .catch(e=>{
+      if(el) el.innerHTML='<div style="color:var(--red);font-family:DM Mono,monospace">Both methods failed.<br>'+e.message+'<br><br>Please check your network.</div>';
+    });
+}
+
 loadData(false);
 </script>
 </body>
