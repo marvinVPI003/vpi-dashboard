@@ -491,7 +491,11 @@ function render() {
       'CapUtil(CQ): <b style="color:#fff">'+r0['Capacity Utilization Rate,%']+'</b> | '+
       'UDT(H): <b style="color:#fff">'+r0['Unscheduled Down Time, hr']+'</b> | '+
       'SDT(G): <b style="color:#fff">'+r0['Scheduled Down Time, hr']+'</b> | '+
+      'SDT alt1: <b style="color:#fff">'+r0['Scheduled Down Time, %']+'</b> | '+
+      'WrkHrs: <b style="color:#fff">'+r0['Working Hours']+'</b> | '+
       'PDR(BG): <b style="color:#fff">'+r0['Plant Daily Pelleting Rate,ton/day']+'</b><br>'+
+      'All keys: <b style="color:#888">'+Object.keys(r0).slice(0,15).join(' | ')+'</b><br>'+
+      'Keys 15-30: <b style="color:#888">'+Object.keys(r0).slice(15,30).join(' | ')+'</b><br>'+
       '<span style="color:#3fb950">AC Breakdown →</span> '+
       'CF(AP): <b style="color:#388bfd">'+r0['Total Plant Output EXC MIXGRAIN & VIETOP']+'</b> | '+
       'MG(AR): <b style="color:#a371f7">'+r0['Mixgrain']+'</b> | '+
