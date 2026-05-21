@@ -489,17 +489,17 @@ function render() {
     <div class="kc" style="--kc-color:var(--purple)">
       <div class="kc-lbl">Power</div>
       <div class="kc-val" style="font-size:22px;color:var(--purple)">${fv(kpiRows.reduce((a,r)=>a+gf(r,'kWh/ton'),0)/Math.max(kpiRows.length,1),2)}<span style="font-size:12px;color:var(--text2)"> kWh/t</span></div>
-      <div class="kc-sub">Electricity per ton (BV)</div>
+      <div class="kc-sub">Electricity per ton</div>
     </div>
     <div class="kc" style="--kc-color:var(--amber)">
       <div class="kc-lbl">Fuel</div>
       <div class="kc-val" style="font-size:22px;color:var(--amber)">${fv(kpiRows.reduce((a,r)=>a+gf(r,'Li/ton'),0)/Math.max(kpiRows.length,1),2)}<span style="font-size:12px;color:var(--text2)"> L/t</span></div>
-      <div class="kc-sub">Diesel per ton (BX)</div>
+      <div class="kc-sub">Diesel per ton</div>
     </div>
     <div class="kc" style="--kc-color:var(--text3)">
       <div class="kc-lbl">Coal</div>
       <div class="kc-val" style="font-size:22px">${(()=>{const v=kpiRows.reduce((a,r)=>a+gf(r,'kg/ton'),0)/Math.max(kpiRows.length,1);return v>0?fv(v,2):'—';})()} <span style="font-size:12px;color:var(--text2)">${kpiRows.some(r=>gf(r,'kg/ton')>0)?'kg/t':''}</span></div>
-      <div class="kc-sub">Coal per ton (BZ)</div>
+      <div class="kc-sub">Coal per ton</div>
     </div>
     <div class="kc" style="--kc-color:${(()=>{const v=kpiRows.reduce((a,r)=>a+gf(r,'RM Variance, %'),0)/Math.max(kpiRows.length,1)*100;return v<0?'var(--red)':v>0?'var(--green)':'var(--border2)';})()}">
       <div class="kc-lbl">RM Variance</div>
@@ -509,7 +509,7 @@ function render() {
         const c=v<0?'var(--red)':v>0?'var(--green-b)':'var(--text2)';
         return '<div class="kc-val" style="font-size:22px;color:'+c+'">'+(v>=0?'+':'')+fv(v,3)+'<span style="font-size:12px;color:var(--text2)">%</span></div>';
       })()}
-      <div class="kc-sub">RM Variance % (CE)</div>
+      <div class="kc-sub">RM Variance %</div>
       <span class="bdg ${(()=>{const v=kpiRows.reduce((a,r)=>a+gf(r,'RM Variance, %'),0)/Math.max(kpiRows.length,1)*100;return v<0?'r':v>0?'g':'b';})()}">${(()=>{const v=kpiRows.reduce((a,r)=>a+gf(r,'RM Variance, %'),0)/Math.max(kpiRows.length,1)*100;return v<0?'Under':'Over';})()}</span>
     </div>
     <div class="kc" style="--kc-color:${(()=>{const v=kpiRows.reduce((a,r)=>a+gf(r,'RM Variance (w/o used sacks), %'),0)/Math.max(kpiRows.length,1)*100;return v<0?'var(--red)':v>0?'var(--green)':'var(--border2)';})()}">
@@ -520,7 +520,7 @@ function render() {
         const c=v<0?'var(--red)':v>0?'var(--green-b)':'var(--text2)';
         return '<div class="kc-val" style="font-size:22px;color:'+c+'">'+(v>=0?'+':'')+fv(v,3)+'<span style="font-size:12px;color:var(--text2)">%</span></div>';
       })()}
-      <div class="kc-sub">RM Var w/o Sacks % (CL)</div>
+      <div class="kc-sub">RM Var w/o Sacks %</div>
     </div>
   </div>
 </div>
