@@ -547,19 +547,37 @@ function render() {
     gasGet('daily_detail',{site:activeSite,week:activeWeek}).then(d=>{
       const drows=d.rows||[];
       if(!wrap)return;
-      if(!drows.length){wrap.innerHTML='<div class="no-data">No daily data found for '+SL[activeSite]+' Week '+activeWeek+'</div>';return;}
+      if(!drows.length){
+        wrap.innerHTML='<div class="no-data">No daily data found for '+SL[activeSite]+' Week '+activeWeek+
+          '<br><small style="color:var(--text3)">Check that GAS was redeployed with new code</small></div>';
+        return;
+      }
+      // Show first row keys for debugging
+      const keys=Object.keys(drows[0]);
+      // MR Daily field names — try multiple variants
+      const getOut=r=>gf(r,'Total Plant Output,mt w/o toll','Total Plant Output, mt w/o toll','Pellet Volume, mt');
+      const getSdt=r=>gf(r,'Scheduled Down Time, hr','Scheduled Dowr','Scheduled Operating Time, hr');
+      const getUdt=r=>gf(r,'Unscheduled Down Time, hr','Unscheduled Dc');
+      const getKwh=r=>gf(r,'kWh/ton','KWH/ton','kwh/ton');
+      const getFuel=r=>gf(r,'Li/ton','li/ton','Fuel L/ton');
+      const getCoal=r=>gf(r,'kg/ton','Coal kg/ton');
+
       wrap.innerHTML='<div class="tbl-wrap"><table>'+
-        '<thead><tr><th>Date</th><th>Output mt</th><th>SDT Hr</th><th>UDT Hr</th><th>kWh/ton</th><th>Fuel L/ton</th><th>Coal kg/ton</th></tr></thead>'+
+        '<thead><tr>'+
+          '<th style="text-align:left">Date</th>'+
+          '<th>Output mt</th><th>SDT Hr</th><th>UDT Hr</th>'+
+          '<th>kWh/ton</th><th>Fuel L/ton</th><th>Coal kg/ton</th>'+
+        '</tr></thead>'+
         '<tbody>'+drows.map(r=>{
           const date=r['Date']||r['date']||'—';
-          const out=gf(r,'Total Plant Output,mt w/o toll')||gf(r,'Total Production')||gf(r,'output')||0;
-          const sdt=gf(r,'Scheduled Operating Time, hr')||gf(r,'Scheduled Down Time, hr')||0;
-          const udt=gf(r,'Unscheduled Down Time, hr')||gf(r,'Unscheduled Dc')||0;
-          const kwh=gf(r,'kWh/ton')||0;
-          const fuel=gf(r,'Li/ton')||0;
-          const coal=gf(r,'kg/ton')||0;
+          const out=getOut(r);
+          const sdt=getSdt(r);
+          const udt=getUdt(r);
+          const kwh=getKwh(r);
+          const fuel=getFuel(r);
+          const coal=getCoal(r);
           return '<tr>'+
-            '<td style="text-align:left;color:var(--text2)">'+date+'</td>'+
+            '<td style="text-align:left;font-family:Barlow,sans-serif;color:var(--text)">'+date+'</td>'+
             '<td>'+(out>0?out.toFixed(2):'—')+'</td>'+
             '<td>'+(sdt>0?sdt.toFixed(2):'—')+'</td>'+
             '<td class="'+(udt>8?'tr':udt>4?'ta':'')+'">'+(udt>0?udt.toFixed(2):'—')+'</td>'+
@@ -568,8 +586,14 @@ function render() {
             '<td>'+(coal>0?coal.toFixed(2):'—')+'</td>'+
             '</tr>';
         }).join('')+
-        '</tbody></table></div>';
-    }).catch(e=>{if(wrap)wrap.innerHTML='<div class="no-data">Error loading daily data: '+e.message+'</div>';});
+        '</tbody></table>'+
+        '<div style="font-size:9px;color:var(--text3);margin-top:6px;font-family:DM Mono,monospace">'+
+          drows.length+' daily records · Fields: '+keys.slice(0,8).join(', ')+'...'+
+        '</div></div>';
+    }).catch(e=>{
+      if(wrap)wrap.innerHTML='<div class="no-data" style="color:var(--red)">Error: '+e.message+
+        '<br><small>Make sure GAS is redeployed</small></div>';
+    });
   }
 
   const sf = activeSite==='NATIONAL' ? r=>true : r=>(r.Plant||r.plant||'').toUpperCase()===activeSite;
