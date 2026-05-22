@@ -11,6 +11,82 @@ let DATA = {}, activeSite='NATIONAL', activeWeek=1, activePage='dashboard', char
 // ── FETCH ──────────────────────────────────────────────────
 // Fetch via iframe proxy — handles GAS redirect to googleusercontent.com
 function gasGet(tab, extra={}) {
+  var params = {tab:tab, site:activeSite, week:activeWeek};
+  if(extra) Object.keys(extra).forEach(function(k){ params[k]=extra[k]; });
+  var qs = Object.keys(params).map(function(k){
+    return encodeURIComponent(k)+'='+encodeURIComponent(params[k]);
+  }).join('&');
+  var url = GAS + '?' + qs;
+
+  // Edge can fetch GAS directly (confirmed working)
+  return fetch(url)
+    .then(function(r){ return r.text(); })
+    .then(function(text){
+      // GAS returns JSON directly
+      var d = JSON.parse(text);
+      if(d && d.error) throw new Error(d.error);
+      return d;
+    });
+}) {
+  var params = {tab:tab, site:activeSite, week:activeWeek};
+  if(extra) Object.keys(extra).forEach(function(k){ params[k]=extra[k]; });
+  var qs = Object.keys(params).map(function(k){
+    return encodeURIComponent(k)+'='+encodeURIComponent(params[k]);
+  }).join('&');
+  var url = GAS + '?' + qs;
+
+  // Method 1: fetch with cors (works when GAS redirects properly)
+  return fetch(url, {redirect:'follow', mode:'cors'})
+    .then(function(r){
+      if(r.ok) return r.json();
+      throw new Error('HTTP '+r.status);
+    })
+    .then(function(d){
+      if(d&&d.error) throw new Error(d.error);
+      return d;
+    })
+    .catch(function(){
+      // Method 2: JSONP (fallback)
+      return new Promise(function(resolve, reject){
+        var cb = '_cb_'+Math.random().toString(36).slice(2);
+        var s = document.createElement('script');
+        var done = false;
+        var t = setTimeout(function(){
+          if(done)return; done=true;
+          if(s.parentNode) s.parentNode.removeChild(s);
+          delete window[cb];
+          setStatus('error');
+          var el=document.getElementById('loading');
+          if(el) el.innerHTML='<div style="color:#f85149;font-size:18px;margin-bottom:8px">Connection Failed</div>'+
+            '<div style="color:#8b949e;font-size:11px;font-family:monospace;margin-bottom:12px">Edge is blocking the request to Google.<br><br>To fix: Open Edge → Settings → Privacy → Tracking Prevention → Set to Basic</div>'+
+            '<button onclick="location.reload()" style="padding:8px 16px;border:1px solid #f85149;border-radius:4px;background:none;color:#f85149;cursor:pointer;margin-right:8px">⟳ Retry</button>';
+          reject(new Error('Blocked by browser'));
+        }, 25000);
+        window[cb] = function(d){
+          if(done)return; done=true;
+          clearTimeout(t);
+          if(s.parentNode) s.parentNode.removeChild(s);
+          delete window[cb];
+          if(d&&d.error) reject(new Error(d.error));
+          else resolve(d);
+        };
+        s.onerror = function(){
+          if(done)return; done=true;
+          clearTimeout(t);
+          if(s.parentNode) s.parentNode.removeChild(s);
+          delete window[cb];
+          setStatus('error');
+          var el=document.getElementById('loading');
+          if(el) el.innerHTML='<div style="color:#f85149;font-size:18px;margin-bottom:8px">Script Blocked</div>'+
+            '<div style="color:#8b949e;font-size:11px;font-family:monospace;margin-bottom:12px">Edge blocked the Google Apps Script.<br><br>Fix: Edge Settings → Privacy → Tracking Prevention → Basic<br>Or try Chrome/Firefox.</div>'+
+            '<button onclick="location.reload()" style="padding:8px 16px;border:1px solid #f85149;border-radius:4px;background:none;color:#f85149;cursor:pointer">⟳ Retry</button>';
+          reject(new Error('Script onerror'));
+        };
+        s.src = url + '&callback=' + cb;
+        document.head.appendChild(s);
+      });
+    });
+}) {
   return new Promise(function(resolve, reject) {
     var cb = '_vpi_' + Math.random().toString(36).slice(2);
     var p = new URLSearchParams({tab:tab, site:activeSite, week:activeWeek, callback:cb});
