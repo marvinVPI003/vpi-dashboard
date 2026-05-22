@@ -10,7 +10,37 @@ const DT_CATS = {'Mechanical':'cat-mech','Electrical':'cat-elec','PLC':'cat-elec
 let DATA = {}, activeSite='NATIONAL', activeWeek=1, activePage='dashboard', charts={}, refreshTimer=null;
 // ── FETCH ──────────────────────────────────────────────────
 // Fetch via iframe proxy — handles GAS redirect to googleusercontent.com
-function gasGet(tab, extra={}) {
+function gasGet(tab, extra) {
+  return new Promise(function(resolve, reject) {
+    var cb = 'vpi' + Date.now();
+    var p = 'tab='+encodeURIComponent(tab)
+      +'&site='+encodeURIComponent(activeSite)
+      +'&week='+encodeURIComponent(activeWeek)
+      +'&callback='+cb;
+    if(extra) {
+      Object.keys(extra).forEach(function(k){
+        p += '&'+encodeURIComponent(k)+'='+encodeURIComponent(extra[k]);
+      });
+    }
+    var s = document.createElement('script');
+    var timer = setTimeout(function(){
+      cleanup(); reject(new Error('Timeout'));
+    }, 30000);
+    function cleanup(){
+      clearTimeout(timer);
+      try{ document.head.removeChild(s); }catch(e){}
+      delete window[cb];
+    }
+    window[cb] = function(data){
+      cleanup();
+      if(data && data.error) reject(new Error(data.error));
+      else resolve(data);
+    };
+    s.onerror = function(){ cleanup(); reject(new Error('Load error')); };
+    s.src = GAS + '?' + p;
+    document.head.appendChild(s);
+  });
+}) {
   var params = {tab:tab, site:activeSite, week:activeWeek};
   if(extra) Object.keys(extra).forEach(function(k){ params[k]=extra[k]; });
   var qs = Object.keys(params).map(function(k){
