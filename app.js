@@ -460,7 +460,7 @@ function buildNatTable(wkRows){
     var kwh=gf(r,'kWh/ton');var fuel=gf(r,'Li/ton');var coal=gf(r,'kg/ton');
     var rmvR=gf(r,'RM Variance, %');var rmv=rmvR*100;
     var rmvwR=gf(r,'RM Variance (w/o used sacks), %');var rmvw=rmvwR*100;
-    return '<tr>'+dot(s)+(SL[s]||s)+'</td>'
+    return '<tr><td>'+dot(s)+(SL[s]||s)+'</td>'
       +'<td>'+(out>0?out.toFixed(1):'—')+'</td>'
       +'<td>'+(pdr>0?pdr.toFixed(2):'—')+'</td>'
       +'<td class="'+(cu>=80?'tg':cu>=60?'ta':'tr')+'">'+(cu>0?cu.toFixed(1)+'%':'—')+'</td>'
