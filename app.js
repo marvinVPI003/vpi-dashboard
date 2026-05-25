@@ -174,6 +174,8 @@ function render(){
   var totCF=kpiRows.reduce(function(a,r){return a+gf(r,'COMPLETE FEEDS, mt');},0);
   var totMG=kpiRows.reduce(function(a,r){return a+gf(r,'Mixgrain');},0);
   var totVT=kpiRows.reduce(function(a,r){return a+gf(r,'Vietop');},0);
+  var totRP=kpiRows.reduce(function(a,r){return a+gf(r,'Repack, mt');},0);
+  var totMash=activeSite==='ARGAO'?kpiRows.reduce(function(a,r){return a+gf(r,'Mash,mt');},0):0;
   var totUDT=kpiRows.reduce(function(a,r){return a+gf(r,'Unscheduled Down Time, hr');},0);
   var totSDT=kpiRows.reduce(function(a,r){return a+gf(r,'Scheduled Down Time, hr');},0);
   var cuRaw=kpiRows.length?kpiRows.reduce(function(a,r){return a+gf(r,'Capacity Utilization Rate,%');},0)/kpiRows.length:0;
@@ -197,6 +199,8 @@ function render(){
         var cf=sr.reduce(function(a,r){return a+gf(r,'COMPLETE FEEDS, mt');},0);
         var mg=sr.reduce(function(a,r){return a+gf(r,'Mixgrain');},0);
         var vt=sr.reduce(function(a,r){return a+gf(r,'Vietop');},0);
+        var rp=sr.reduce(function(a,r){return a+gf(r,'Repack, mt');},0);
+        var mash=s==='ARGAO'?sr.reduce(function(a,r){return a+gf(r,'Mash,mt');},0):0;
         var cuR=sr.length?sr.reduce(function(a,r){return a+gf(r,'Capacity Utilization Rate,%');},0)/sr.length:0;
         var cu=cuR*100;
         var oeeR=sr.length?sr.reduce(function(a,r){return a+gf(r,'OEE');},0)/sr.length:0;
@@ -205,7 +209,7 @@ function render(){
         var cuC=cu>=80?'var(--green)':cu>=60?'var(--amber)':'var(--red)';
         var oeeC=oee>=85?'var(--green-b)':oee>=70?'var(--amber)':'var(--red)';
         var udtC2=udt>20?'var(--red)':udt>10?'var(--amber)':'var(--text3)';
-        var cfD=cf>0?cf:out-mg-vt;
+        var cfD=cf>0?cf:out-mg-vt-rp-(s==='ARGAO'?mash:0);
         return '<div style="background:var(--bg2);border:1px solid var(--border);border-top:2px solid '+cuC+';border-radius:var(--rl);padding:10px 8px;text-align:center">'
           +'<div style="margin-bottom:5px">'+dot(s)+'<span style="font-size:10px;font-weight:700;color:var(--text)">'+s+'</span></div>'
           +'<div style="border-bottom:1px solid var(--border);padding-bottom:6px;margin-bottom:6px">'
@@ -215,6 +219,8 @@ function render(){
           +(cfD>0?'<span style="font-size:8px;background:rgba(56,139,253,0.15);color:#388bfd;padding:1px 5px;border-radius:3px">CF '+cfD.toFixed(1)+'</span>':'')
           +(mg>0?'<span style="font-size:8px;background:rgba(163,113,247,0.15);color:#a371f7;padding:1px 5px;border-radius:3px">MG '+mg.toFixed(1)+'</span>':'')
           +(vt>0?'<span style="font-size:8px;background:rgba(26,188,156,0.15);color:#1abc9c;padding:1px 5px;border-radius:3px">VT '+vt.toFixed(1)+'</span>':'')
+          +(rp>0?'<span style="font-size:8px;background:rgba(255,166,87,0.15);color:#ffa657;padding:1px 5px;border-radius:3px">RP '+rp.toFixed(1)+'</span>':'')
+          +(mash>0?'<span style="font-size:8px;background:rgba(210,153,34,0.15);color:#d29922;padding:1px 5px;border-radius:3px">MS '+mash.toFixed(1)+'</span>':'')
           +'</div></div>'
           +'<div style="display:flex;flex-direction:column;gap:5px">'
           +'<div style="display:flex;justify-content:space-between"><span style="font-size:9px;color:var(--text3)">Cap Util</span><span style="font-family:DM Mono,monospace;font-size:10px;font-weight:600;color:'+cuC+'">'+(cu>0?cu.toFixed(1)+'%':'—')+'</span></div>'
@@ -234,6 +240,8 @@ function render(){
   +(totCF>0?'<span style="font-size:8px;background:rgba(56,139,253,0.15);color:#388bfd;padding:1px 5px;border-radius:3px">CF '+totCF.toFixed(1)+'</span>':'')
   +(totMG>0?'<span style="font-size:8px;background:rgba(163,113,247,0.15);color:#a371f7;padding:1px 5px;border-radius:3px">MG '+totMG.toFixed(1)+'</span>':'')
   +(totVT>0?'<span style="font-size:8px;background:rgba(26,188,156,0.15);color:#1abc9c;padding:1px 5px;border-radius:3px">VT '+totVT.toFixed(1)+'</span>':'')
+  +(totRP>0?'<span style="font-size:8px;background:rgba(255,166,87,0.15);color:#ffa657;padding:1px 5px;border-radius:3px">RP '+totRP.toFixed(1)+'</span>':'')
+  +(totMash>0?'<span style="font-size:8px;background:rgba(210,153,34,0.15);color:#d29922;padding:1px 5px;border-radius:3px">MS '+totMash.toFixed(1)+'</span>':'')
   +'</div></div>'
   +'<div class="kc" style="--kc-color:'+pC+'"><div class="kc-lbl">Capacity Utilization</div>'
   +'<div class="kc-val" style="color:'+pC+'">'+(totCU>0?totCU.toFixed(1):'—')+'<span style="font-size:12px;color:var(--text2)">%</span></div>'
