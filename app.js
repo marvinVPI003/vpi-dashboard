@@ -110,7 +110,11 @@ async function loadData(isRefresh) {
     ['downtime','cost','production','oee','cost_analytics','quality_energy'].forEach(function(tab){
       gasGet(tab).then(function(d){DATA[tab]=d;}).catch(function(){});
     });
-    gasGet('daily_detail',{site:'National',week:activeWeek}).then(function(d){DATA.daily_detail=d;}).catch(function(){});
+    // Preload daily for all sites
+    gasGet('daily_detail',{site:'National',week:activeWeek}).then(function(d){
+      DATA.daily_detail=d;
+      buildDailyChart(); // trigger chart once data arrives
+    }).catch(function(){});
   } catch(err) {
     setStatus('error');
     console.error('LoadData error:',err);
@@ -303,7 +307,9 @@ function render(){
   // Load daily for specific site
   if(activeSite!=='NATIONAL'){
     var wrap=document.getElementById('detail-table-wrap');
-    gasGet('daily_detail',{site:activeSite,week:activeWeek}).then(function(d){
+    (function(){
+    var _site=activeSite, _week=activeWeek;
+    gasGet('daily_detail',{site:_site,week:_week}).then(function(d){
       var wrap=document.getElementById('detail-table-wrap');
       if(!wrap)return;
       var drows=(d.rows||[]);
@@ -336,6 +342,7 @@ function render(){
       var wrap=document.getElementById('detail-table-wrap');
       if(wrap)wrap.innerHTML='<div class="no-data" style="color:var(--red)">Error: '+e.message+'</div>';
     });
+  })();
   }
 
   // Charts
@@ -415,7 +422,20 @@ function buildDailyChart(){
   var vals=dates.map(function(d){return +byDate[d].toFixed(2);});
   var lbls=dates.map(function(d){try{var dt=new Date(d+'T12:00:00');return dt.toLocaleDateString('en-PH',{month:'short',day:'numeric',weekday:'short'});}catch(e){return d;}});
   if(charts['c-daily-out']){try{charts['c-daily-out'].destroy();}catch(e){}}
-  if(!dates.length){setTimeout(function(){if(DATA.daily_detail&&DATA.daily_detail.rows&&DATA.daily_detail.rows.length)buildDailyChart();},3000);return;}
+  if(!dates.length){
+    // Retry up to 5 times every 2s
+    if(!buildDailyChart._retries) buildDailyChart._retries=0;
+    if(buildDailyChart._retries<5){
+      buildDailyChart._retries++;
+      setTimeout(buildDailyChart,2000);
+    } else {
+      buildDailyChart._retries=0;
+      var cv2=document.getElementById('c-daily-out');
+      if(cv2){var ctx2=cv2.getContext('2d');ctx2.fillStyle='#484f58';ctx2.font='11px DM Mono,monospace';ctx2.textAlign='center';ctx2.fillText('No daily data for Week '+activeWeek,cv2.width/2,cv2.height/2);}
+    }
+    return;
+  }
+  buildDailyChart._retries=0;
   var dayTgt=DAILY_TARGET[activeSite]||DAILY_TARGET.NATIONAL;
   var dayPtC=vals.map(function(v){return v>0&&v<dayTgt?'#f85149':'#3fb950';});
   var cv=document.getElementById('c-daily-out');
