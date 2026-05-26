@@ -170,22 +170,27 @@ function render(){
   var sf=activeSite==='NATIONAL'?function(r){return (r.Plant||r.plant||'').toUpperCase()==='NATIONAL';}:function(r){return (r.Plant||r.plant||'').toUpperCase()===activeSite;};
 
   // KPIs
-  // Output:
-  // National = sum of all 7 sites AM + Argao Mash separately
-  // Per site = AM column only
+  // National total = CF + MG + VT + RP + Mash(Argao only)
+  // Confirmed: 3580.83 + 41.75 + 0 + 16.5 + 48.25 = 3687.33
+  // Per site = AM column only (CCPC uses CF+VT since AM=0)
   var totOut=(function(){
     if(activeSite==='NATIONAL'){
-      var allSiteRows=wkRows.filter(function(r){
-        var p=(r.Plant||r.plant||'').toUpperCase();
-        return PROD_SITES.indexOf(p)>=0;
-      });
-      var amSum=allSiteRows.reduce(function(a,r){return a+gf(r,'Total Plant Output,mt w/o toll','Total Plant Output,mt');},0);
-      var argaoMash=allSiteRows.filter(function(r){return (r.Plant||r.plant||'').toUpperCase()==='ARGAO';})
-        .reduce(function(a,r){return a+gf(r,'Mash,mt');},0);
-      return amSum+argaoMash;
+      var natR=wkRows.filter(function(r){return (r.Plant||r.plant||'').toUpperCase()==='NATIONAL';});
+      var cf=natR.reduce(function(a,r){return a+gf(r,'COMPLETE FEEDS, mt');},0);
+      var mg=natR.reduce(function(a,r){return a+gf(r,'Mixgrain');},0);
+      var vt=natR.reduce(function(a,r){return a+gf(r,'Vietop');},0);
+      var rp=natR.reduce(function(a,r){return a+gf(r,'Total Repack (MG+CF), mt');},0);
+      var argaoRows=wkRows.filter(function(r){return (r.Plant||r.plant||'').toUpperCase()==='ARGAO';});
+      var ms=argaoRows.reduce(function(a,r){return a+gf(r,'Mash,mt');},0);
+      return cf+mg+vt+rp+ms;
     } else {
-      // Individual site: AM column only
-      return kpiRows.reduce(function(a,r){return a+gf(r,'Total Plant Output,mt w/o toll','Total Plant Output,mt');},0);
+      // Per site: use AM column. CCPC AM=0 so fall back to CF+VT+RP
+      var am=kpiRows.reduce(function(a,r){
+        var v=gf(r,'Total Plant Output,mt w/o toll','Total Plant Output,mt','Total Plant Output, mt');
+        if(v>0) return a+v;
+        return a+gf(r,'COMPLETE FEEDS, mt')+gf(r,'Mixgrain')+gf(r,'Vietop')+gf(r,'Total Repack (MG+CF), mt');
+      },0);
+      return am;
     }
   })();
   var totCF=kpiRows.reduce(function(a,r){return a+gf(r,'COMPLETE FEEDS, mt');},0);
@@ -212,7 +217,13 @@ function render(){
       +'<div style="display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px">'
       +PROD_SITES.map(function(s){
         var sr=wkRows.filter(function(r){return (r.Plant||r.plant||'').toUpperCase()===s;});
-        var out=sr.reduce(function(a,r){return a+gf(r,'Total Plant Output,mt w/o toll','Total Plant Output,mt');},0);
+        // Try AM column, fallback to CF+MG+VT+RP if AM=0
+        var out=sr.reduce(function(a,r){
+          var am=gf(r,'Total Plant Output,mt w/o toll','Total Plant Output,mt','Total Plant Output, mt');
+          if(am>0) return a+am;
+          // AM=0: use component sum (CCPC tolling, SOUTH field name mismatch)
+          return a+gf(r,'COMPLETE FEEDS, mt')+gf(r,'Mixgrain')+gf(r,'Vietop')+gf(r,'Total Repack (MG+CF), mt');
+        },0);
         var cf=sr.reduce(function(a,r){return a+gf(r,'COMPLETE FEEDS, mt');},0);
         var mg=sr.reduce(function(a,r){return a+gf(r,'Mixgrain');},0);
         var vt=sr.reduce(function(a,r){return a+gf(r,'Vietop');},0);
