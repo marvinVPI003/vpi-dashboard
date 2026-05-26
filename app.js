@@ -170,16 +170,25 @@ function render(){
   var sf=activeSite==='NATIONAL'?function(r){return (r.Plant||r.plant||'').toUpperCase()==='NATIONAL';}:function(r){return (r.Plant||r.plant||'').toUpperCase()===activeSite;};
 
   // KPIs
-  // Output = CF + MG + VT + Repack + Mash(Argao only)
+  // Output: for each site use AM column, for National sum all sites AM + Argao Mash
   var totOut=(function(){
-    var cf=kpiRows.reduce(function(a,r){return a+gf(r,'COMPLETE FEEDS, mt');},0);
-    var mg=kpiRows.reduce(function(a,r){return a+gf(r,'Mixgrain');},0);
-    var vt=kpiRows.reduce(function(a,r){return a+gf(r,'Vietop');},0);
-    var rp=kpiRows.reduce(function(a,r){return a+gf(r,'Total Repack (MG+CF), mt');},0);
-    // Get Argao Mash from wkRows (not kpiRows which may be NATIONAL aggregate)
-    var _argaoRows=wkRows.filter(function(r){return (r.Plant||r.plant||'').toUpperCase()==='ARGAO';});
-    var ms=_argaoRows.reduce(function(a,r){return a+gf(r,'Mash,mt');},0);
-    return cf+mg+vt+rp+ms;
+    if(activeSite==='NATIONAL'){
+      // Sum AM across all prod sites (not the NATIONAL aggregate row)
+      var allSiteRows=wkRows.filter(function(r){
+        var p=(r.Plant||r.plant||'').toUpperCase();
+        return PROD_SITES.indexOf(p)>=0;
+      });
+      var amSum=allSiteRows.reduce(function(a,r){return a+gf(r,'Total Plant Output,mt w/o toll','Total Plant Output,mt');},0);
+      // Add Argao Mash (col AS) separately
+      var argaoMash=allSiteRows.filter(function(r){return (r.Plant||r.plant||'').toUpperCase()==='ARGAO';})
+        .reduce(function(a,r){return a+gf(r,'Mash,mt');},0);
+      return amSum+argaoMash;
+    } else {
+      // Individual site: AM + Mash if ARGAO
+      var am=kpiRows.reduce(function(a,r){return a+gf(r,'Total Plant Output,mt w/o toll','Total Plant Output,mt');},0);
+      var ms=activeSite==='ARGAO'?kpiRows.reduce(function(a,r){return a+gf(r,'Mash,mt');},0):0;
+      return am+ms;
+    }
   })();
   var totCF=kpiRows.reduce(function(a,r){return a+gf(r,'COMPLETE FEEDS, mt');},0);
   var totMG=kpiRows.reduce(function(a,r){return a+gf(r,'Mixgrain');},0);
@@ -205,8 +214,9 @@ function render(){
       +'<div style="display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px">'
       +PROD_SITES.map(function(s){
         var sr=wkRows.filter(function(r){return (r.Plant||r.plant||'').toUpperCase()===s;});
-        // Use AM column for site output
         var out=sr.reduce(function(a,r){return a+gf(r,'Total Plant Output,mt w/o toll','Total Plant Output,mt');},0);
+        // Add Mash for Argao only
+        if(s==='ARGAO') out+=sr.reduce(function(a,r){return a+gf(r,'Mash,mt');},0);
         var cf=sr.reduce(function(a,r){return a+gf(r,'COMPLETE FEEDS, mt');},0);
         var mg=sr.reduce(function(a,r){return a+gf(r,'Mixgrain');},0);
         var vt=sr.reduce(function(a,r){return a+gf(r,'Vietop');},0);
@@ -220,7 +230,7 @@ function render(){
         var cuC=cu>=80?'var(--green)':cu>=60?'var(--amber)':'var(--red)';
         var oeeC=oee>=85?'var(--green-b)':oee>=70?'var(--amber)':'var(--red)';
         var udtC2=udt>20?'var(--red)':udt>10?'var(--amber)':'var(--text3)';
-        var cfD=cf>0?cf:out-mg-vt-rp-(s==='ARGAO'?mash:0);
+        var cfD=cf>0?cf:(out-mg-vt-rp-mash);
         return '<div style="background:var(--bg2);border:1px solid var(--border);border-top:2px solid '+cuC+';border-radius:var(--rl);padding:10px 8px;text-align:center">'
           +'<div style="margin-bottom:5px">'+dot(s)+'<span style="font-size:10px;font-weight:700;color:var(--text)">'+s+'</span></div>'
           +'<div style="border-bottom:1px solid var(--border);padding-bottom:6px;margin-bottom:6px">'
