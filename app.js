@@ -170,7 +170,15 @@ function render(){
   var sf=activeSite==='NATIONAL'?function(r){return (r.Plant||r.plant||'').toUpperCase()==='NATIONAL';}:function(r){return (r.Plant||r.plant||'').toUpperCase()===activeSite;};
 
   // KPIs
-  var totOut=kpiRows.reduce(function(a,r){return a+gf(r,'Total Plant Output,mt w/o toll','Total Plant Output,mt');},0);
+  // Output = CF + MG + VT + Repack + Mash(Argao only)
+  var totOut=(function(){
+    var cf=kpiRows.reduce(function(a,r){return a+gf(r,'COMPLETE FEEDS, mt');},0);
+    var mg=kpiRows.reduce(function(a,r){return a+gf(r,'Mixgrain');},0);
+    var vt=kpiRows.reduce(function(a,r){return a+gf(r,'Vietop');},0);
+    var rp=kpiRows.reduce(function(a,r){return a+gf(r,'Total Repack (MG+CF), mt');},0);
+    var ms=kpiRows.filter(function(r){return (r.Plant||r.plant||'').toUpperCase()==='ARGAO';}).reduce(function(a,r){return a+gf(r,'Mash,mt');},0);
+    return cf+mg+vt+rp+ms;
+  })();
   var totCF=kpiRows.reduce(function(a,r){return a+gf(r,'COMPLETE FEEDS, mt');},0);
   var totMG=kpiRows.reduce(function(a,r){return a+gf(r,'Mixgrain');},0);
   var totVT=kpiRows.reduce(function(a,r){return a+gf(r,'Vietop');},0);
@@ -195,7 +203,14 @@ function render(){
       +'<div style="display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px">'
       +PROD_SITES.map(function(s){
         var sr=wkRows.filter(function(r){return (r.Plant||r.plant||'').toUpperCase()===s;});
-        var out=sr.reduce(function(a,r){return a+gf(r,'Total Plant Output,mt w/o toll','Total Plant Output,mt');},0);
+        var out=(function(){
+          var _cf=sr.reduce(function(a,r){return a+gf(r,'COMPLETE FEEDS, mt');},0);
+          var _mg=sr.reduce(function(a,r){return a+gf(r,'Mixgrain');},0);
+          var _vt=sr.reduce(function(a,r){return a+gf(r,'Vietop');},0);
+          var _rp=sr.reduce(function(a,r){return a+gf(r,'Total Repack (MG+CF), mt');},0);
+          var _ms=s==='ARGAO'?sr.reduce(function(a,r){return a+gf(r,'Mash,mt');},0):0;
+          return _cf+_mg+_vt+_rp+_ms;
+        })();
         var cf=sr.reduce(function(a,r){return a+gf(r,'COMPLETE FEEDS, mt');},0);
         var mg=sr.reduce(function(a,r){return a+gf(r,'Mixgrain');},0);
         var vt=sr.reduce(function(a,r){return a+gf(r,'Vietop');},0);
@@ -459,7 +474,8 @@ function buildNatTable(wkRows){
   return '<div class="tbl-wrap"><table><thead><tr><th>Site</th><th>Output mt</th><th>PDR t/day</th><th>Cap Util%</th><th>SDT Hr</th><th>UDT Hr</th><th>OEE%</th><th>kWh/ton</th><th>Fuel L/ton</th><th>Coal kg/ton</th><th>RM Var%</th><th>RM Var w/o Sacks%</th></tr></thead><tbody>'
   +siteRows.map(function(r){
     var s=(r.Plant||r.plant||'').toString().toUpperCase();
-    var out=gf(r,'Total Plant Output,mt w/o toll','Total Plant Output,mt');
+    var s2=(r.Plant||r.plant||'').toUpperCase();
+    var out=gf(r,'COMPLETE FEEDS, mt')+gf(r,'Mixgrain')+gf(r,'Vietop')+gf(r,'Total Repack (MG+CF), mt')+(s2==='ARGAO'?gf(r,'Mash,mt'):0);
     var udt=gf(r,'Unscheduled Down Time, hr');
     var sdt=gf(r,'Scheduled Down Time, hr');
     var oee=gf(r,'OEE')*100;
