@@ -170,11 +170,11 @@ function render(){
   var sf=activeSite==='NATIONAL'?function(r){return (r.Plant||r.plant||'').toUpperCase()==='NATIONAL';}:function(r){return (r.Plant||r.plant||'').toUpperCase()===activeSite;};
 
   // KPIs
-  var totOut=kpiRows.reduce(function(a,r){return a+gf(r,'Total Plant Output,mt w/o toll');},0);
+  var totOut=kpiRows.reduce(function(a,r){return a+gf(r,'Total Plant Output,mt w/o toll','Total Plant Output,mt');},0);
   var totCF=kpiRows.reduce(function(a,r){return a+gf(r,'COMPLETE FEEDS, mt');},0);
   var totMG=kpiRows.reduce(function(a,r){return a+gf(r,'Mixgrain');},0);
   var totVT=kpiRows.reduce(function(a,r){return a+gf(r,'Vietop');},0);
-  var totRP=kpiRows.reduce(function(a,r){return a+gf(r,'Repack, mt');},0);
+  var totRP=kpiRows.reduce(function(a,r){return a+gf(r,'Total Repack (MG+CF), mt');},0);
   var totMash=activeSite==='ARGAO'?kpiRows.reduce(function(a,r){return a+gf(r,'Mash,mt');},0):0;
   var totUDT=kpiRows.reduce(function(a,r){return a+gf(r,'Unscheduled Down Time, hr');},0);
   var totSDT=kpiRows.reduce(function(a,r){return a+gf(r,'Scheduled Down Time, hr');},0);
@@ -195,11 +195,11 @@ function render(){
       +'<div style="display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px">'
       +PROD_SITES.map(function(s){
         var sr=wkRows.filter(function(r){return (r.Plant||r.plant||'').toUpperCase()===s;});
-        var out=sr.reduce(function(a,r){return a+gf(r,'Total Plant Output,mt w/o toll');},0);
+        var out=sr.reduce(function(a,r){return a+gf(r,'Total Plant Output,mt w/o toll','Total Plant Output,mt');},0);
         var cf=sr.reduce(function(a,r){return a+gf(r,'COMPLETE FEEDS, mt');},0);
         var mg=sr.reduce(function(a,r){return a+gf(r,'Mixgrain');},0);
         var vt=sr.reduce(function(a,r){return a+gf(r,'Vietop');},0);
-        var rp=sr.reduce(function(a,r){return a+gf(r,'Repack, mt');},0);
+        var rp=sr.reduce(function(a,r){return a+gf(r,'Total Repack (MG+CF), mt');},0);
         var mash=s==='ARGAO'?sr.reduce(function(a,r){return a+gf(r,'Mash,mt');},0):0;
         var cuR=sr.length?sr.reduce(function(a,r){return a+gf(r,'Capacity Utilization Rate,%');},0)/sr.length:0;
         var cu=cuR*100;
@@ -325,7 +325,7 @@ function render(){
       var fmtD=function(r){return r._dateFormatted||String(r.Date||r.date||'—').split('T')[0];};
       var dateCols=drows.map(fmtD);
       var metrics=[
-        {label:'Output mt',fn:function(r){return gf(r,'Total Plant Output,mt w/o toll');},lim:0,cls:function(v,l){return '';}},
+        {label:'Output mt',fn:function(r){return gf(r,'Total Plant Output,mt w/o toll','Total Plant Output,mt');},lim:0,cls:function(v,l){return '';}},
         {label:'SDT Hr',fn:function(r){return gf(r,'Scheduled Down Time, hr');},lim:0,cls:function(v,l){return '';}},
         {label:'UDT Hr',fn:function(r){return gf(r,'Unscheduled Down Time, hr');},lim:8,cls:function(v,l){return v>l?'tr':v>l*0.8?'ta':'tg';}},
         {label:'kWh/ton',fn:function(r){return gf(r,'kWh/ton');},lim:35,cls:function(v,l){return v>l?'tr':v>l*0.9?'ta':'tg';}},
@@ -365,7 +365,7 @@ function render(){
   // Weekly output chart
   var wkOutData=allWeeks.map(function(w){
     var wr=rows.filter(function(r){return +(r.Week||r.week||0)===+w&&sf(r);});
-    return +wr.reduce(function(a,r){return a+gf(r,'Total Plant Output,mt w/o toll');},0).toFixed(1);
+    return +wr.reduce(function(a,r){return a+gf(r,'Total Plant Output,mt w/o toll','Total Plant Output,mt');},0).toFixed(1);
   });
   var wkTgt=WEEKLY_TARGET[activeSite]||WEEKLY_TARGET.NATIONAL;
   var wkPtColors=wkOutData.map(function(v,i){return +allWeeks[i]===+activeWeek?'#ffffff':v>0&&v<wkTgt?'#f85149':'#3fb950';});
@@ -425,7 +425,7 @@ function buildDailyChart(){
     return siteMatch&&rWeek===String(activeWeek);
   }).sort(function(a,b){return new Date(a.Date||a.date||0)-new Date(b.Date||b.date||0);});
   var byDate={};
-  dRows.forEach(function(r){var raw=String(r.Date||r.date||'').split('T')[0];if(!raw||raw==='undefined')return;byDate[raw]=(byDate[raw]||0)+gf(r,'Total Plant Output,mt w/o toll');});
+  dRows.forEach(function(r){var raw=String(r.Date||r.date||'').split('T')[0];if(!raw||raw==='undefined')return;byDate[raw]=(byDate[raw]||0)+gf(r,'Total Plant Output,mt w/o toll','Total Plant Output,mt');});
   var dates=Object.keys(byDate).sort();
   var vals=dates.map(function(d){return +byDate[d].toFixed(2);});
   var lbls=dates.map(function(d){try{var dt=new Date(d+'T12:00:00');return dt.toLocaleDateString('en-PH',{month:'short',day:'numeric',weekday:'short'});}catch(e){return d;}});
@@ -459,7 +459,7 @@ function buildNatTable(wkRows){
   return '<div class="tbl-wrap"><table><thead><tr><th>Site</th><th>Output mt</th><th>PDR t/day</th><th>Cap Util%</th><th>SDT Hr</th><th>UDT Hr</th><th>OEE%</th><th>kWh/ton</th><th>Fuel L/ton</th><th>Coal kg/ton</th><th>RM Var%</th><th>RM Var w/o Sacks%</th></tr></thead><tbody>'
   +siteRows.map(function(r){
     var s=(r.Plant||r.plant||'').toString().toUpperCase();
-    var out=gf(r,'Total Plant Output,mt w/o toll');
+    var out=gf(r,'Total Plant Output,mt w/o toll','Total Plant Output,mt');
     var udt=gf(r,'Unscheduled Down Time, hr');
     var sdt=gf(r,'Scheduled Down Time, hr');
     var oee=gf(r,'OEE')*100;
