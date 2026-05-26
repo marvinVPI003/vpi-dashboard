@@ -513,7 +513,141 @@ function buildNatTable(wkRows){
 }
 
 // ── OTHER TABS (stubs) ─────────────────────────────────────
-function renderMonthly(){var ct=document.getElementById('content-monthly');ct.innerHTML='<div class="no-data">Monthly tab — coming soon</div>';}
+// ── MONTHLY STATE ─────────────────────────────────────────
+var activeMonth='';
+
+function renderMonthly(){
+  var ct=document.getElementById('content-monthly');
+  if(!DATA.monthly){
+    ct.innerHTML='<div class="no-data">⟳ Loading monthly data...</div>';
+    gasGet('monthly',{}).then(function(d){DATA.monthly=d;renderMonthly();}).catch(function(e){ct.innerHTML='<div class="no-data" style="color:var(--red)">Error: '+e.message+'</div>';});
+    return;
+  }
+
+  var rows=DATA.monthly.rows||[];
+  var months=DATA.monthly.months||[];
+  if(!activeMonth||months.indexOf(activeMonth)<0) activeMonth=months[months.length-1]||'';
+
+  // Filter rows for active month
+  var mRows=rows.filter(function(r){return String(r.MONTH||r.Month||'').trim()===activeMonth;});
+
+  // Build month pill strip
+  var pills=document.getElementById('month-pills');
+  if(pills){
+    pills.innerHTML=months.map(function(m){
+      return '<button class="wk-pill'+(m===activeMonth?' active':'')+'" onclick="activeMonth=''+m+'';renderMonthly()">'+m.slice(0,3)+'</button>';
+    }).join('');
+    setTimeout(function(){var a=pills.querySelector('.wk-pill.active');if(a)a.scrollIntoView({behavior:'smooth',block:'nearest',inline:'center'});},100);
+  }
+
+  // Helper: get output for a site row (same formula as weekly)
+  function siteOut(sr,s){
+    var am=sr.reduce(function(a,r){return a+gf(r,'Total Plant Output,mt','Total Plant Output,mt w/o toll');},0);
+    if(am===0) am=sr.reduce(function(a,r){return a+gf(r,'COMPLETE FEEDS, mt','COMPLETE FEEDS,mt')+gf(r,'Mixgrain')+gf(r,'Vietop')+gf(r,'Total Repack (MG+CF), mt');},0);
+    return am;
+  }
+
+  // National total = CF+MG+VT+RP from NATIONAL row + Argao Mash
+  function natOut(){
+    var natR=mRows.filter(function(r){return (r.Plant||'').toUpperCase()==='NATIONAL';});
+    var cf=natR.reduce(function(a,r){return a+gf(r,'COMPLETE FEEDS, mt','COMPLETE FEEDS,mt');},0);
+    var mg=natR.reduce(function(a,r){return a+gf(r,'Mixgrain');},0);
+    var vt=natR.reduce(function(a,r){return a+gf(r,'Vietop');},0);
+    var rp=natR.reduce(function(a,r){return a+gf(r,'Total Repack (MG+CF), mt');},0);
+    var argaoR=mRows.filter(function(r){return (r.Plant||'').toUpperCase()==='ARGAO';});
+    var ms=argaoR.reduce(function(a,r){return a+gf(r,'Mash','Mash,mt');},0);
+    return cf+mg+vt+rp+ms;
+  }
+
+  // National scorecard — 7 site cards
+  var scorecard='<div class="sec"><div class="sec-hdr"><div class="sec-title">National Scorecard — '+activeMonth+'</div><div class="sec-line"></div></div>'
+    +'<div style="display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px">'
+    +PROD_SITES.map(function(s){
+      var sr=mRows.filter(function(r){return (r.Plant||r.plant||'').toUpperCase()===s;});
+      var out=siteOut(sr,s);
+      var cf=sr.reduce(function(a,r){return a+gf(r,'COMPLETE FEEDS, mt','COMPLETE FEEDS,mt');},0);
+      var mg=sr.reduce(function(a,r){return a+gf(r,'Mixgrain');},0);
+      var vt=sr.reduce(function(a,r){return a+gf(r,'Vietop');},0);
+      var rp=sr.reduce(function(a,r){return a+gf(r,'Total Repack (MG+CF), mt');},0);
+      var mash=s==='ARGAO'?sr.reduce(function(a,r){return a+gf(r,'Mash','Mash,mt');},0):0;
+      var cfD=cf>0?cf:out-mg-vt-rp-mash;
+      var cuR=sr.length?sr.reduce(function(a,r){return a+gf(r,'Capacity Utilization Rate,%','Capacity Utilization,%');},0)/sr.length:0;
+      var cu=cuR>1?cuR:cuR*100;
+      var oeeR=sr.length?sr.reduce(function(a,r){return a+gf(r,'OEE');},0)/sr.length:0;
+      var oee=oeeR>1?oeeR:oeeR*100;
+      var udt=sr.reduce(function(a,r){return a+gf(r,'Unscheduled Down Time, hr','Unscheduled Downtime, hr');},0);
+      var cuC=cu>=80?'var(--green)':cu>=60?'var(--amber)':'var(--red)';
+      var oeeC=oee>=85?'var(--green-b)':oee>=70?'var(--amber)':'var(--red)';
+      var udtC=udt>80?'var(--red)':udt>40?'var(--amber)':'var(--text3)';
+      return '<div style="background:var(--bg2);border:1px solid var(--border);border-top:2px solid '+cuC+';border-radius:var(--rl);padding:10px 8px;text-align:center">'
+        +'<div style="margin-bottom:5px">'+dot(s)+'<span style="font-size:10px;font-weight:700;color:var(--text)">'+s+'</span></div>'
+        +'<div style="border-bottom:1px solid var(--border);padding-bottom:6px;margin-bottom:6px">'
+        +'<div style="font-size:8px;color:var(--text3);text-transform:uppercase;letter-spacing:1px;margin-bottom:2px">Output mt</div>'
+        +'<div style="font-family:Barlow Condensed,sans-serif;font-size:22px;font-weight:700;color:var(--text);line-height:1">'+(out>0?out.toFixed(1):'—')+'</div>'
+        +'<div style="display:flex;justify-content:center;gap:3px;margin-top:4px;flex-wrap:wrap">'
+        +(cfD>0?'<span style="font-size:8px;background:rgba(56,139,253,0.15);color:#388bfd;padding:1px 5px;border-radius:3px">CF '+cfD.toFixed(1)+'</span>':'')
+        +(mg>0?'<span style="font-size:8px;background:rgba(163,113,247,0.15);color:#a371f7;padding:1px 5px;border-radius:3px">MG '+mg.toFixed(1)+'</span>':'')
+        +(vt>0?'<span style="font-size:8px;background:rgba(26,188,156,0.15);color:#1abc9c;padding:1px 5px;border-radius:3px">VT '+vt.toFixed(1)+'</span>':'')
+        +(rp>0?'<span style="font-size:8px;background:rgba(255,166,87,0.15);color:#ffa657;padding:1px 5px;border-radius:3px">RP '+rp.toFixed(1)+'</span>':'')
+        +(mash>0?'<span style="font-size:8px;background:rgba(210,153,34,0.15);color:#d29922;padding:1px 5px;border-radius:3px">MS '+mash.toFixed(1)+'</span>':'')
+        +'</div></div>'
+        +'<div style="display:flex;flex-direction:column;gap:5px">'
+        +'<div style="display:flex;justify-content:space-between"><span style="font-size:9px;color:var(--text3)">Cap Util</span><span style="font-family:DM Mono,monospace;font-size:10px;font-weight:600;color:'+cuC+'">'+(cu>0?cu.toFixed(1)+'%':'—')+'</span></div>'
+        +'<div style="display:flex;justify-content:space-between"><span style="font-size:9px;color:var(--text3)">OEE</span><span style="font-family:DM Mono,monospace;font-size:10px;font-weight:600;color:'+oeeC+'">'+(oee>0?oee.toFixed(1)+'%':'—')+'</span></div>'
+        +'<div style="display:flex;justify-content:space-between"><span style="font-size:9px;color:var(--text3)">UDT</span><span style="font-family:DM Mono,monospace;font-size:10px;font-weight:600;color:'+udtC+'">'+(udt>0?udt.toFixed(2)+'h':'—')+'</span></div>'
+        +'</div></div>';
+    }).join('')+'</div></div>';
+
+  // National KPI cards
+  var natR2=mRows.filter(function(r){return (r.Plant||'').toUpperCase()==='NATIONAL';});
+  var mOut=natOut();
+  var mCF=natR2.reduce(function(a,r){return a+gf(r,'COMPLETE FEEDS, mt','COMPLETE FEEDS,mt');},0);
+  var mMG=natR2.reduce(function(a,r){return a+gf(r,'Mixgrain');},0);
+  var mVT=natR2.reduce(function(a,r){return a+gf(r,'Vietop');},0);
+  var mRP=natR2.reduce(function(a,r){return a+gf(r,'Total Repack (MG+CF), mt');},0);
+  var mMS=mRows.filter(function(r){return (r.Plant||'').toUpperCase()==='ARGAO';}).reduce(function(a,r){return a+gf(r,'Mash','Mash,mt');},0);
+  var cuRN=natR2.length?natR2.reduce(function(a,r){return a+gf(r,'Capacity Utilization Rate,%','Capacity Utilization,%');},0)/natR2.length:0;
+  var mCU=cuRN>1?cuRN:cuRN*100;
+  var oeeRN=natR2.length?natR2.reduce(function(a,r){return a+gf(r,'OEE');},0)/natR2.length:0;
+  var mOEE=oeeRN>1?oeeRN:oeeRN*100;
+  var mUDT=natR2.reduce(function(a,r){return a+gf(r,'Unscheduled Down Time, hr','Unscheduled Downtime, hr');},0);
+  var mSDT=natR2.reduce(function(a,r){return a+gf(r,'Scheduled Down Time, hr');},0);
+  var mPDR=natR2.reduce(function(a,r){return a+gf(r,'Plant Daily Pelleting Rate,ton/day');},0);
+  var cuC2=mCU>=80?'var(--green-b)':mCU>=60?'var(--amber)':'var(--red)';
+  var oeeC2=mOEE>=85?'var(--green-b)':mOEE>=70?'var(--amber)':'var(--red)';
+  var udtC2=mUDT>80?'var(--red)':mUDT>40?'var(--amber)':'var(--text)';
+
+  var kpiCards='<div class="sec"><div class="sec-hdr"><div class="sec-title">National · '+activeMonth+'</div><div class="sec-line"></div></div>'
+    +'<div class="g5">'
+    +'<div class="kc" style="--kc-color:var(--blue)"><div class="kc-lbl">Output</div>'
+    +'<div class="kc-val" style="color:var(--blue)">'+(mOut>0?mOut.toFixed(1):'—')+'<span style="font-size:12px;color:var(--text2)"> mt</span></div>'
+    +'<div style="display:flex;gap:3px;flex-wrap:wrap;margin-top:4px">'
+    +(mCF>0?'<span style="font-size:8px;background:rgba(56,139,253,0.15);color:#388bfd;padding:1px 5px;border-radius:3px">CF '+mCF.toFixed(1)+'</span>':'')
+    +(mMG>0?'<span style="font-size:8px;background:rgba(163,113,247,0.15);color:#a371f7;padding:1px 5px;border-radius:3px">MG '+mMG.toFixed(1)+'</span>':'')
+    +(mVT>0?'<span style="font-size:8px;background:rgba(26,188,156,0.15);color:#1abc9c;padding:1px 5px;border-radius:3px">VT '+mVT.toFixed(1)+'</span>':'')
+    +(mRP>0?'<span style="font-size:8px;background:rgba(255,166,87,0.15);color:#ffa657;padding:1px 5px;border-radius:3px">RP '+mRP.toFixed(1)+'</span>':'')
+    +(mMS>0?'<span style="font-size:8px;background:rgba(210,153,34,0.15);color:#d29922;padding:1px 5px;border-radius:3px">MS '+mMS.toFixed(1)+'</span>':'')
+    +'</div></div>'
+    +'<div class="kc" style="--kc-color:'+cuC2+'"><div class="kc-lbl">Capacity Utilization</div>'
+    +'<div class="kc-val" style="color:'+cuC2+'">'+(mCU>0?mCU.toFixed(1):'—')+'<span style="font-size:12px;color:var(--text2)">%</span></div>'
+    +'<span class="bdg '+(mCU>=80?'g':mCU>=60?'a':'r')+'">'+(mCU>=80?'On Track':mCU>=60?'Moderate':'Low')+'</span></div>'
+    +'<div class="kc" style="--kc-color:'+udtC2+'"><div class="kc-lbl">Downtime</div>'
+    +'<div style="display:flex;gap:8px;align-items:flex-end;margin-bottom:4px">'
+    +'<div><div style="font-size:9px;color:var(--red);font-weight:600">UDT</div>'
+    +'<div style="font-family:Barlow Condensed,sans-serif;font-size:22px;font-weight:700;color:'+udtC2+'">'+(mUDT>0?mUDT.toFixed(1):'—')+'<span style="font-size:11px;color:var(--text2)"> hr</span></div></div>'
+    +'<div style="width:1px;height:32px;background:var(--border)"></div>'
+    +'<div><div style="font-size:9px;color:var(--text3);font-weight:600">SDT</div>'
+    +'<div style="font-family:Barlow Condensed,sans-serif;font-size:22px;font-weight:700;color:var(--text2)">'+(mSDT>0?mSDT.toFixed(1):'—')+'<span style="font-size:11px;color:var(--text3)"> hr</span></div></div>'
+    +'</div></div>'
+    +'<div class="kc" style="--kc-color:'+oeeC2+'"><div class="kc-lbl">OEE</div>'
+    +'<div class="kc-val" style="color:'+oeeC2+'">'+(mOEE>0?mOEE.toFixed(1):'N/A')+'<span style="font-size:12px;color:var(--text2)">'+(mOEE>0?'%':'')+'</span></div>'
+    +'<span class="bdg '+(mOEE>=85?'g':mOEE>=70?'a':mOEE>0?'r':'b')+'">'+(mOEE>=85?'World Class':mOEE>=70?'Acceptable':mOEE>0?'Needs Attn':'N/A')+'</span></div>'
+    +'<div class="kc" style="--kc-color:var(--teal)"><div class="kc-lbl">Plant Daily Rate</div>'
+    +'<div class="kc-val" style="color:var(--teal)">'+(mPDR>0?mPDR.toFixed(2):'—')+'<span style="font-size:12px;color:var(--text2)"> t/day</span></div></div>'
+    +'</div></div>';
+
+  ct.innerHTML=scorecard+kpiCards;
+}
 function renderCost(){var ct=document.getElementById('content-cost');if(!DATA.cost){ct.innerHTML='<div class="no-data">⟳ Loading...</div>';gasGet('cost').then(function(d){DATA.cost=d;renderCost();}).catch(function(e){ct.innerHTML='<div class="no-data">Error: '+e.message+'</div>';});return;}ct.innerHTML='<div class="no-data">Cost data loaded — '+( DATA.cost.rows||[]).length+' rows</div>';}
 function renderDowntime(){var ct=document.getElementById('content-downtime');if(!DATA.downtime){ct.innerHTML='<div class="no-data">⟳ Loading...</div>';gasGet('downtime').then(function(d){DATA.downtime=d;renderDowntime();}).catch(function(e){ct.innerHTML='<div class="no-data">Error: '+e.message+'</div>';});return;}var d=DATA.downtime;var rows=d.rows||[];var byReason=d.byReason||{};var reasons=Object.entries(byReason).sort(function(a,b){return b[1]-a[1];});ct.innerHTML='<div class="sec"><div class="sec-hdr"><div class="sec-title">Downtime</div><div class="sec-line"></div></div><div class="g2"><div class="cc"><div class="cc-title">By Category</div>'+reasons.slice(0,10).map(function(e){var max=reasons[0]?reasons[0][1]:1;return '<div class="mbar-row"><div class="mbar-lbl">'+e[0].slice(0,18)+'</div><div class="mbar-bg"><div class="mbar-fill" style="width:'+(e[1]/max*100).toFixed(0)+'%;background:var(--red)"></div></div><div class="mbar-val">'+e[1].toFixed(1)+'h</div></div>';}).join('')+'</div><div class="cc"><div class="cc-title">Records</div><div class="tbl-wrap"><table><thead><tr><th style="text-align:left">Plant</th><th style="text-align:left">Category</th><th>UDT hr</th></tr></thead><tbody>'+rows.slice(0,30).map(function(r){var s=(r.Plant||'').toUpperCase();return '<tr><td>'+dot(s)+s+'</td><td><span class="cat-pill '+(DT_CATS[r.Category||'']||'cat-other')+'">'+(r.Category||'—')+'</span></td><td class="tr">'+(r['Unscheduled Down Time, hr']||0).toFixed(2)+'</td></tr>';}).join('')+'</tbody></table></div></div></div></div>';}
 function renderProduction(){var ct=document.getElementById('content-production');ct.innerHTML='<div class="no-data">Production tab</div>';}
