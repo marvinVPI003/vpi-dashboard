@@ -176,7 +176,9 @@ function render(){
     var mg=kpiRows.reduce(function(a,r){return a+gf(r,'Mixgrain');},0);
     var vt=kpiRows.reduce(function(a,r){return a+gf(r,'Vietop');},0);
     var rp=kpiRows.reduce(function(a,r){return a+gf(r,'Total Repack (MG+CF), mt');},0);
-    var ms=kpiRows.filter(function(r){return (r.Plant||r.plant||'').toUpperCase()==='ARGAO';}).reduce(function(a,r){return a+gf(r,'Mash,mt');},0);
+    // Get Argao Mash from wkRows (not kpiRows which may be NATIONAL aggregate)
+    var _argaoRows=wkRows.filter(function(r){return (r.Plant||r.plant||'').toUpperCase()==='ARGAO';});
+    var ms=_argaoRows.reduce(function(a,r){return a+gf(r,'Mash,mt');},0);
     return cf+mg+vt+rp+ms;
   })();
   var totCF=kpiRows.reduce(function(a,r){return a+gf(r,'COMPLETE FEEDS, mt');},0);
