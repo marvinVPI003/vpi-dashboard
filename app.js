@@ -170,24 +170,22 @@ function render(){
   var sf=activeSite==='NATIONAL'?function(r){return (r.Plant||r.plant||'').toUpperCase()==='NATIONAL';}:function(r){return (r.Plant||r.plant||'').toUpperCase()===activeSite;};
 
   // KPIs
-  // Output: for each site use AM column, for National sum all sites AM + Argao Mash
+  // Output:
+  // National = sum of all 7 sites AM + Argao Mash separately
+  // Per site = AM column only
   var totOut=(function(){
     if(activeSite==='NATIONAL'){
-      // Sum AM across all prod sites (not the NATIONAL aggregate row)
       var allSiteRows=wkRows.filter(function(r){
         var p=(r.Plant||r.plant||'').toUpperCase();
         return PROD_SITES.indexOf(p)>=0;
       });
       var amSum=allSiteRows.reduce(function(a,r){return a+gf(r,'Total Plant Output,mt w/o toll','Total Plant Output,mt');},0);
-      // Add Argao Mash (col AS) separately
       var argaoMash=allSiteRows.filter(function(r){return (r.Plant||r.plant||'').toUpperCase()==='ARGAO';})
         .reduce(function(a,r){return a+gf(r,'Mash,mt');},0);
       return amSum+argaoMash;
     } else {
-      // Individual site: AM + Mash if ARGAO
-      var am=kpiRows.reduce(function(a,r){return a+gf(r,'Total Plant Output,mt w/o toll','Total Plant Output,mt');},0);
-      var ms=activeSite==='ARGAO'?kpiRows.reduce(function(a,r){return a+gf(r,'Mash,mt');},0):0;
-      return am+ms;
+      // Individual site: AM column only
+      return kpiRows.reduce(function(a,r){return a+gf(r,'Total Plant Output,mt w/o toll','Total Plant Output,mt');},0);
     }
   })();
   var totCF=kpiRows.reduce(function(a,r){return a+gf(r,'COMPLETE FEEDS, mt');},0);
@@ -215,8 +213,6 @@ function render(){
       +PROD_SITES.map(function(s){
         var sr=wkRows.filter(function(r){return (r.Plant||r.plant||'').toUpperCase()===s;});
         var out=sr.reduce(function(a,r){return a+gf(r,'Total Plant Output,mt w/o toll','Total Plant Output,mt');},0);
-        // Add Mash for Argao only
-        if(s==='ARGAO') out+=sr.reduce(function(a,r){return a+gf(r,'Mash,mt');},0);
         var cf=sr.reduce(function(a,r){return a+gf(r,'COMPLETE FEEDS, mt');},0);
         var mg=sr.reduce(function(a,r){return a+gf(r,'Mixgrain');},0);
         var vt=sr.reduce(function(a,r){return a+gf(r,'Vietop');},0);
