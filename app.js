@@ -515,12 +515,16 @@ function buildNatTable(wkRows){
 // ── OTHER TABS (stubs) ─────────────────────────────────────
 // ── MONTHLY STATE ─────────────────────────────────────────
 var activeMonth='';
+var _monthsList=[];
+function setMonth(idx){
+  if(_monthsList[idx]){activeMonth=_monthsList[idx];renderMonthly();}
+}
 
 function renderMonthly(){
   var ct=document.getElementById('content-monthly');
   if(!DATA.monthly){
     ct.innerHTML='<div class="no-data">⟳ Loading monthly data...</div>';
-    gasGet('monthly',{}).then(function(d){DATA.monthly=d;renderMonthly();}).catch(function(e){ct.innerHTML='<div class="no-data" style="color:var(--red)">Error: '+e.message+'</div>';});
+    gasGet('monthly').then(function(d){DATA.monthly=d;renderMonthly();}).catch(function(e){ct.innerHTML='<div class="no-data" style="color:var(--red)">Error: '+e.message+'</div>';});
     return;
   }
 
@@ -534,8 +538,9 @@ function renderMonthly(){
   // Build month pill strip
   var pills=document.getElementById('month-pills');
   if(pills){
-    pills.innerHTML=months.map(function(m){
-      return '<button class="wk-pill'+(m===activeMonth?' active':'')+'" onclick="activeMonth=''+m+'';renderMonthly()">'+m.slice(0,3)+'</button>';
+    _monthsList=months;
+    pills.innerHTML=months.map(function(m,i){
+      return '<button class="wk-pill'+(m===activeMonth?' active':'')+'" onclick="setMonth('+i+')">'+m.slice(0,3)+'</button>';
     }).join('');
     setTimeout(function(){var a=pills.querySelector('.wk-pill.active');if(a)a.scrollIntoView({behavior:'smooth',block:'nearest',inline:'center'});},100);
   }
