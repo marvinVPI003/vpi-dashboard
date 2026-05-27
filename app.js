@@ -604,31 +604,36 @@ function renderMonthly(){
     }).join('')+'</div></div>';
 
   // National KPI cards
-  var natR2=mRows.filter(function(r){return (r.Plant||'').toUpperCase()==='NATIONAL';});
-  // Output from col AR = Total Plant Output,mt
-  var mOut=natR2.reduce(function(a,r){return a+gf(r,'Total Plant Output,mt');},0);
-  // Badges: CF(AU), MG(AW), Mash(AX-Argao only), VT(BE), RP(EX)
-  var mCF=natR2.reduce(function(a,r){return a+gf(r,'COMPLETE FEEDS, mt','COMPLETE FEEDS,mt');},0);
-  var mMG=natR2.reduce(function(a,r){return a+gf(r,'Mixgrain');},0);
-  var mVT=natR2.reduce(function(a,r){return a+gf(r,'Vietop');},0);
-  var mRP=natR2.reduce(function(a,r){return a+gf(r,'Total Repack (MG+CF), mt');},0);
-  var mMS=mRows.filter(function(r){return (r.Plant||'').toUpperCase()==='ARGAO';}).reduce(function(a,r){return a+gf(r,'Mash','Mash,mt');},0);
-  // Cap Util from col BP
-  var cuRN=natR2.length?natR2.reduce(function(a,r){return a+gf(r,'Capacity Utilization Rate,%','Capacity Utilization,%');},0)/natR2.length:0;
+  // Filter by selected site
+  var kpiR2=activeSite==='NATIONAL'
+    ? mRows.filter(function(r){return (r.Plant||'').toUpperCase()==='NATIONAL';})
+    : mRows.filter(function(r){return (r.Plant||'').toUpperCase()===activeSite;});
+  var natR2=kpiR2;
+  var mOut=(function(){
+    if(activeSite==='NATIONAL') return kpiR2.reduce(function(a,r){return a+gf(r,'Total Plant Output,mt');},0);
+    var am=kpiR2.reduce(function(a,r){return a+gf(r,'Total Plant Output,mt','Total Plant Output,mt w/o toll');},0);
+    if(am===0) am=kpiR2.reduce(function(a,r){return a+gf(r,'COMPLETE FEEDS, mt','COMPLETE FEEDS,mt')+gf(r,'Mixgrain')+gf(r,'Vietop')+gf(r,'Total Repack (MG+CF), mt');},0);
+    return am;
+  })();
+  var mCF=kpiR2.reduce(function(a,r){return a+gf(r,'COMPLETE FEEDS, mt','COMPLETE FEEDS,mt');},0);
+  var mMG=kpiR2.reduce(function(a,r){return a+gf(r,'Mixgrain');},0);
+  var mVT=kpiR2.reduce(function(a,r){return a+gf(r,'Vietop');},0);
+  var mRP=kpiR2.reduce(function(a,r){return a+gf(r,'Total Repack (MG+CF), mt');},0);
+  var mMS=(activeSite==='ARGAO'||activeSite==='NATIONAL')
+    ? mRows.filter(function(r){return (r.Plant||'').toUpperCase()==='ARGAO';}).reduce(function(a,r){return a+gf(r,'Mash','Mash,mt');},0)
+    : 0;
+  var cuRN=kpiR2.length?kpiR2.reduce(function(a,r){return a+gf(r,'Capacity Utilization Rate,%','Capacity Utilization,%');},0)/kpiR2.length:0;
   var mCU=cuRN>1?cuRN:cuRN*100;
-  // OEE from col DA
-  var oeeRN=natR2.length?natR2.reduce(function(a,r){return a+gf(r,'OEE');},0)/natR2.length:0;
+  var oeeRN=kpiR2.length?kpiR2.reduce(function(a,r){return a+gf(r,'OEE');},0)/kpiR2.length:0;
   var mOEE=oeeRN>1?oeeRN:oeeRN*100;
-  // UDT from col J, SDT from col H
-  var mUDT=natR2.reduce(function(a,r){return a+gf(r,'Unscheduled Down Time, hr','Unscheduled Downtime, hr','UDT, hr');},0);
-  var mSDT=natR2.reduce(function(a,r){return a+gf(r,'Scheduled Down Time, hr','SDT, hr');},0);
-  // PDR from col BL
-  var mPDR=natR2.reduce(function(a,r){return a+gf(r,'Plant Daily Pelleting Rate,ton/day','Plant Daily Rate, ton/day');},0);
+  var mUDT=kpiR2.reduce(function(a,r){return a+gf(r,'Unscheduled Down Time, hr','Unscheduled Downtime, hr','UDT, hr');},0);
+  var mSDT=kpiR2.reduce(function(a,r){return a+gf(r,'Scheduled Down Time, hr','SDT, hr');},0);
+  var mPDR=kpiR2.reduce(function(a,r){return a+gf(r,'Plant Daily Pelleting Rate,ton/day','Plant Daily Rate, ton/day');},0);
   var cuC2=mCU>=80?'var(--green-b)':mCU>=60?'var(--amber)':'var(--red)';
   var oeeC2=mOEE>=85?'var(--green-b)':mOEE>=70?'var(--amber)':'var(--red)';
   var udtC2=mUDT>80?'var(--red)':mUDT>40?'var(--amber)':'var(--text)';
 
-  var kpiCards='<div class="sec"><div class="sec-hdr"><div class="sec-title">National · '+activeMonth+'</div><div class="sec-line"></div></div>'
+  var kpiCards='<div class="sec"><div class="sec-hdr"><div class="sec-title">'+(activeSite==='NATIONAL'?'National':SL[activeSite])+' · '+activeMonth+'</div><div class="sec-line"></div></div>'
     +'<div class="g5">'
     +'<div class="kc" style="--kc-color:var(--blue)"><div class="kc-lbl">Output</div>'
     +'<div class="kc-val" style="color:var(--blue)">'+(mOut>0?mOut.toFixed(1):'—')+'<span style="font-size:12px;color:var(--text2)"> mt</span></div>'
@@ -687,7 +692,7 @@ function renderMonthly(){
     +'<div class="kc-val" style="font-size:20px;color:'+(mRMVWSpct<0?'var(--red)':'var(--green-b)')+'">'+(mRMVWS!==0?(mRMVWSpct>=0?'+':'')+mRMVWSpct.toFixed(3)+'%':'—')+'</div>'
     +'</div></div>';
 
-  ct.innerHTML=scorecard+kpiCards+kpiCards2;
+  ct.innerHTML=(activeSite==='NATIONAL'?scorecard:'')+kpiCards+kpiCards2;
 }
 function renderCost(){var ct=document.getElementById('content-cost');if(!DATA.cost){ct.innerHTML='<div class="no-data">⟳ Loading...</div>';gasGet('cost').then(function(d){DATA.cost=d;renderCost();}).catch(function(e){ct.innerHTML='<div class="no-data">Error: '+e.message+'</div>';});return;}ct.innerHTML='<div class="no-data">Cost data loaded — '+( DATA.cost.rows||[]).length+' rows</div>';}
 function renderDowntime(){var ct=document.getElementById('content-downtime');if(!DATA.downtime){ct.innerHTML='<div class="no-data">⟳ Loading...</div>';gasGet('downtime').then(function(d){DATA.downtime=d;renderDowntime();}).catch(function(e){ct.innerHTML='<div class="no-data">Error: '+e.message+'</div>';});return;}var d=DATA.downtime;var rows=d.rows||[];var byReason=d.byReason||{};var reasons=Object.entries(byReason).sort(function(a,b){return b[1]-a[1];});ct.innerHTML='<div class="sec"><div class="sec-hdr"><div class="sec-title">Downtime</div><div class="sec-line"></div></div><div class="g2"><div class="cc"><div class="cc-title">By Category</div>'+reasons.slice(0,10).map(function(e){var max=reasons[0]?reasons[0][1]:1;return '<div class="mbar-row"><div class="mbar-lbl">'+e[0].slice(0,18)+'</div><div class="mbar-bg"><div class="mbar-fill" style="width:'+(e[1]/max*100).toFixed(0)+'%;background:var(--red)"></div></div><div class="mbar-val">'+e[1].toFixed(1)+'h</div></div>';}).join('')+'</div><div class="cc"><div class="cc-title">Records</div><div class="tbl-wrap"><table><thead><tr><th style="text-align:left">Plant</th><th style="text-align:left">Category</th><th>UDT hr</th></tr></thead><tbody>'+rows.slice(0,30).map(function(r){var s=(r.Plant||'').toUpperCase();return '<tr><td>'+dot(s)+s+'</td><td><span class="cat-pill '+(DT_CATS[r.Category||'']||'cat-other')+'">'+(r.Category||'—')+'</span></td><td class="tr">'+(r['Unscheduled Down Time, hr']||0).toFixed(2)+'</td></tr>';}).join('')+'</tbody></table></div></div></div></div>';}
