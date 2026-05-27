@@ -605,19 +605,25 @@ function renderMonthly(){
 
   // National KPI cards
   var natR2=mRows.filter(function(r){return (r.Plant||'').toUpperCase()==='NATIONAL';});
-  var mOut=natOut();
+  // Output from col AR = Total Plant Output,mt
+  var mOut=natR2.reduce(function(a,r){return a+gf(r,'Total Plant Output,mt');},0);
+  // Badges: CF(AU), MG(AW), Mash(AX-Argao only), VT(BE), RP(EX)
   var mCF=natR2.reduce(function(a,r){return a+gf(r,'COMPLETE FEEDS, mt','COMPLETE FEEDS,mt');},0);
   var mMG=natR2.reduce(function(a,r){return a+gf(r,'Mixgrain');},0);
   var mVT=natR2.reduce(function(a,r){return a+gf(r,'Vietop');},0);
   var mRP=natR2.reduce(function(a,r){return a+gf(r,'Total Repack (MG+CF), mt');},0);
   var mMS=mRows.filter(function(r){return (r.Plant||'').toUpperCase()==='ARGAO';}).reduce(function(a,r){return a+gf(r,'Mash','Mash,mt');},0);
+  // Cap Util from col BP
   var cuRN=natR2.length?natR2.reduce(function(a,r){return a+gf(r,'Capacity Utilization Rate,%','Capacity Utilization,%');},0)/natR2.length:0;
   var mCU=cuRN>1?cuRN:cuRN*100;
+  // OEE from col DA
   var oeeRN=natR2.length?natR2.reduce(function(a,r){return a+gf(r,'OEE');},0)/natR2.length:0;
   var mOEE=oeeRN>1?oeeRN:oeeRN*100;
-  var mUDT=natR2.reduce(function(a,r){return a+gf(r,'Unscheduled Down Time, hr','Unscheduled Downtime, hr');},0);
-  var mSDT=natR2.reduce(function(a,r){return a+gf(r,'Scheduled Down Time, hr');},0);
-  var mPDR=natR2.reduce(function(a,r){return a+gf(r,'Plant Daily Pelleting Rate,ton/day');},0);
+  // UDT from col J, SDT from col H
+  var mUDT=natR2.reduce(function(a,r){return a+gf(r,'Unscheduled Down Time, hr','Unscheduled Downtime, hr','UDT, hr');},0);
+  var mSDT=natR2.reduce(function(a,r){return a+gf(r,'Scheduled Down Time, hr','SDT, hr');},0);
+  // PDR from col BL
+  var mPDR=natR2.reduce(function(a,r){return a+gf(r,'Plant Daily Pelleting Rate,ton/day','Plant Daily Rate, ton/day');},0);
   var cuC2=mCU>=80?'var(--green-b)':mCU>=60?'var(--amber)':'var(--red)';
   var oeeC2=mOEE>=85?'var(--green-b)':mOEE>=70?'var(--amber)':'var(--red)';
   var udtC2=mUDT>80?'var(--red)':mUDT>40?'var(--amber)':'var(--text)';
