@@ -657,7 +657,37 @@ function renderMonthly(){
     +'<div class="kc-val" style="color:var(--teal)">'+(mPDR>0?mPDR.toFixed(2):'—')+'<span style="font-size:12px;color:var(--text2)"> t/day</span></div></div>'
     +'</div></div>';
 
-  ct.innerHTML=scorecard+kpiCards;
+  // Row 2 KPI cards: Power, Fuel, Coal, RM Variance, RM Var w/o Sacks
+  var mKwh=natR2.length?natR2.reduce(function(a,r){return a+gf(r,'kWh/ton');},0)/natR2.length:0;
+  var mFuel=natR2.length?natR2.reduce(function(a,r){return a+gf(r,'Li/ton');},0)/natR2.length:0;
+  var mCoal=natR2.length?natR2.reduce(function(a,r){return a+gf(r,'kg/ton');},0)/natR2.length:0;
+  var mRMV=natR2.length?natR2.reduce(function(a,r){return a+gf(r,'RM Variance, %');},0)/natR2.length:0;
+  var mRMVWS=natR2.length?natR2.reduce(function(a,r){return a+gf(r,'RM Variance (w/o used sacks), %');},0)/natR2.length:0;
+  // Convert if stored as decimal
+  var mRMVpct=Math.abs(mRMV)>1?mRMV:mRMV*100;
+  var mRMVWSpct=Math.abs(mRMVWS)>1?mRMVWS:mRMVWS*100;
+
+  var kpiCards2='<div class="g5" style="margin-top:8px">'
+    +'<div class="kc" style="--kc-color:var(--purple)"><div class="kc-lbl">Power</div>'
+    +'<div class="kc-val" style="font-size:22px;color:var(--purple)">'+(mKwh>0?mKwh.toFixed(2):'—')+'<span style="font-size:12px;color:var(--text2)"> kWh/t</span></div>'
+    +'<div class="kc-sub">Electricity per ton</div>'
+    +'<span class="bdg '+(mKwh>35?'r':mKwh>31.5?'a':'g')+'">'+(mKwh>35?'Over limit':mKwh>31.5?'Near limit':mKwh>0?'Within limit':'N/A')+'</span></div>'
+    +'<div class="kc" style="--kc-color:var(--amber)"><div class="kc-lbl">Fuel</div>'
+    +'<div class="kc-val" style="font-size:22px;color:var(--amber)">'+(mFuel>0?mFuel.toFixed(2):'—')+'<span style="font-size:12px;color:var(--text2)"> L/t</span></div>'
+    +'<div class="kc-sub">Diesel per ton</div>'
+    +'<span class="bdg '+(mFuel>3.5?'r':mFuel>3.15?'a':'g')+'">'+(mFuel>3.5?'Over limit':mFuel>3.15?'Near limit':mFuel>0?'Within limit':'N/A')+'</span></div>'
+    +'<div class="kc" style="--kc-color:var(--text3)"><div class="kc-lbl">Coal</div>'
+    +'<div class="kc-val" style="font-size:22px">'+(mCoal>0?mCoal.toFixed(2):'—')+'<span style="font-size:12px;color:var(--text2)">'+(mCoal>0?' kg/t':'')+'</span></div>'
+    +'<div class="kc-sub">Coal per ton</div>'
+    +'<span class="bdg '+(mCoal>12?'r':mCoal>10.8?'a':mCoal>0?'g':'b')+'">'+(mCoal>12?'Over limit':mCoal>10.8?'Near limit':mCoal>0?'Within limit':'N/A')+'</span></div>'
+    +'<div class="kc" style="--kc-color:'+(mRMVpct<0?'var(--red)':'var(--green)')+'"><div class="kc-lbl">RM Variance</div>'
+    +'<div class="kc-val" style="font-size:20px;color:'+(mRMVpct<0?'var(--red)':'var(--green-b)')+'">'+(mRMV!==0?(mRMVpct>=0?'+':'')+mRMVpct.toFixed(3)+'%':'—')+'</div>'
+    +'<span class="bdg '+(mRMVpct<0?'r':'g')+'">'+(mRMVpct<0?'Under':'Over')+'</span></div>'
+    +'<div class="kc" style="--kc-color:'+(mRMVWSpct<0?'var(--red)':'var(--green)')+'"><div class="kc-lbl">RM Var w/o Sacks</div>'
+    +'<div class="kc-val" style="font-size:20px;color:'+(mRMVWSpct<0?'var(--red)':'var(--green-b)')+'">'+(mRMVWS!==0?(mRMVWSpct>=0?'+':'')+mRMVWSpct.toFixed(3)+'%':'—')+'</div>'
+    +'</div></div>';
+
+  ct.innerHTML=scorecard+kpiCards+kpiCards2;
 }
 function renderCost(){var ct=document.getElementById('content-cost');if(!DATA.cost){ct.innerHTML='<div class="no-data">⟳ Loading...</div>';gasGet('cost').then(function(d){DATA.cost=d;renderCost();}).catch(function(e){ct.innerHTML='<div class="no-data">Error: '+e.message+'</div>';});return;}ct.innerHTML='<div class="no-data">Cost data loaded — '+( DATA.cost.rows||[]).length+' rows</div>';}
 function renderDowntime(){var ct=document.getElementById('content-downtime');if(!DATA.downtime){ct.innerHTML='<div class="no-data">⟳ Loading...</div>';gasGet('downtime').then(function(d){DATA.downtime=d;renderDowntime();}).catch(function(e){ct.innerHTML='<div class="no-data">Error: '+e.message+'</div>';});return;}var d=DATA.downtime;var rows=d.rows||[];var byReason=d.byReason||{};var reasons=Object.entries(byReason).sort(function(a,b){return b[1]-a[1];});ct.innerHTML='<div class="sec"><div class="sec-hdr"><div class="sec-title">Downtime</div><div class="sec-line"></div></div><div class="g2"><div class="cc"><div class="cc-title">By Category</div>'+reasons.slice(0,10).map(function(e){var max=reasons[0]?reasons[0][1]:1;return '<div class="mbar-row"><div class="mbar-lbl">'+e[0].slice(0,18)+'</div><div class="mbar-bg"><div class="mbar-fill" style="width:'+(e[1]/max*100).toFixed(0)+'%;background:var(--red)"></div></div><div class="mbar-val">'+e[1].toFixed(1)+'h</div></div>';}).join('')+'</div><div class="cc"><div class="cc-title">Records</div><div class="tbl-wrap"><table><thead><tr><th style="text-align:left">Plant</th><th style="text-align:left">Category</th><th>UDT hr</th></tr></thead><tbody>'+rows.slice(0,30).map(function(r){var s=(r.Plant||'').toUpperCase();return '<tr><td>'+dot(s)+s+'</td><td><span class="cat-pill '+(DT_CATS[r.Category||'']||'cat-other')+'">'+(r.Category||'—')+'</span></td><td class="tr">'+(r['Unscheduled Down Time, hr']||0).toFixed(2)+'</td></tr>';}).join('')+'</tbody></table></div></div></div></div>';}
