@@ -6,6 +6,7 @@ const SC = {NATIONAL:'#3fb950',AC:'#388bfd',PFMIS:'#d29922',HOREB:'#1abc9c',BUKI
 const WEEKLY_TARGET = {AC:1375,PFMIS:1000,HOREB:875,BUKID:1750,CCPC:125,ARGAO:875,SOUTH:1000,NATIONAL:7000};
 const DAILY_TARGET  = {AC:230,PFMIS:165,HOREB:145,BUKID:290,CCPC:20,ARGAO:145,SOUTH:165,NATIONAL:1160};
 const LIMITS = {UDT_PCT:5,KWH_TON:35,FUEL_TON:3.5,COAL_TON:12};
+const MONTHLY_TARGET = {AC:5500,PFMIS:4000,HOREB:3500,BUKID:7000,CCPC:500,ARGAO:3500,SOUTH:4000,NATIONAL:28000};
 const DT_CATS = {'Mechanical':'cat-mech','Electrical':'cat-elec','PLC':'cat-elec','Process':'cat-proc','Warehouse':'cat-proc','Raw Materials':'cat-rm','Change Over':'cat-co','Change Die':'cat-co','Change Screen':'cat-co','Power Interruption':'cat-pwr'};
 
 let DATA={}, activeSite='NATIONAL', activeWeek=1, activePage='dashboard', charts={}, refreshTimer=null;
@@ -704,7 +705,148 @@ function renderMonthly(){
     +'<div class="kc-val" style="font-size:20px;color:'+(mRMVWSpct<0?'var(--red)':'var(--green-b)')+'">'+(mRMVWS!==0?(mRMVWSpct>=0?'+':'')+mRMVWSpct.toFixed(3)+'%':'—')+'</div>'
     +'</div></div>';
 
-  ct.innerHTML=(activeSite==='NATIONAL'?scorecard:'')+kpiCards+kpiCards2;
+  // ── MONTHLY CHARTS ─────────────────────────────────────
+  var chartSection='<div class="sec"><div class="sec-hdr"><div class="sec-title">Monthly Trends — '+(activeSite==='NATIONAL'?'National':SL[activeSite])+'</div><div class="sec-line"></div></div>'
+    // Row 1: Output + Cap Util combo, then UDT combo
+    +'<div class="g2" style="margin-bottom:8px">'
+    +'<div class="cc"><div class="cc-title">Monthly Output vs Target (mt)</div><div style="position:relative;height:180px"><canvas id="cm-out"></canvas></div></div>'
+    +'<div class="cc"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><div class="cc-title" style="margin-bottom:0">Unscheduled Downtime — hrs &amp; % (Limit: 5%)</div><div id="cm-udt-badge" style="font-size:9px;font-family:DM Mono,monospace;padding:2px 8px;border-radius:10px"></div></div><div style="position:relative;height:160px"><canvas id="cm-udt"></canvas></div></div>'
+    +'</div>'
+    // Row 2: Power, Fuel
+    +'<div class="g2" style="margin-bottom:8px">'
+    +'<div class="cc"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><div class="cc-title" style="margin-bottom:0">Power kWh/ton (Limit: 35)</div><div id="cm-kwh-badge" style="font-size:9px;font-family:DM Mono,monospace;padding:2px 8px;border-radius:10px"></div></div><div style="position:relative;height:160px"><canvas id="cm-kwh"></canvas></div></div>'
+    +'<div class="cc"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><div class="cc-title" style="margin-bottom:0">Fuel L/ton (Limit: 3.5)</div><div id="cm-fuel-badge" style="font-size:9px;font-family:DM Mono,monospace;padding:2px 8px;border-radius:10px"></div></div><div style="position:relative;height:160px"><canvas id="cm-fuel"></canvas></div></div>'
+    +'</div>'
+    // Row 3: Coal
+    +'<div class="g2">'
+    +'<div class="cc"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><div class="cc-title" style="margin-bottom:0">Coal kg/ton (Limit: 12)</div><div id="cm-coal-badge" style="font-size:9px;font-family:DM Mono,monospace;padding:2px 8px;border-radius:10px"></div></div><div style="position:relative;height:160px"><canvas id="cm-coal"></canvas></div></div>'
+    +'<div class="cc"><div class="cc-title">Capacity Utilization % by Month</div><div style="position:relative;height:160px"><canvas id="cm-cu"></canvas></div></div>'
+    +'</div></div>';
+
+  ct.innerHTML=(activeSite==='NATIONAL'?scorecard:'')+kpiCards+kpiCards2+chartSection;
+
+  // ── RENDER MONTHLY CHARTS ───────────────────────────────
+  // destroy old charts
+  ['cm-out','cm-udt','cm-kwh','cm-fuel','cm-coal','cm-cu'].forEach(function(id){
+    if(charts[id]){try{charts[id].destroy();}catch(e){}}
+  });
+
+  var mLabels=months;
+  var gc='rgba(255,255,255,0.04)';
+  var sc={grid:{color:gc},ticks:{color:'#484f58',font:{size:9}}};
+  var mTip={backgroundColor:'#1f2631',borderColor:'rgba(255,255,255,.1)',borderWidth:1,bodyFont:{family:"'DM Mono',monospace",size:10}};
+
+  // helper: get value per month for current site
+  function perMonth(field){
+    return months.map(function(m){
+      var mr=rows.filter(function(r){
+        var p=(r.Plant||'').toUpperCase();
+        var match=activeSite==='NATIONAL'?p==='NATIONAL':p===activeSite;
+        return match&&String(r.MONTH||r.Month||'').trim()===m;
+      });
+      if(!mr.length) return null;
+      var v=mr.reduce(function(a,r){return a+gf(r,field);},0);
+      return v>0?+v.toFixed(2):null;
+    });
+  }
+  function avgPerMonth(field){
+    return months.map(function(m){
+      var mr=rows.filter(function(r){
+        var p=(r.Plant||'').toUpperCase();
+        var match=activeSite==='NATIONAL'?p==='NATIONAL':p===activeSite;
+        return match&&String(r.MONTH||r.Month||'').trim()===m;
+      });
+      if(!mr.length) return null;
+      var v=mr.reduce(function(a,r){return a+gf(r,field);},0)/mr.length;
+      return v>0?+v.toFixed(2):null;
+    });
+  }
+
+  var mTgt=MONTHLY_TARGET[activeSite]||MONTHLY_TARGET.NATIONAL;
+  var ptC=function(v,lim){if(!v)return 'rgba(139,148,158,0.4)';return v>lim?'#f85149':v>lim*0.9?'#d29922':'#3fb950';};
+  var setBadge=function(id,val,lim,unit){
+    var el=document.getElementById(id);if(!el)return;
+    var over=val>lim,near=val>lim*0.9;
+    el.textContent=(over?'▲ ':near?'◉ ':'▼ ')+val.toFixed(2)+unit+(over?' over':near?' near':' ok');
+    el.style.cssText='font-size:9px;font-family:DM Mono,monospace;padding:2px 8px;border-radius:10px;background:'+(over?'rgba(248,81,73,0.15)':near?'rgba(210,153,34,0.15)':'rgba(46,160,67,0.15)')+';color:'+(over?'#f85149':near?'#d29922':'#3fb950')+';border:1px solid '+(over?'rgba(248,81,73,0.3)':near?'rgba(210,153,34,0.3)':'rgba(46,160,67,0.3)')+';';
+  };
+
+  // 1. Monthly Output + Cap Util combo
+  var outData=perMonth('Total Plant Output,mt');
+  var cuData=avgPerMonth('Capacity Utilization Rate,%').map(function(v){return v?+(v>1?v:v*100).toFixed(1):null;});
+  var outC=document.getElementById('cm-out');
+  if(outC) charts['cm-out']=new Chart(outC.getContext('2d'),{
+    data:{labels:mLabels,datasets:[
+      {type:'bar',label:'Output mt',data:outData,
+       backgroundColor:outData.map(function(v){return v&&v>=mTgt?'rgba(63,185,80,0.5)':'rgba(248,81,73,0.4)';}),
+       borderRadius:3,yAxisID:'y'},
+      {type:'line',label:'Target '+mTgt+' mt',data:months.map(function(){return mTgt;}),
+       borderColor:'rgba(248,81,73,0.6)',borderDash:[4,4],borderWidth:1.5,pointRadius:0,fill:false,yAxisID:'y'},
+      {type:'line',label:'Cap Util %',data:cuData,
+       borderColor:'#388bfd',backgroundColor:'transparent',tension:.3,pointRadius:4,
+       pointBackgroundColor:cuData.map(function(v){return v>=80?'#3fb950':v>=60?'#d29922':'#f85149';}),
+       spanGaps:true,yAxisID:'y1'}
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,animation:{duration:200},
+      plugins:{legend:{display:true,labels:{color:'#8b949e',font:{size:9},boxWidth:10}},tooltip:{backgroundColor:'#1f2631',borderColor:'rgba(255,255,255,.1)',borderWidth:1,bodyFont:{family:"'DM Mono',monospace",size:10}}},
+      scales:{
+        x:sc,
+        y:{position:'left',grid:{color:gc},ticks:{color:'#484f58',font:{size:9}},title:{display:true,text:'mt',color:'#484f58',font:{size:9}}},
+        y1:{position:'right',grid:{display:false},ticks:{color:'#484f58',font:{size:9},callback:function(v){return v+'%';}},min:0,max:100}
+      }}
+  });
+
+  // 2. UDT combo (bar=hrs, line=%)
+  var udtHrs=perMonth('Unscheduled Down Time, hr');
+  var udtPct=avgPerMonth('Unscheduled Down Time, %').map(function(v){return v?(v>1?+v.toFixed(2):+(v*100).toFixed(2)):null;});
+  var latestUDT=udtPct.filter(function(v){return v!==null;}).slice(-1)[0]||0;
+  setBadge('cm-udt-badge',latestUDT,LIMITS.UDT_PCT,'%');
+  var udtC=document.getElementById('cm-udt');
+  if(udtC) charts['cm-udt']=new Chart(udtC.getContext('2d'),{
+    data:{labels:mLabels,datasets:[
+      {type:'bar',label:'UDT Hours',data:udtHrs,backgroundColor:udtHrs.map(function(v){return v>0?'rgba(248,81,73,0.6)':'rgba(56,139,253,0.3)';}),borderRadius:3,yAxisID:'y'},
+      {type:'line',label:'UDT %',data:udtPct,borderColor:'#f85149',backgroundColor:'transparent',tension:.3,pointRadius:4,pointBackgroundColor:udtPct.map(function(v){return ptC(v,LIMITS.UDT_PCT);}),spanGaps:true,yAxisID:'y1'},
+      {type:'line',label:'5% Limit',data:months.map(function(){return LIMITS.UDT_PCT;}),borderColor:'rgba(248,81,73,0.5)',borderDash:[4,4],borderWidth:1.5,pointRadius:0,fill:false,yAxisID:'y1'}
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,animation:{duration:200},
+      plugins:{legend:{display:true,labels:{color:'#8b949e',font:{size:9},boxWidth:10}},tooltip:{backgroundColor:'#1f2631',borderColor:'rgba(255,255,255,.1)',borderWidth:1,bodyFont:{family:"'DM Mono',monospace",size:10}}},
+      scales:{x:sc,y:{position:'left',grid:{color:gc},ticks:{color:'#484f58',font:{size:9}},title:{display:true,text:'Hours',color:'#484f58',font:{size:9}}},y1:{position:'right',grid:{display:false},ticks:{color:'#484f58',font:{size:9},callback:function(v){return v+'%';}}}}}
+  });
+
+  // 3. kWh/ton
+  var kwhData=avgPerMonth('kWh/ton');
+  setBadge('cm-kwh-badge',kwhData.filter(function(v){return v!==null;}).slice(-1)[0]||0,LIMITS.KWH_TON,' kWh/t');
+  var kwhC=document.getElementById('cm-kwh');
+  if(kwhC) charts['cm-kwh']=new Chart(kwhC.getContext('2d'),{type:'line',data:{labels:mLabels,datasets:[
+    {label:'kWh/ton',data:kwhData,borderColor:'#a371f7',backgroundColor:'rgba(163,113,247,0.08)',fill:true,tension:.3,pointRadius:4,spanGaps:true,pointBackgroundColor:kwhData.map(function(v){return ptC(v,LIMITS.KWH_TON);})},
+    {label:'Limit 35',data:months.map(function(){return LIMITS.KWH_TON;}),borderColor:'rgba(248,81,73,0.5)',borderDash:[4,4],borderWidth:1.5,pointRadius:0,fill:false}
+  ]},options:{responsive:true,maintainAspectRatio:false,animation:{duration:200},plugins:{legend:{display:true,labels:{color:'#8b949e',font:{size:9},boxWidth:10}},tooltip:mTip},scales:{x:sc,y:sc}}});
+
+  // 4. Fuel L/ton
+  var fuelData=avgPerMonth('Li/ton');
+  setBadge('cm-fuel-badge',fuelData.filter(function(v){return v!==null;}).slice(-1)[0]||0,LIMITS.FUEL_TON,' L/t');
+  var fuelC=document.getElementById('cm-fuel');
+  if(fuelC) charts['cm-fuel']=new Chart(fuelC.getContext('2d'),{type:'line',data:{labels:mLabels,datasets:[
+    {label:'L/ton',data:fuelData,borderColor:'#d29922',backgroundColor:'rgba(210,153,34,0.08)',fill:true,tension:.3,pointRadius:4,spanGaps:true,pointBackgroundColor:fuelData.map(function(v){return ptC(v,LIMITS.FUEL_TON);})},
+    {label:'Limit 3.5',data:months.map(function(){return LIMITS.FUEL_TON;}),borderColor:'rgba(248,81,73,0.5)',borderDash:[4,4],borderWidth:1.5,pointRadius:0,fill:false}
+  ]},options:{responsive:true,maintainAspectRatio:false,animation:{duration:200},plugins:{legend:{display:true,labels:{color:'#8b949e',font:{size:9},boxWidth:10}},tooltip:mTip},scales:{x:sc,y:sc}}});
+
+  // 5. Coal kg/ton
+  var coalData=avgPerMonth('kg/ton');
+  setBadge('cm-coal-badge',coalData.filter(function(v){return v!==null;}).slice(-1)[0]||0,LIMITS.COAL_TON,' kg/t');
+  var coalC=document.getElementById('cm-coal');
+  if(coalC) charts['cm-coal']=new Chart(coalC.getContext('2d'),{type:'line',data:{labels:mLabels,datasets:[
+    {label:'kg/ton',data:coalData,borderColor:'#8b949e',backgroundColor:'rgba(139,148,158,0.08)',fill:true,tension:.3,pointRadius:4,spanGaps:true,pointBackgroundColor:coalData.map(function(v){return ptC(v,LIMITS.COAL_TON);})},
+    {label:'Limit 12',data:months.map(function(){return LIMITS.COAL_TON;}),borderColor:'rgba(248,81,73,0.5)',borderDash:[4,4],borderWidth:1.5,pointRadius:0,fill:false}
+  ]},options:{responsive:true,maintainAspectRatio:false,animation:{duration:200},plugins:{legend:{display:true,labels:{color:'#8b949e',font:{size:9},boxWidth:10}},tooltip:mTip},scales:{x:sc,y:sc}}});
+
+  // 6. Cap Util % line
+  var cuC2=document.getElementById('cm-cu');
+  if(cuC2) charts['cm-cu']=new Chart(cuC2.getContext('2d'),{type:'line',data:{labels:mLabels,datasets:[
+    {label:'Cap Util %',data:cuData,borderColor:'#388bfd',backgroundColor:'rgba(56,139,253,0.08)',fill:true,tension:.3,pointRadius:4,spanGaps:true,
+     pointBackgroundColor:cuData.map(function(v){return v>=80?'#3fb950':v>=60?'#d29922':'#f85149';})},
+    {label:'Target 80%',data:months.map(function(){return 80;}),borderColor:'rgba(63,185,80,0.5)',borderDash:[4,4],borderWidth:1.5,pointRadius:0,fill:false}
+  ]},options:{responsive:true,maintainAspectRatio:false,animation:{duration:200},plugins:{legend:{display:true,labels:{color:'#8b949e',font:{size:9},boxWidth:10}},tooltip:mTip},scales:{x:sc,y:{grid:{color:gc},ticks:{color:'#484f58',font:{size:9},callback:function(v){return v+'%';}},min:0,max:120}}}});
 }
 function renderCost(){var ct=document.getElementById('content-cost');if(!DATA.cost){ct.innerHTML='<div class="no-data">⟳ Loading...</div>';gasGet('cost').then(function(d){DATA.cost=d;renderCost();}).catch(function(e){ct.innerHTML='<div class="no-data">Error: '+e.message+'</div>';});return;}ct.innerHTML='<div class="no-data">Cost data loaded — '+( DATA.cost.rows||[]).length+' rows</div>';}
 function renderDowntime(){var ct=document.getElementById('content-downtime');if(!DATA.downtime){ct.innerHTML='<div class="no-data">⟳ Loading...</div>';gasGet('downtime').then(function(d){DATA.downtime=d;renderDowntime();}).catch(function(e){ct.innerHTML='<div class="no-data">Error: '+e.message+'</div>';});return;}var d=DATA.downtime;var rows=d.rows||[];var byReason=d.byReason||{};var reasons=Object.entries(byReason).sort(function(a,b){return b[1]-a[1];});ct.innerHTML='<div class="sec"><div class="sec-hdr"><div class="sec-title">Downtime</div><div class="sec-line"></div></div><div class="g2"><div class="cc"><div class="cc-title">By Category</div>'+reasons.slice(0,10).map(function(e){var max=reasons[0]?reasons[0][1]:1;return '<div class="mbar-row"><div class="mbar-lbl">'+e[0].slice(0,18)+'</div><div class="mbar-bg"><div class="mbar-fill" style="width:'+(e[1]/max*100).toFixed(0)+'%;background:var(--red)"></div></div><div class="mbar-val">'+e[1].toFixed(1)+'h</div></div>';}).join('')+'</div><div class="cc"><div class="cc-title">Records</div><div class="tbl-wrap"><table><thead><tr><th style="text-align:left">Plant</th><th style="text-align:left">Category</th><th>UDT hr</th></tr></thead><tbody>'+rows.slice(0,30).map(function(r){var s=(r.Plant||'').toUpperCase();return '<tr><td>'+dot(s)+s+'</td><td><span class="cat-pill '+(DT_CATS[r.Category||'']||'cat-other')+'">'+(r.Category||'—')+'</span></td><td class="tr">'+(r['Unscheduled Down Time, hr']||0).toFixed(2)+'</td></tr>';}).join('')+'</tbody></table></div></div></div></div>';}
