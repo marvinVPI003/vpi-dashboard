@@ -141,8 +141,20 @@ function buildNav(){
     setTimeout(function(){var a=pills.querySelector('.wk-pill.active');if(a)a.scrollIntoView({behavior:'smooth',block:'nearest',inline:'center'});},100);
   }
 }
-function setSite(s){activeSite=s;buildNav();render();}
-function setWeek(w){activeWeek=+w;buildNav();render();}
+function setSite(s){
+  activeSite=s;
+  buildNav();
+  var fns={dashboard:render,monthly:renderMonthly,cost:renderCost,downtime:renderDowntime,production:renderProduction,oee:renderOEE,cost_analytics:renderCostAnalytics,quality_energy:renderQualityEnergy};
+  if(fns[activePage]) fns[activePage]();
+  else render();
+}
+function setWeek(w){
+  activeWeek=+w;
+  buildNav();
+  var fns={dashboard:render,monthly:renderMonthly,cost:renderCost,downtime:renderDowntime,production:renderProduction,oee:renderOEE,cost_analytics:renderCostAnalytics,quality_energy:renderQualityEnergy};
+  if(fns[activePage]) fns[activePage]();
+  else render();
+}
 
 // ── PAGE NAV ──────────────────────────────────────────────
 function setPage(p){
