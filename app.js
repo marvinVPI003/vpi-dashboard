@@ -723,7 +723,92 @@ function renderMonthly(){
     +'<div class="cc"><div class="cc-title">OEE % by Month</div><div style="position:relative;height:160px"><canvas id="cm-cu"></canvas></div></div>'
     +'</div></div>';
 
-  ct.innerHTML=(activeSite==='NATIONAL'?scorecard:'')+kpiCards+kpiCards2+chartSection;
+  // ── PROJECTED VOLUME TABLE ─────────────────────────────
+  // Remaining days = calendar days in month - days elapsed
+  // Use today's date to compute days remaining for current month
+  var today=new Date();
+  var todayMonth=today.toLocaleString('en-PH',{month:'long'}).toUpperCase();
+  var isCurrentMonth=(activeMonth.toUpperCase()===todayMonth);
+
+  // Build projected table rows
+  var projRows=[];
+  var sitesToShow=activeSite==='NATIONAL'?PROD_SITES:[activeSite];
+
+  sitesToShow.forEach(function(s){
+    var sr=mRows.filter(function(r){return (r.Plant||'').toUpperCase()===s;});
+    if(!sr.length)return;
+
+    var mtdOut=sr.reduce(function(a,r){
+      var am=gf(r,'Total Plant Output,mt','Total Plant Output,mt w/o toll');
+      if(am===0) am=gf(r,'COMPLETE FEEDS, mt','COMPLETE FEEDS,mt')+gf(r,'Mixgrain')+gf(r,'Vietop')+gf(r,'Total Repack (MG+CF), mt');
+      return a+am;
+    },0);
+    if(s==='ARGAO') mtdOut+=sr.reduce(function(a,r){return a+gf(r,'Mash','Mash,mt');},0);
+
+    var pdr=sr.reduce(function(a,r){return a+gf(r,'Plant Daily Pelleting Rate,ton/day','Plant Daily Rate, ton/day');},0);
+    var calDays=sr.reduce(function(a,r){return a+gf(r,'CALENDAR DA','CALENDAR DAYS','Calendar Days');},0);
+
+    // Remaining days calculation
+    var remaining=0;
+    if(isCurrentMonth && calDays>0){
+      var dayOfMonth=today.getDate();
+      remaining=Math.max(0,calDays-dayOfMonth);
+    } else if(calDays>0){
+      // For past months remaining=0, for future months remaining=calDays
+      remaining=0;
+    }
+
+    var projected=pdr>0?(pdr*remaining)+mtdOut:mtdOut;
+    var target=MONTHLY_TARGET[s]||0;
+    var gap=target>0?projected-target:0;
+
+    projRows.push({
+      site:s,label:SL[s]||s,
+      mtdOut:mtdOut,pdr:pdr,calDays:calDays,
+      remaining:remaining,projected:projected,
+      target:target,gap:gap
+    });
+  });
+
+  // National projected total
+  if(activeSite==='NATIONAL'){
+    var natProjTotal=projRows.reduce(function(a,r){return a+r.projected;},0);
+    var natMTD=projRows.reduce(function(a,r){return a+r.mtdOut;},0);
+    var natTarget=MONTHLY_TARGET.NATIONAL||0;
+    projRows.push({
+      site:'NATIONAL',label:'NATIONAL',isTotal:true,
+      mtdOut:natMTD,pdr:0,remaining:0,
+      projected:natProjTotal,target:natTarget,gap:natProjTotal-natTarget
+    });
+  }
+
+  var projTable='<div class="sec"><div class="sec-hdr"><div class="sec-title">Projected Volume — '+activeMonth+(isCurrentMonth?' (Current Month)':' (Final)')+'</div><div class="sec-line"></div></div>'
+    +'<div class="cc"><div class="tbl-wrap"><table>'
+    +'<thead><tr>'
+    +'<th style="text-align:left">Plant</th>'
+    +'<th>MTD Output mt</th>'
+    +'<th>PDR t/day</th>'
+    +'<th>Remaining Days</th>'
+    +'<th>Projected mt</th>'
+    +'<th>Target mt</th>'
+    +'<th>Gap mt</th>'
+    +'</tr></thead><tbody>'
+    +projRows.map(function(r){
+      var projC=r.target>0?(r.projected>=r.target?'tg':'tr'):'';
+      var gapC=r.gap>=0?'tg':'tr';
+      return '<tr style="'+(r.isTotal?'font-weight:700;background:var(--bg3);border-top:2px solid var(--border)':'')+'">'
+        +'<td style="text-align:left">'+dot(r.site)+(r.isTotal?'<strong>'+r.label+'</strong>':SL[r.site]||r.label)+'</td>'
+        +'<td>'+(r.mtdOut>0?r.mtdOut.toFixed(1):'—')+'</td>'
+        +'<td>'+(r.pdr>0?r.pdr.toFixed(2):'—')+'</td>'
+        +'<td style="color:var(--text2)">'+(r.isTotal?'—':r.remaining+'d')+'</td>'
+        +'<td class="'+projC+'" style="font-family:DM Mono,monospace;font-weight:600">'+(r.projected>0?r.projected.toFixed(1):'—')+'</td>'
+        +'<td style="color:var(--text3)">'+(r.target>0?r.target.toFixed(0):'—')+'</td>'
+        +'<td class="'+gapC+'" style="font-family:DM Mono,monospace">'+(r.target>0?(r.gap>=0?'+':'')+r.gap.toFixed(1):'—')+'</td>'
+        +'</tr>';
+    }).join('')
+    +'</tbody></table></div></div></div>';
+
+  ct.innerHTML=(activeSite==='NATIONAL'?scorecard:'')+kpiCards+kpiCards2+chartSection+projTable;
 
   // ── RENDER MONTHLY CHARTS ───────────────────────────────
   // destroy old charts
