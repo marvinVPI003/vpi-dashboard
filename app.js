@@ -1073,6 +1073,62 @@ function renderDowntime(){
     var coRows=mFiltered.filter(function(r){return r['No. Of Change Over']>0;})
       .sort(function(a,b){return b['No. Of Change Over']-a['No. Of Change Over'];});
 
+    // Build 80% UDT breakdown table - grouped and totaled
+    var breakdown80={};
+    var cumHrs=0;
+    // Only include rows from categories in the 80% pareto
+    pareto80.filter(function(p){return p.cumPct<=80.01;}).forEach(function(p){
+      mFiltered.filter(function(r){
+        return r.Category===p.category && r['Unscheduled Downtime']>0;
+      }).forEach(function(r){
+        // Key = Plant + Category + Sub-Category + Reason
+        var key=r.Plant+'||'+r.Category+'||'+(r['Sub-Category']||'')+'||'+(r['Reason of Delay']||'');
+        if(!breakdown80[key]){
+          breakdown80[key]={
+            Plant:r.Plant, Month:r.Month, Category:r.Category,
+            'Sub-Category':r['Sub-Category']||'',
+            'Reason of Delay':r['Reason of Delay']||'',
+            'Unscheduled Downtime':0
+          };
+        }
+        breakdown80[key]['Unscheduled Downtime']+=r['Unscheduled Downtime'];
+      });
+    });
+    var bd80Rows=Object.values(breakdown80)
+      .sort(function(a,b){return b['Unscheduled Downtime']-a['Unscheduled Downtime'];});
+    var bd80Total=bd80Rows.reduce(function(a,r){return a+r['Unscheduled Downtime'];},0);
+
+    var bd80Section='<div class="sec"><div class="sec-hdr"><div class="sec-title">80% UDT Breakdown — '+activeMonth+' (Grouped &amp; Totaled)</div><div class="sec-line"></div></div>'
+      +(bd80Rows.length?
+        '<div class="cc"><div class="tbl-wrap" style="max-height:360px;overflow-y:auto"><table>'
+        +'<thead><tr>'
+        +'<th>Plant</th><th>Month</th>'
+        +'<th style="text-align:left">Category</th>'
+        +'<th style="text-align:left">Sub-Category</th>'
+        +'<th style="text-align:left">Reason of Delay</th>'
+        +'<th>UDT hrs</th><th>%</th>'
+        +'</tr></thead><tbody>'
+        +bd80Rows.map(function(r){
+          var pct=bd80Total>0?(r['Unscheduled Downtime']/bd80Total*100):0;
+          return '<tr>'
+            +'<td>'+dot((r.Plant||'').toUpperCase())+(r.Plant||'—')+'</td>'
+            +'<td>'+(r.Month||activeMonth)+'</td>'
+            +'<td style="text-align:left"><span class="cat-pill '+(DT_CATS[r.Category||'']||'cat-other')+'">'+(r.Category||'—')+'</span></td>'
+            +'<td style="text-align:left;font-size:10px;color:var(--text2)">'+(r['Sub-Category']||'—')+'</td>'
+            +'<td style="text-align:left;font-size:10px;color:var(--text3);max-width:220px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+(r['Reason of Delay']||'—')+'</td>'
+            +'<td class="tr" style="font-family:DM Mono,monospace;font-weight:600">'+r['Unscheduled Downtime'].toFixed(2)+'</td>'
+            +'<td style="color:var(--text2);font-size:10px">'+pct.toFixed(1)+'%</td>'
+            +'</tr>';
+        }).join('')
+        +'<tr style="border-top:2px solid var(--border);background:var(--bg3)">'
+        +'<td colspan="5" style="text-align:right;font-weight:700;color:var(--text)">TOTAL</td>'
+        +'<td class="tr" style="font-family:DM Mono,monospace;font-weight:700">'+bd80Total.toFixed(2)+'</td>'
+        +'<td style="color:var(--text2)">100%</td>'
+        +'</tr>'
+        +'</tbody></table></div></div>'
+        :'<div class="no-data">No 80% breakdown data</div>')
+      +'</div>';
+
     var tablesSection='<div class="sec"><div class="sec-hdr"><div class="sec-title">Downtime Detail Records — '+activeMonth+'</div><div class="sec-line"></div></div>'
       +dtTable('Unscheduled Downtime Records',udtRows,'Unscheduled Downtime')
       +'<div style="margin-top:8px"></div>'
@@ -1081,7 +1137,7 @@ function renderDowntime(){
       +dtTable('Change Over Records',coRows,'No. Of Change Over')
       +'</div>';
 
-    dtWrap.innerHTML=paretoSection+tablesSection;
+    dtWrap.innerHTML=paretoSection+bd80Section+tablesSection;
 
     // Render pareto chart
     var ctx=document.getElementById('dt-pareto-chart');
