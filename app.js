@@ -860,6 +860,20 @@ function renderDowntime(){
   }
   var rows=DATA.monthly.rows||[];
   var months=DATA.monthly.months||[];
+
+  // Sync activeMonth if not set
+  if(!activeMonth||months.indexOf(activeMonth)<0) activeMonth=months[months.length-1]||'';
+
+  // Build month pill strip for downtime tab
+  var dtPills=document.getElementById('dt-month-pills');
+  if(dtPills){
+    _monthsList=months;
+    dtPills.innerHTML=months.map(function(m,i){
+      return '<button class="wk-pill'+(m===activeMonth?' active':'')+'" onclick="setMonth('+i+');renderDowntime()">'+m.slice(0,3)+'</button>';
+    }).join('');
+    setTimeout(function(){var a=dtPills.querySelector('.wk-pill.active');if(a)a.scrollIntoView({behavior:'smooth',block:'nearest',inline:'center'});},100);
+  }
+
   // Filter by active month and site
   var mRows=rows.filter(function(r){return String(r.MONTH||r.Month||'').trim()===activeMonth;});
   var dRows=activeSite==='NATIONAL'
