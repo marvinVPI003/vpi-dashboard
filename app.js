@@ -902,8 +902,9 @@ function renderDowntime(){
   var whP  = avgPct('Warehouse, %');
   var rmH  = sumHr('Raw Materials, hr','Raw Materials, h');
   var rmP  = avgPct('Raw Materials, %');
-  var coH  = sumHr('Change Over Downtime, hr','Change Over Down Time, hr');
-  var coP  = avgPct('Change Over Downtime, %','Change Over Down Time, %');
+  // Row 1: Change Over Downtime = col AA/AB
+  var coH  = sumHr('Change Over Downtime, hr');
+  var coP  = avgPct('Change Over Downtime, %');
   var pfH  = sumHr('Power Failure, hr','Power Failure, h');
   var pfP  = avgPct('Power Failure, %');
 
@@ -929,6 +930,9 @@ function renderDowntime(){
   var meP  = avgPct('Mechanical, %');
   var plH  = sumHr('PLC, hr');
   var plP  = avgPct('PLC, %');
+  // Row 2: Change Over = col AC/AF, Change Die = col AD/AG
+  var coACH = sumHr('Change Over, hr');
+  var coACP = avgPct('Change Over, %');
   var cdH  = sumHr('Change Die, hr');
   var cdP  = avgPct('Change Die, %');
   var csH  = sumHr('Change Screen, hr');
@@ -944,7 +948,7 @@ function renderDowntime(){
     +dtCard('Process',prH,prP,'var(--amber)')
     +dtCard('Warehouse',whH,whP,'var(--blue)')
     +dtCard('Raw Materials',rmH,rmP,'var(--purple)')
-    +dtCard('Change Over',coH,coP,'var(--teal)')
+    +dtCard('Change Over DT',coH,coP,'var(--teal)')
     +dtCard('Power Failure',pfH,pfP,'var(--amber)')
     +'</div>'
     // Row 2
@@ -953,7 +957,7 @@ function renderDowntime(){
     +dtCard('Electrical',elH,elP,'var(--red)')
     +dtCard('Mechanical',meH,meP,'var(--red)')
     +dtCard('PLC',plH,plP,'var(--amber)')
-    +dtCard('Change Over',coH,coP,'var(--teal)')
+    +dtCard('Change Over',coACH,coACP,'var(--teal)')
     +dtCard('Change Die',cdH,cdP,'var(--teal)')
     +dtCard('Change Screen',csH,csP,'var(--teal)')
     +'</div></div>';
