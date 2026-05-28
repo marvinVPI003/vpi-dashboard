@@ -745,8 +745,22 @@ function renderMonthly(){
       if(am===0) am=gf(r,'COMPLETE FEEDS, mt','COMPLETE FEEDS,mt')+gf(r,'Mixgrain')+gf(r,'Vietop')+gf(r,'Total Repack (MG+CF), mt');
       return a+am;
     },0);
-    // ARGAO: add Mash (same as scorecard)
-    if(s==='ARGAO') mtdOut+=sr.reduce(function(a,r){return a+gf(r,'Mash','Mash,mt');},0);
+    // ARGAO: add Mash only if AM doesn't already include it
+    // Check: if AM > CF+MG+VT+RP, Mash is already included in AM
+    if(s==='ARGAO'){
+      var argaoCF=sr.reduce(function(a,r){return a+gf(r,'COMPLETE FEEDS, mt','COMPLETE FEEDS,mt');},0);
+      var argaoMG=sr.reduce(function(a,r){return a+gf(r,'Mixgrain');},0);
+      var argaoVT=sr.reduce(function(a,r){return a+gf(r,'Vietop');},0);
+      var argaoRP=sr.reduce(function(a,r){return a+gf(r,'Total Repack (MG+CF), mt');},0);
+      var argaoMash=sr.reduce(function(a,r){return a+gf(r,'Mash','Mash,mt');},0);
+      var cfSum=argaoCF+argaoMG+argaoVT+argaoRP;
+      // If AM already includes Mash (AM ≈ CF+MG+VT+RP+Mash), don't add again
+      // If AM ≈ CF only (AM < cfSum+Mash), add Mash
+      if(mtdOut < cfSum+argaoMash*0.5){
+        mtdOut+=argaoMash;
+      }
+      // else AM already includes Mash - use as is
+    }
 
     var pdr=sr.reduce(function(a,r){return a+gf(r,'Plant Daily Pelleting Rate,ton/day','Plant Daily Rate, ton/day');},0);
     var calDays=sr.reduce(function(a,r){return a+gf(r,'CALENDAR DA','CALENDAR DAYS','Calendar Days');},0);
