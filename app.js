@@ -738,25 +738,29 @@ function renderMonthly(){
     var sr=mRows.filter(function(r){return (r.Plant||'').toUpperCase()===s;});
     if(!sr.length)return;
 
+    // Use AM column (Total Plant Output,mt) - same as scorecard
     var mtdOut=sr.reduce(function(a,r){
       var am=gf(r,'Total Plant Output,mt','Total Plant Output,mt w/o toll');
+      // Fallback for CCPC/SOUTH where AM=0
       if(am===0) am=gf(r,'COMPLETE FEEDS, mt','COMPLETE FEEDS,mt')+gf(r,'Mixgrain')+gf(r,'Vietop')+gf(r,'Total Repack (MG+CF), mt');
       return a+am;
     },0);
+    // ARGAO: add Mash (same as scorecard)
     if(s==='ARGAO') mtdOut+=sr.reduce(function(a,r){return a+gf(r,'Mash','Mash,mt');},0);
 
     var pdr=sr.reduce(function(a,r){return a+gf(r,'Plant Daily Pelleting Rate,ton/day','Plant Daily Rate, ton/day');},0);
     var calDays=sr.reduce(function(a,r){return a+gf(r,'CALENDAR DA','CALENDAR DAYS','Calendar Days');},0);
 
-    // Remaining days calculation
+    // Remaining days = calendar days in month - today's day number
+    // e.g. May 28 with 31 calendar days = 31-28 = 3 remaining days
     var remaining=0;
-    if(isCurrentMonth && calDays>0){
+    if(isCurrentMonth){
       var dayOfMonth=today.getDate();
-      remaining=Math.max(0,calDays-dayOfMonth);
-    } else if(calDays>0){
-      // For past months remaining=0, for future months remaining=calDays
-      remaining=0;
+      // Use calDays from sheet, or fallback to last day of month
+      var totalDays=calDays>0?calDays:new Date(today.getFullYear(),today.getMonth()+1,0).getDate();
+      remaining=Math.max(0,totalDays-dayOfMonth);
     }
+    // Past months: remaining=0 (final result)
 
     var projected=pdr>0?(pdr*remaining)+mtdOut:mtdOut;
     var target=MONTHLY_TARGET[s]||0;
