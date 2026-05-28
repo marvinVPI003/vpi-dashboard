@@ -922,9 +922,22 @@ function renderDowntime(){
       +'</div>';
   }
 
+  // Row 2 values
+  var elH  = sumHr('Electrical, hr');
+  var elP  = avgPct('Electrical, %');
+  var meH  = sumHr('Mechanical, hr');
+  var meP  = avgPct('Mechanical, %');
+  var plH  = sumHr('PLC, hr');
+  var plP  = avgPct('PLC, %');
+  var cdH  = sumHr('Change Die, hr');
+  var cdP  = avgPct('Change Die, %');
+  var csH  = sumHr('Change Screen, hr');
+  var csP  = avgPct('Change Screen, %');
+
   ct.innerHTML='<div class="sec"><div class="sec-hdr"><div class="sec-title">Downtime Scorecard — '+(activeSite==='NATIONAL'?'National':SL[activeSite])+' · '+activeMonth+'</div><div class="sec-line"></div></div>'
-    // All cards in one row
-    +'<div style="display:flex;gap:6px;flex-wrap:nowrap;overflow-x:auto">'
+    // Row 1
+    +'<div style="font-size:8px;color:var(--text3);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;font-family:DM Mono,monospace">Overall Downtime</div>'
+    +'<div style="display:flex;gap:6px;flex-wrap:nowrap;overflow-x:auto;margin-bottom:10px">'
     +dtCard('Scheduled DT',sdt,null,'var(--text3)')
     +dtCard('Unscheduled DT',udt,udtP,'var(--red)')
     +dtCard('Equipment',eqH,eqP,'var(--red)')
@@ -933,6 +946,16 @@ function renderDowntime(){
     +dtCard('Raw Materials',rmH,rmP,'var(--purple)')
     +dtCard('Change Over',coH,coP,'var(--teal)')
     +dtCard('Power Failure',pfH,pfP,'var(--amber)')
+    +'</div>'
+    // Row 2
+    +'<div style="font-size:8px;color:var(--text3);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;font-family:DM Mono,monospace">Equipment &amp; Change Over Breakdown</div>'
+    +'<div style="display:flex;gap:6px;flex-wrap:nowrap;overflow-x:auto">'
+    +dtCard('Electrical',elH,elP,'var(--red)')
+    +dtCard('Mechanical',meH,meP,'var(--red)')
+    +dtCard('PLC',plH,plP,'var(--amber)')
+    +dtCard('Change Over',coH,coP,'var(--teal)')
+    +dtCard('Change Die',cdH,cdP,'var(--teal)')
+    +dtCard('Change Screen',csH,csP,'var(--teal)')
     +'</div></div>';
 }
 function renderProduction(){var ct=document.getElementById('content-production');ct.innerHTML='<div class="no-data">Production tab</div>';}
