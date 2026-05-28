@@ -850,7 +850,77 @@ function renderMonthly(){
   ]},options:{responsive:true,maintainAspectRatio:false,animation:{duration:200},plugins:{legend:{display:true,labels:{color:'#8b949e',font:{size:9},boxWidth:10}},tooltip:mTip},scales:{x:sc,y:{grid:{color:gc},ticks:{color:'#484f58',font:{size:9},callback:function(v){return v+'%';}},min:0,max:120}}}});
 }
 function renderCost(){var ct=document.getElementById('content-cost');if(!DATA.cost){ct.innerHTML='<div class="no-data">⟳ Loading...</div>';gasGet('cost').then(function(d){DATA.cost=d;renderCost();}).catch(function(e){ct.innerHTML='<div class="no-data">Error: '+e.message+'</div>';});return;}ct.innerHTML='<div class="no-data">Cost data loaded — '+( DATA.cost.rows||[]).length+' rows</div>';}
-function renderDowntime(){var ct=document.getElementById('content-downtime');if(!DATA.downtime){ct.innerHTML='<div class="no-data">⟳ Loading...</div>';gasGet('downtime').then(function(d){DATA.downtime=d;renderDowntime();}).catch(function(e){ct.innerHTML='<div class="no-data">Error: '+e.message+'</div>';});return;}var d=DATA.downtime;var rows=d.rows||[];var byReason=d.byReason||{};var reasons=Object.entries(byReason).sort(function(a,b){return b[1]-a[1];});ct.innerHTML='<div class="sec"><div class="sec-hdr"><div class="sec-title">Downtime</div><div class="sec-line"></div></div><div class="g2"><div class="cc"><div class="cc-title">By Category</div>'+reasons.slice(0,10).map(function(e){var max=reasons[0]?reasons[0][1]:1;return '<div class="mbar-row"><div class="mbar-lbl">'+e[0].slice(0,18)+'</div><div class="mbar-bg"><div class="mbar-fill" style="width:'+(e[1]/max*100).toFixed(0)+'%;background:var(--red)"></div></div><div class="mbar-val">'+e[1].toFixed(1)+'h</div></div>';}).join('')+'</div><div class="cc"><div class="cc-title">Records</div><div class="tbl-wrap"><table><thead><tr><th style="text-align:left">Plant</th><th style="text-align:left">Category</th><th>UDT hr</th></tr></thead><tbody>'+rows.slice(0,30).map(function(r){var s=(r.Plant||'').toUpperCase();return '<tr><td>'+dot(s)+s+'</td><td><span class="cat-pill '+(DT_CATS[r.Category||'']||'cat-other')+'">'+(r.Category||'—')+'</span></td><td class="tr">'+(r['Unscheduled Down Time, hr']||0).toFixed(2)+'</td></tr>';}).join('')+'</tbody></table></div></div></div></div>';}
+function renderDowntime(){
+  var ct=document.getElementById('content-downtime');
+  // Use MR Monthly data
+  if(!DATA.monthly){
+    ct.innerHTML='<div class="no-data">⟳ Loading...</div>';
+    gasGet('monthly').then(function(d){DATA.monthly=d;renderDowntime();}).catch(function(e){ct.innerHTML='<div class="no-data" style="color:var(--red)">Error: '+e.message+'</div>';});
+    return;
+  }
+  var rows=DATA.monthly.rows||[];
+  var months=DATA.monthly.months||[];
+  // Filter by active month and site
+  var mRows=rows.filter(function(r){return String(r.MONTH||r.Month||'').trim()===activeMonth;});
+  var dRows=activeSite==='NATIONAL'
+    ? mRows.filter(function(r){return (r.Plant||'').toUpperCase()==='NATIONAL';})
+    : mRows.filter(function(r){return (r.Plant||'').toUpperCase()===activeSite;});
+
+  // Helper to get hr and pct fields with fallbacks
+  function dtHr(r,f1,f2){return gf(r,f1,f2||f1);}
+  function dtPct(r,f1,f2){var v=gf(r,f1,f2||f1);return v>1?v:v*100;}
+
+  // Sum values from dRows
+  function sumHr(f1,f2){return dRows.reduce(function(a,r){return a+dtHr(r,f1,f2);},0);}
+  function avgPct(f1,f2){
+    var v=dRows.reduce(function(a,r){return a+gf(r,f1,f2||f1);},0)/Math.max(dRows.length,1);
+    return v>1?v:v*100;
+  }
+
+  var sdt  = sumHr('Scheduled Down Time, hr','Scheduled Downtime, hr');
+  var udt  = sumHr('Unscheduled Down Time, hr','Unscheduled Downtime, hr');
+  var udtP = avgPct('Unscheduled Down Time, %','Unscheduled Downtime, %');
+  var eqH  = sumHr('Equipment Downtime, hr','Equipment Down Time, hr');
+  var eqP  = avgPct('Equipment Downtime, %','Equipment Down Time, %');
+  var prH  = sumHr('Process, hr');
+  var prP  = avgPct('Process, %');
+  var whH  = sumHr('Warehouse, hr');
+  var whP  = avgPct('Warehouse, %');
+  var rmH  = sumHr('Raw Materials, hr','Raw Materials, h');
+  var rmP  = avgPct('Raw Materials, %');
+  var coH  = sumHr('Change Over Downtime, hr','Change Over Down Time, hr');
+  var coP  = avgPct('Change Over Downtime, %','Change Over Down Time, %');
+  var pfH  = sumHr('Power Failure, hr','Power Failure, h');
+  var pfP  = avgPct('Power Failure, %');
+
+  // Color helpers
+  function dtColor(hrs){return hrs>80?'var(--red)':hrs>40?'var(--amber)':'var(--text)';}
+  function pctColor(pct){return pct>5?'var(--red)':pct>3?'var(--amber)':'var(--green-b)';}
+
+  // Scorecard card builder
+  function dtCard(label,hrs,pct,color){
+    var hrsC=dtColor(hrs);
+    var pctC=pct!==null?pctColor(pct):'var(--text3)';
+    return '<div style="background:var(--bg2);border:1px solid var(--border);border-top:2px solid '+hrsC+';border-radius:var(--rl);padding:12px 10px;flex:1;min-width:0">'
+      +'<div style="font-size:8px;color:var(--text3);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;white-space:nowrap">'+label+'</div>'
+      +'<div style="font-family:Barlow Condensed,sans-serif;font-size:28px;font-weight:700;color:'+hrsC+';line-height:1">'+(hrs>0?hrs.toFixed(2):'—')+'<span style="font-size:12px;color:var(--text2);font-family:Barlow,sans-serif"> hr</span></div>'
+      +(pct!==null?'<div style="font-family:DM Mono,monospace;font-size:11px;font-weight:600;color:'+pctC+';margin-top:4px">'+(pct>0?pct.toFixed(2)+'%':'0.00%')+'</div>':'')
+      +'</div>';
+  }
+
+  ct.innerHTML='<div class="sec"><div class="sec-hdr"><div class="sec-title">Downtime Scorecard — '+(activeSite==='NATIONAL'?'National':SL[activeSite])+' · '+activeMonth+'</div><div class="sec-line"></div></div>'
+    // All cards in one row
+    +'<div style="display:flex;gap:6px;flex-wrap:nowrap;overflow-x:auto">'
+    +dtCard('Scheduled DT',sdt,null,'var(--text3)')
+    +dtCard('Unscheduled DT',udt,udtP,'var(--red)')
+    +dtCard('Equipment',eqH,eqP,'var(--red)')
+    +dtCard('Process',prH,prP,'var(--amber)')
+    +dtCard('Warehouse',whH,whP,'var(--blue)')
+    +dtCard('Raw Materials',rmH,rmP,'var(--purple)')
+    +dtCard('Change Over',coH,coP,'var(--teal)')
+    +dtCard('Power Failure',pfH,pfP,'var(--amber)')
+    +'</div></div>';
+}
 function renderProduction(){var ct=document.getElementById('content-production');ct.innerHTML='<div class="no-data">Production tab</div>';}
 function renderOEE(){var ct=document.getElementById('content-oee');ct.innerHTML='<div class="no-data">OEE tab</div>';}
 function renderCostAnalytics(){var ct=document.getElementById('content-cost_analytics');ct.innerHTML='<div class="no-data">Cost Analytics tab</div>';}
