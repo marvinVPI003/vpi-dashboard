@@ -543,6 +543,8 @@ function renderMonthly(){
 
   var rows=DATA.monthly.rows||[];
   var months=DATA.monthly.months||[];
+  // Debug: log actual field names from sheet
+  if(DATA.monthly.debugKeys) console.log('Monthly row keys:', DATA.monthly.debugKeys);
   if(!activeMonth||months.indexOf(activeMonth)<0) activeMonth=months[months.length-1]||'';
 
   // Filter rows for active month
@@ -963,6 +965,8 @@ function renderDowntime(){
   }
   var rows=DATA.monthly.rows||[];
   var months=DATA.monthly.months||[];
+  // Debug: log actual field names from sheet
+  if(DATA.monthly.debugKeys) console.log('Monthly row keys:', DATA.monthly.debugKeys);
 
   // Sync activeMonth if not set
   if(!activeMonth||months.indexOf(activeMonth)<0) activeMonth=months[months.length-1]||'';
@@ -1275,7 +1279,232 @@ function renderDowntime(){
   });
 }
 function renderProduction(){var ct=document.getElementById('content-production');ct.innerHTML='<div class="no-data">Production tab</div>';}
-function renderOEE(){var ct=document.getElementById('content-oee');ct.innerHTML='<div class="no-data">OEE tab</div>';}
+function renderOEE(){
+  var ct=document.getElementById('content-oee');
+  if(!DATA.oee_data){
+    ct.innerHTML='<div class="no-data">⟳ Loading OEE data...</div>';
+    gasGet('oee_data',{site:activeSite}).then(function(d){
+      if(d.error){ct.innerHTML='<div class="no-data" style="color:var(--red)">Error: '+d.error+'</div>';return;}
+      DATA.oee_data=d;
+      renderOEE();
+    }).catch(function(e){ct.innerHTML='<div class="no-data" style="color:var(--red)">Error: '+e.message+'</div>';});
+    return;
+  }
+
+  var rows=DATA.oee_data.rows||[];
+  var months=DATA.oee_data.months||[];
+  var allSites=DATA.oee_data.sites||[];
+
+  // Filter by site
+  var siteRows=activeSite==='NATIONAL'
+    ? rows.filter(function(r){return r.site==='NATIONAL';})
+    : rows.filter(function(r){return r.site===activeSite;});
+
+  // Latest month data
+  var latest=siteRows.length?siteRows[siteRows.length-1]:{oee:0,availability:0,performance:0,quality:0,month:''};
+  var latestMonth=latest.month||months[months.length-1]||'';
+
+  // Determine status color
+  function oeeColor(v){return v>=85?'#3fb950':v>=70?'#d29922':'#f85149';}
+  function oeeGrade(v){return v>=85?'World Class':v>=70?'Acceptable':'Needs Improvement';}
+
+  // Pie chart colors
+  var pieColors=['#3fb950','#388bfd','#a371f7','#d29922'];
+
+  ct.innerHTML=
+    // Header
+    '<div class="sec"><div class="sec-hdr"><div class="sec-title">OEE Dashboard — '+(activeSite==='NATIONAL'?'National':SL[activeSite])+' · '+latestMonth+'</div><div class="sec-line"></div></div>'
+
+    // Row 1: Big OEE pie + 3 small pies
+    +'<div style="display:flex;gap:12px;align-items:center;margin-bottom:8px">'
+
+    // Big OEE donut
+    +'<div class="cc" style="flex:0 0 280px;text-align:center">'
+    +'<div class="cc-title">Overall OEE</div>'
+    +'<div style="position:relative;height:220px"><canvas id="oee-big-pie"></canvas></div>'
+    +'<div style="font-family:Barlow Condensed,sans-serif;font-size:36px;font-weight:700;color:'+oeeColor(latest.oee)+';margin-top:-8px">'+latest.oee.toFixed(1)+'%</div>'
+    +'<div style="font-size:10px;font-family:DM Mono,monospace;color:'+oeeColor(latest.oee)+'">'+oeeGrade(latest.oee)+'</div>'
+    +'<div style="font-size:9px;color:var(--text3);margin-top:4px">World Class Target: 85%</div>'
+    +'</div>'
+
+    // 3 small pies in column
+    +'<div style="display:flex;flex-direction:column;gap:8px;flex:1">'
+    +'<div style="display:flex;gap:8px">'
+
+    // Availability
+    +'<div class="cc" style="flex:1;text-align:center">'
+    +'<div class="cc-title" style="color:#388bfd">Availability</div>'
+    +'<div style="position:relative;height:120px"><canvas id="oee-av-pie"></canvas></div>'
+    +'<div style="font-family:Barlow Condensed,sans-serif;font-size:28px;font-weight:700;color:'+oeeColor(latest.availability)+'">'+latest.availability.toFixed(1)+'%</div>'
+    +'<div style="font-size:9px;color:var(--text3)">Operating Time / Planned Time</div>'
+    +'</div>'
+
+    // Performance
+    +'<div class="cc" style="flex:1;text-align:center">'
+    +'<div class="cc-title" style="color:#a371f7">Performance</div>'
+    +'<div style="position:relative;height:120px"><canvas id="oee-perf-pie"></canvas></div>'
+    +'<div style="font-family:Barlow Condensed,sans-serif;font-size:28px;font-weight:700;color:'+oeeColor(latest.performance)+'">'+latest.performance.toFixed(1)+'%</div>'
+    +'<div style="font-size:9px;color:var(--text3)">Actual vs Net Operating Time</div>'
+    +'</div>'
+
+    // Quality
+    +'<div class="cc" style="flex:1;text-align:center">'
+    +'<div class="cc-title" style="color:#d29922">Quality</div>'
+    +'<div style="position:relative;height:120px"><canvas id="oee-qual-pie"></canvas></div>'
+    +'<div style="font-family:Barlow Condensed,sans-serif;font-size:28px;font-weight:700;color:'+oeeColor(latest.quality)+'">'+latest.quality.toFixed(1)+'%</div>'
+    +'<div style="font-size:9px;color:var(--text3)">Good Output / Total Output</div>'
+    +'</div>'
+    +'</div>'
+    +'</div></div></div>'
+
+    // OEE Trend Line Chart
+    +'<div class="sec"><div class="sec-hdr"><div class="sec-title">OEE Trend — '+(activeSite==='NATIONAL'?'National':SL[activeSite])+'</div><div class="sec-line"></div></div>'
+    +'<div class="cc"><div style="position:relative;height:200px"><canvas id="oee-trend"></canvas></div></div></div>'
+
+    // Monthly Table
+    +'<div class="sec"><div class="sec-hdr"><div class="sec-title">Monthly OEE Summary</div><div class="sec-line"></div></div>'
+    +'<div class="cc"><div class="tbl-wrap"><table>'
+    +'<thead><tr><th>Month</th><th>Site</th><th>OEE %</th><th>Availability %</th><th>Performance %</th><th>Quality %</th><th>Status</th></tr></thead>'
+    +'<tbody>'
+    +(activeSite==='NATIONAL'
+      ? months.map(function(m){
+          return ['AC','PFMIS','HOREB','ARGAO','BUKID','NATIONAL'].map(function(s){
+            var r=rows.find(function(x){return x.month===m&&x.site===s;});
+            if(!r) return '';
+            return '<tr><td>'+m+'</td><td>'+dot(s)+s+'</td>'
+              +'<td class="'+(r.oee>=85?'tg':r.oee>=70?'ta':r.oee>0?'tr':'')+'" style="font-weight:700">'+( r.oee>0?r.oee.toFixed(1)+'%':'—')+'</td>'
+              +'<td>'+(r.availability>0?r.availability.toFixed(1)+'%':'—')+'</td>'
+              +'<td>'+(r.performance>0?r.performance.toFixed(1)+'%':'—')+'</td>'
+              +'<td>'+(r.quality>0?r.quality.toFixed(1)+'%':'—')+'</td>'
+              +'<td><span class="bdg '+(r.oee>=85?'g':r.oee>=70?'a':r.oee>0?'r':'b')+'">'+oeeGrade(r.oee)+'</span></td>'
+              +'</tr>';
+          }).join('');
+        }).join('')
+      : siteRows.map(function(r){
+          return '<tr><td>'+r.month+'</td><td>'+dot(r.site)+r.site+'</td>'
+            +'<td class="'+(r.oee>=85?'tg':r.oee>=70?'ta':r.oee>0?'tr':'')+'" style="font-weight:700">'+( r.oee>0?r.oee.toFixed(1)+'%':'—')+'</td>'
+            +'<td>'+(r.availability>0?r.availability.toFixed(1)+'%':'—')+'</td>'
+            +'<td>'+(r.performance>0?r.performance.toFixed(1)+'%':'—')+'</td>'
+            +'<td>'+(r.quality>0?r.quality.toFixed(1)+'%':'—')+'</td>'
+            +'<td><span class="bdg '+(r.oee>=85?'g':r.oee>=70?'a':r.oee>0?'r':'b')+'">'+oeeGrade(r.oee)+'</span></td>'
+            +'</tr>';
+        }).join('')
+    )
+    +'</tbody></table></div></div></div>'
+
+    // AI Analysis
+    +'<div class="sec" id="oee-analysis-wrap"><div class="sec-hdr"><div class="sec-title">OEE Analysis &amp; Recommendations</div><div class="sec-line"></div></div>'
+    +'<div class="cc"><div class="no-data">⟳ Generating analysis...</div></div></div>';
+
+  // Destroy old charts
+  ['oee-big-pie','oee-av-pie','oee-perf-pie','oee-qual-pie','oee-trend'].forEach(function(id){
+    if(charts[id]){try{charts[id].destroy();}catch(e){}}
+  });
+
+  var gc='rgba(255,255,255,0.04)';
+  var sc={grid:{color:gc},ticks:{color:'#484f58',font:{size:9}}};
+
+  // Helper: draw donut chart
+  function donut(id,val,color,max){
+    var cv=document.getElementById(id); if(!cv) return;
+    var v=Math.min(val,max||120);
+    charts[id]=new Chart(cv.getContext('2d'),{
+      type:'doughnut',
+      data:{datasets:[{
+        data:[v,Math.max(0,(max||100)-v)],
+        backgroundColor:[color,'rgba(255,255,255,0.06)'],
+        borderWidth:0, cutout:'75%'
+      }]},
+      options:{responsive:true,maintainAspectRatio:false,animation:{duration:400},
+        plugins:{legend:{display:false},tooltip:{enabled:false}}}
+    });
+  }
+
+  donut('oee-big-pie', latest.oee,       oeeColor(latest.oee),       100);
+  donut('oee-av-pie',  latest.availability, '#388bfd', 100);
+  donut('oee-perf-pie',latest.performance,  '#a371f7', 120);
+  donut('oee-qual-pie',latest.quality,      '#d29922', 100);
+
+  // OEE Trend Line
+  var mLabels=siteRows.map(function(r){return r.month.slice(0,3);});
+  var oeeVals=siteRows.map(function(r){return r.oee>0?r.oee:null;});
+  var avVals=siteRows.map(function(r){return r.availability>0?r.availability:null;});
+  var perfVals=siteRows.map(function(r){return r.performance>0?r.performance:null;});
+  var qualVals=siteRows.map(function(r){return r.quality>0?r.quality:null;});
+
+  var trendCv=document.getElementById('oee-trend');
+  if(trendCv) charts['oee-trend']=new Chart(trendCv.getContext('2d'),{
+    type:'line',
+    data:{labels:mLabels,datasets:[
+      {label:'OEE %',data:oeeVals,borderColor:'#3fb950',backgroundColor:'rgba(63,185,80,0.08)',fill:true,tension:.3,pointRadius:5,spanGaps:true,
+       pointBackgroundColor:oeeVals.map(function(v){return !v?'grey':v>=85?'#3fb950':v>=70?'#d29922':'#f85149';})},
+      {label:'Availability',data:avVals,borderColor:'#388bfd',backgroundColor:'transparent',tension:.3,pointRadius:3,spanGaps:true},
+      {label:'Performance',data:perfVals,borderColor:'#a371f7',backgroundColor:'transparent',tension:.3,pointRadius:3,spanGaps:true},
+      {label:'Quality',data:qualVals,borderColor:'#d29922',backgroundColor:'transparent',tension:.3,pointRadius:3,spanGaps:true},
+      {label:'85% Target',data:mLabels.map(function(){return 85;}),borderColor:'rgba(63,185,80,0.4)',borderDash:[4,4],borderWidth:1.5,pointRadius:0,fill:false}
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,animation:{duration:200},
+      plugins:{legend:{display:true,labels:{color:'#8b949e',font:{size:9},boxWidth:10}},
+        tooltip:{backgroundColor:'#1f2631',borderColor:'rgba(255,255,255,.1)',borderWidth:1,bodyFont:{family:"'DM Mono',monospace",size:10}}},
+      scales:{x:sc,y:{grid:{color:gc},ticks:{color:'#484f58',font:{size:9},callback:function(v){return v+'%';}},min:0,max:130}}}
+  });
+
+  // AI Analysis using Anthropic API
+  buildOEEAnalysis(siteRows, activeSite);
+}
+
+function buildOEEAnalysis(siteRows, site){
+  var wrap=document.getElementById('oee-analysis-wrap');
+  if(!wrap||!siteRows.length) return;
+
+  // Build context for analysis
+  var summary=siteRows.map(function(r){
+    return r.month+': OEE='+r.oee+'%, Availability='+r.availability+'%, Performance='+r.performance+'%, Quality='+r.quality+'%';
+  }).join('; ');
+
+  var prompt='You are a manufacturing OEE analyst for a feedmill operation. Analyze this OEE data for '
+    +(site==='NATIONAL'?'National aggregate':'site '+site)+' and provide:
+'
+    +'1. Overall performance assessment (2-3 sentences)
+'
+    +'2. Key findings: which metric (Availability/Performance/Quality) needs most improvement and why
+'
+    +'3. Top 2-3 specific actionable recommendations
+'
+    +'4. Best performing month and what drove it
+
+'
+    +'Data: '+summary+'
+
+'
+    +'World class OEE = 85%+. Keep response concise and operational. Use bullet points.';
+
+  fetch('https://api.anthropic.com/v1/messages',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({
+      model:'claude-sonnet-4-20250514',
+      max_tokens:600,
+      messages:[{role:'user',content:prompt}]
+    })
+  }).then(function(r){return r.json();})
+  .then(function(d){
+    var text=d.content&&d.content[0]?d.content[0].text:'Analysis unavailable';
+    // Convert markdown bullets to HTML
+    var html=text
+      .replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>')
+      .replace(/^### (.*)/gm,'<div style="font-size:11px;font-weight:700;color:var(--text);margin:10px 0 4px">$1</div>')
+      .replace(/^## (.*)/gm,'<div style="font-size:12px;font-weight:700;color:var(--text);margin:10px 0 4px">$1</div>')
+      .replace(/^\* (.*)/gm,'<div style="display:flex;gap:6px;margin:3px 0"><span style="color:var(--green-b)">▸</span><span>$1</span></div>')
+      .replace(/^- (.*)/gm,'<div style="display:flex;gap:6px;margin:3px 0"><span style="color:var(--green-b)">▸</span><span>$1</span></div>')
+      .replace(/^\d+\. (.*)/gm,'<div style="display:flex;gap:6px;margin:3px 0"><span style="color:var(--blue)">●</span><span>$1</span></div>')
+      .replace(/
+/g,'');
+    if(wrap) wrap.querySelector('.cc').innerHTML='<div style="font-size:11px;line-height:1.8;color:var(--text2);font-family:Barlow,sans-serif">'+html+'</div>';
+  }).catch(function(){
+    if(wrap) wrap.querySelector('.cc').innerHTML='<div class="no-data">Analysis unavailable</div>';
+  });
+}
 function renderCostAnalytics(){var ct=document.getElementById('content-cost_analytics');ct.innerHTML='<div class="no-data">Cost Analytics tab</div>';}
 function renderQualityEnergy(){var ct=document.getElementById('content-quality_energy');ct.innerHTML='<div class="no-data">Quality & Energy tab</div>';}
 
