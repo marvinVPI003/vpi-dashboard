@@ -720,7 +720,7 @@ function renderMonthly(){
     // Row 3: Coal
     +'<div class="g2">'
     +'<div class="cc"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><div class="cc-title" style="margin-bottom:0">Coal kg/ton (Limit: 12)</div><div id="cm-coal-badge" style="font-size:9px;font-family:DM Mono,monospace;padding:2px 8px;border-radius:10px"></div></div><div style="position:relative;height:160px"><canvas id="cm-coal"></canvas></div></div>'
-    +'<div class="cc"><div class="cc-title">Capacity Utilization % by Month</div><div style="position:relative;height:160px"><canvas id="cm-cu"></canvas></div></div>'
+    +'<div class="cc"><div class="cc-title">OEE % by Month</div><div style="position:relative;height:160px"><canvas id="cm-cu"></canvas></div></div>'
     +'</div></div>';
 
   ct.innerHTML=(activeSite==='NATIONAL'?scorecard:'')+kpiCards+kpiCards2+chartSection;
@@ -840,12 +840,13 @@ function renderMonthly(){
     {label:'Limit 12',data:months.map(function(){return LIMITS.COAL_TON;}),borderColor:'rgba(248,81,73,0.5)',borderDash:[4,4],borderWidth:1.5,pointRadius:0,fill:false}
   ]},options:{responsive:true,maintainAspectRatio:false,animation:{duration:200},plugins:{legend:{display:true,labels:{color:'#8b949e',font:{size:9},boxWidth:10}},tooltip:mTip},scales:{x:sc,y:sc}}});
 
-  // 6. Cap Util % line
+  // 6. OEE % line
+  var oeeMonthData=avgPerMonth('OEE').map(function(v){return v?(v>1?+v.toFixed(1):+(v*100).toFixed(1)):null;});
   var cuC2=document.getElementById('cm-cu');
   if(cuC2) charts['cm-cu']=new Chart(cuC2.getContext('2d'),{type:'line',data:{labels:mLabels,datasets:[
-    {label:'Cap Util %',data:cuData,borderColor:'#388bfd',backgroundColor:'rgba(56,139,253,0.08)',fill:true,tension:.3,pointRadius:4,spanGaps:true,
-     pointBackgroundColor:cuData.map(function(v){return v>=80?'#3fb950':v>=60?'#d29922':'#f85149';})},
-    {label:'Target 80%',data:months.map(function(){return 80;}),borderColor:'rgba(63,185,80,0.5)',borderDash:[4,4],borderWidth:1.5,pointRadius:0,fill:false}
+    {label:'OEE %',data:oeeMonthData,borderColor:'#3fb950',backgroundColor:'rgba(63,185,80,0.08)',fill:true,tension:.3,pointRadius:4,spanGaps:true,
+     pointBackgroundColor:oeeMonthData.map(function(v){return !v?'grey':v>=85?'#3fb950':v>=70?'#d29922':'#f85149';})},
+    {label:'Target 85%',data:months.map(function(){return 85;}),borderColor:'rgba(63,185,80,0.5)',borderDash:[4,4],borderWidth:1.5,pointRadius:0,fill:false}
   ]},options:{responsive:true,maintainAspectRatio:false,animation:{duration:200},plugins:{legend:{display:true,labels:{color:'#8b949e',font:{size:9},boxWidth:10}},tooltip:mTip},scales:{x:sc,y:{grid:{color:gc},ticks:{color:'#484f58',font:{size:9},callback:function(v){return v+'%';}},min:0,max:120}}}});
 }
 function renderCost(){var ct=document.getElementById('content-cost');if(!DATA.cost){ct.innerHTML='<div class="no-data">⟳ Loading...</div>';gasGet('cost').then(function(d){DATA.cost=d;renderCost();}).catch(function(e){ct.innerHTML='<div class="no-data">Error: '+e.message+'</div>';});return;}ct.innerHTML='<div class="no-data">Cost data loaded — '+( DATA.cost.rows||[]).length+' rows</div>';}
