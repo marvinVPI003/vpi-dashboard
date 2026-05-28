@@ -972,11 +972,29 @@ function renderDowntime(){
     if(!dtWrap) return;
 
     var allRows=d.rows||[];
-    var pareto=d.pareto||[];
     var udtTotal=d.udtTotal||0;
 
-    // Filter by active month
-    var mFiltered=allRows.filter(function(r){return String(r.Month||'').trim()===activeMonth;});
+    // Debug: show unique months in data
+    var uniqueMonths=[...new Set(allRows.map(function(r){return r.Month||''}))].filter(Boolean);
+    var uniquePlants=[...new Set(allRows.map(function(r){return r.Plant||''}))].filter(Boolean);
+    console.log('DT months:',uniqueMonths,'plants:',uniqueMonths,'activeMonth:',activeMonth,'activeSite:',activeSite,'total rows:',allRows.length);
+
+    // Show unique months for debugging
+    console.log('Available months:',d.uniqueMonths,'Total rows:',d.totalRows);
+
+    // Filter by active month - use _monthUpper for reliability
+    var mFiltered=allRows.filter(function(r){
+      var rMonth=r._monthUpper||String(r.Month||'').trim().toUpperCase();
+      return rMonth===activeMonth.toUpperCase();
+    });
+    console.log('Filtered rows for',activeMonth,':',mFiltered.length);
+
+    // If still no data, show debug info
+    if(!mFiltered.length&&allRows.length>0){
+      var dtWrap2=document.getElementById('dt-data-wrap');
+      if(dtWrap2) dtWrap2.innerHTML='<div class="no-data" style="color:var(--amber)">No records for '+activeMonth+'. Available months: '+(d.uniqueMonths||[]).join(', ')+'<br>Total records: '+allRows.length+'</div>';
+      return;
+    }
     var mPareto={};
     mFiltered.forEach(function(r){
       if(r['Unscheduled Downtime']>0){
