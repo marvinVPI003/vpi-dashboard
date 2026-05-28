@@ -583,7 +583,7 @@ function renderMonthly(){
     +PROD_SITES.map(function(s){
       var sr=mRows.filter(function(r){return (r.Plant||r.plant||'').toUpperCase()===s;});
       var out=siteOut(sr,s);
-      var cf=sr.reduce(function(a,r){return a+gf(r,'COMPLETE FEEDS, mt','COMPLETE FEEDS,mt');},0);
+      var cf=sr.reduce(function(a,r){return a+gf(r,'COMPLETE FEEDS, mt','COMPLETE FEEDS,mt','COMPLETE FEEDS');},0);
       var mg=sr.reduce(function(a,r){return a+gf(r,'Mixgrain');},0);
       var vt=sr.reduce(function(a,r){return a+gf(r,'Vietop');},0);
       var rp=sr.reduce(function(a,r){return a+gf(r,'Total Repack (MG+CF), mt');},0);
@@ -628,7 +628,7 @@ function renderMonthly(){
     if(am===0) am=kpiR2.reduce(function(a,r){return a+gf(r,'COMPLETE FEEDS, mt','COMPLETE FEEDS,mt')+gf(r,'Mixgrain')+gf(r,'Vietop')+gf(r,'Total Repack (MG+CF), mt');},0);
     return am;
   })();
-  var mCF=kpiR2.reduce(function(a,r){return a+gf(r,'COMPLETE FEEDS, mt','COMPLETE FEEDS,mt');},0);
+  var mCF=kpiR2.reduce(function(a,r){return a+gf(r,'COMPLETE FEEDS, mt','COMPLETE FEEDS,mt','COMPLETE FEEDS');},0);
   var mMG=kpiR2.reduce(function(a,r){return a+gf(r,'Mixgrain');},0);
   var mVT=kpiR2.reduce(function(a,r){return a+gf(r,'Vietop');},0);
   var mRP=kpiR2.reduce(function(a,r){return a+gf(r,'Total Repack (MG+CF), mt');},0);
