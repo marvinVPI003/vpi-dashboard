@@ -9,6 +9,8 @@ const LIMITS = {UDT_PCT:5,KWH_TON:35,FUEL_TON:3.5,COAL_TON:12};
 const MONTHLY_TARGET = {AC:5500,PFMIS:4000,HOREB:3500,BUKID:7000,CCPC:500,ARGAO:3500,SOUTH:4000,NATIONAL:28000};
 const DT_CATS = {'Mechanical':'cat-mech','Electrical':'cat-elec','PLC':'cat-elec','Process':'cat-proc','Warehouse':'cat-proc','Raw Materials':'cat-rm','Change Over':'cat-co','Change Die':'cat-co','Change Screen':'cat-co','Power Interruption':'cat-pwr'};
 let DATA={}, activeSite='NATIONAL', activeWeek=1, activePage='dashboard', charts={}, refreshTimer=null;
+var activeMonth='';
+var _monthsList=[];
 // ── JSONP FETCH ────────────────────────────────────────────
 function gasGet(tab, extra) {
   return new Promise(function(resolve, reject) {
