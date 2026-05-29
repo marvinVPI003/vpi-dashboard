@@ -1,6 +1,4 @@
 // ── MONTHLY STATE ─────────────────────────────────────────
-var activeMonth='';
-var _monthsList=[];
 function setMonth(idx){
   if(_monthsList[idx]){activeMonth=_monthsList[idx];renderMonthly();}
 }
