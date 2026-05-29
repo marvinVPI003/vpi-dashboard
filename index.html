@@ -1,73 +1,1135 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>VPI Operations Dashboard</title>
-<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@300;400;500;600;700&family=Barlow+Condensed:wght@400;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
-<style>:root{--bg:#0d1117;--bg2:#161b22;--bg3:#1f2631;--border:rgba(255,255,255,0.07);--border2:rgba(255,255,255,0.13);--text:#e6edf3;--text2:#8b949e;--text3:#484f58;--green:#2ea043;--green-b:#3fb950;--green-d:rgba(46,160,67,0.15);--amber:#d29922;--amber-d:rgba(210,153,34,0.15);--red:#f85149;--red-d:rgba(248,81,73,0.15);--blue:#388bfd;--blue-d:rgba(56,139,253,0.15);--teal:#1abc9c;--purple:#a371f7;--r:6px;--rl:10px}*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}body{background:var(--bg);color:var(--text);font-family:'Barlow',sans-serif;font-size:13px;line-height:1.5;display:flex;flex-direction:column;min-height:100vh}.pulse{display:inline-block;width:5px;height:5px;border-radius:50%;background:var(--green-b);animation:pulse 2s infinite;vertical-align:middle}@keyframes pulse{0%{box-shadow:0 0 0 0 rgba(63,185,80,.4)}70%{box-shadow:0 0 0 5px rgba(63,185,80,0)}100%{box-shadow:0 0 0 0 rgba(63,185,80,0)}}.pulse.fetching{background:var(--amber);animation:none}.pulse.error{background:var(--red);animation:none}.loading-screen{position:fixed;inset:0;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:999;gap:16px}.loading-logo{font-family:'Barlow Condensed',sans-serif;font-size:28px;font-weight:700;color:var(--green-b)}.loading-sub{font-size:11px;color:var(--text3);font-family:'DM Mono',monospace;letter-spacing:1px}.loading-bar-wrap{width:220px;height:3px;background:var(--bg3);border-radius:2px;overflow:hidden}.loading-bar{height:100%;background:var(--green);border-radius:2px;animation:loadbar 1.5s ease-in-out infinite}@keyframes loadbar{0%{width:0%;margin-left:0}50%{width:60%}100%{width:0%;margin-left:100%}}.loading-msg{font-size:11px;color:var(--text2);font-family:'DM Mono',monospace}.retry-btn{padding:8px 20px;font-size:11px;font-family:'DM Mono',monospace;border:1px solid var(--red);border-radius:4px;background:none;color:var(--red);cursor:pointer;margin-top:8px}.topnav{position:fixed;top:0;left:0;right:0;height:52px;background:var(--bg2);border-bottom:1px solid var(--border);display:flex;align-items:center;z-index:200;padding:0 16px;gap:0;flex-wrap:nowrap;overflow:hidden}.topnav-brand{font-family:'Barlow Condensed',sans-serif;font-size:15px;font-weight:700;color:var(--green-b);white-space:nowrap;padding-right:12px;border-right:1px solid var(--border);margin-right:12px;flex-shrink:0}.topnav-brand span{display:block;font-size:9px;color:var(--text3);letter-spacing:1.5px;font-weight:400}.page-tabs{display:flex;gap:2px;margin-right:10px;flex-shrink:0}.page-tab{padding:5px 9px;font-size:10px;font-family:'Barlow Condensed',sans-serif;font-weight:600;letter-spacing:.3px;text-transform:uppercase;border:1px solid var(--border);border-radius:var(--r);background:none;color:var(--text2);cursor:pointer;transition:all .15s;white-space:nowrap}.page-tab:hover{background:rgba(255,255,255,.04);color:var(--text)}.page-tab.active{background:var(--green-d);color:var(--green-b);border-color:rgba(63,185,80,.3)}.topnav-selects{display:flex;gap:6px;align-items:center;margin-right:auto;flex-shrink:0}.tn-select{padding:4px 22px 4px 7px;background:var(--bg3);color:var(--text);border:1px solid var(--border2);border-radius:var(--r);font-family:'Barlow',sans-serif;font-size:11px;cursor:pointer;outline:none;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 12 12'%3E%3Cpath fill='%238b949e' d='M6 8L1 3h10z'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 6px center;min-width:110px}.tn-label{font-size:9px;color:var(--text3);font-family:'DM Mono',monospace;letter-spacing:1px;text-transform:uppercase;white-space:nowrap}.topnav-status{display:flex;align-items:center;gap:6px;margin-left:6px;flex-shrink:0}.tn-refresh{padding:4px 9px;font-size:10px;font-family:'DM Mono',monospace;border:1px solid var(--border2);border-radius:4px;background:none;color:var(--text2);cursor:pointer;white-space:nowrap}.tn-refresh:hover{border-color:var(--green);color:var(--green-b)}.tn-refresh:disabled{opacity:.4;cursor:not-allowed}.main{margin-top:52px;width:100%}.content{padding:16px 20px 48px}.page{display:none}.page.active{display:block}.sec{margin-bottom:18px}.sec-hdr{display:flex;align-items:center;gap:8px;margin-bottom:10px}.sec-title{font-family:'Barlow Condensed',sans-serif;font-size:10px;font-weight:600;letter-spacing:2px;text-transform:uppercase;color:var(--text3);white-space:nowrap}.sec-line{flex:1;height:1px;background:var(--border)}.g2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.g3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}.g4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}.g5{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px}.kc{background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:12px 14px;position:relative;overflow:hidden}.kc::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:var(--kc-color,var(--border2))}.kc-lbl{font-size:9px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--text3);margin-bottom:5px}.kc-val{font-family:'Barlow Condensed',sans-serif;font-size:26px;font-weight:700;line-height:1;margin-bottom:3px}.kc-sub{font-size:11px;color:var(--text2);margin-bottom:5px}.cc{background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:14px}.cc-title{font-size:9px;font-weight:600;letter-spacing:1.5px;text-transform:uppercase;color:var(--text3);margin-bottom:10px}.bdg{display:inline-flex;align-items:center;font-size:9px;font-weight:600;padding:2px 7px;border-radius:20px;font-family:'DM Mono',monospace}.g{background:var(--green-d);color:var(--green-b);border:1px solid rgba(63,185,80,.2)}.a{background:var(--amber-d);color:var(--amber);border:1px solid rgba(210,153,34,.2)}.r{background:var(--red-d);color:var(--red);border:1px solid rgba(248,81,73,.2)}.b{background:var(--blue-d);color:var(--blue);border:1px solid rgba(56,139,253,.2)}table{width:100%;border-collapse:collapse;font-size:11px}th{font-size:9px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--text3);padding:6px 8px;text-align:right;border-bottom:1px solid var(--border);white-space:nowrap}th:first-child{text-align:left}td{padding:6px 8px;text-align:right;border-bottom:1px solid var(--border);font-family:'DM Mono',monospace;font-size:10px;color:var(--text2)}td:first-child{text-align:left;font-family:'Barlow',sans-serif;font-size:11px;font-weight:500;color:var(--text)}tr:last-child td{border-bottom:none}tr:hover td{background:rgba(255,255,255,.02)}.tg{color:var(--green-b)!important}.ta{color:var(--amber)!important}.tr{color:var(--red)!important}.mbar-row{display:flex;align-items:center;gap:6px;padding:4px 0}.mbar-lbl{color:var(--text2);width:60px;flex-shrink:0;font-size:9px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.mbar-bg{flex:1;height:4px;background:var(--bg3);border-radius:2px;overflow:hidden}.mbar-fill{height:100%;border-radius:2px;transition:width .5s ease}.mbar-val{font-family:'DM Mono',monospace;font-size:9px;color:var(--text2);width:40px;text-align:right;flex-shrink:0}::-webkit-scrollbar{width:5px;height:5px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px}#week-strip::-webkit-scrollbar{height:3px}#week-strip::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}.wk-pill{padding:4px 10px;font-size:10px;font-family:'DM Mono',monospace;border:1px solid var(--border2);border-radius:4px;background:none;color:var(--text2);cursor:pointer;white-space:nowrap;transition:all .15s;flex-shrink:0}.wk-pill:hover{border-color:var(--green);color:var(--green-b)}.wk-pill.active{background:var(--green);border-color:var(--green);color:#000;font-weight:700}.fade{animation:fadeIn .2s ease}@keyframes fadeIn{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}.no-data{text-align:center;padding:40px;color:var(--text3);font-family:'DM Mono',monospace;font-size:11px}.cat-pill{display:inline-flex;align-items:center;padding:2px 8px;border-radius:10px;font-size:9px;font-family:'DM Mono',monospace;font-weight:600;white-space:nowrap}.cat-mech{background:rgba(248,81,73,.15);color:#f85149}.cat-elec{background:rgba(210,153,34,.15);color:#d29922}.cat-proc{background:rgba(56,139,253,.15);color:#388bfd}.cat-co{background:rgba(163,113,247,.15);color:#a371f7}.cat-rm{background:rgba(26,188,156,.15);color:#1abc9c}.cat-pwr{background:rgba(255,166,87,.15);color:#ffa657}.cat-other{background:rgba(139,148,158,.15);color:#8b949e}.tbl-wrap{overflow-x:auto}</style>
-</head>
-<body>
-<div class="loading-screen" id="loading">
-  <div class="loading-logo">VPI OPS</div>
-  <div class="loading-sub">Feed for Life · Live Dashboard</div>
-  <div class="loading-bar-wrap"><div class="loading-bar"></div></div>
-  <div class="loading-msg" id="loading-msg">Connecting to Google Sheets...</div>
-</div>
-<div class="topnav">
-  <div class="topnav-brand">VPI OPS<span>Feed for Life</span></div>
-  <div class="page-tabs">
-    <button class="page-tab active" onclick="setPage('dashboard')">📊 Weekly Pulse</button>
-    <button class="page-tab" onclick="setPage('monthly')">📅 Monthly</button>
-    <button class="page-tab" onclick="setPage('cost')">💰 Cost</button>
-    <button class="page-tab" onclick="setPage('downtime')">⚠ Downtime</button>
-    <button class="page-tab" onclick="setPage('production')">🏭 Production</button>
-    <button class="page-tab" onclick="setPage('oee')">⚙ OEE</button>
-    <button class="page-tab" onclick="setPage('cost_analytics')">📈 Cost Analytics</button>
-    <button class="page-tab" onclick="setPage('quality_energy')">⚡ Quality &amp; Energy</button>
-  </div>
-  <div class="topnav-selects">
-    <span class="tn-label">Site</span>
-    <select id="site-select" class="tn-select" onchange="setSite(this.value)"></select>
-    <span class="tn-label">Week</span>
-    <select id="week-select" class="tn-select" onchange="setWeek(parseInt(this.value))" style="min-width:90px"></select>
-  </div>
-  <div class="topnav-status">
-    <div style="font-family:'DM Mono',monospace;font-size:10px;color:var(--text3)">
-      <span class="pulse" id="status-dot"></span> <span id="status-txt">Live</span>
-      <span id="last-updated" style="margin-left:6px">—</span>
-    </div>
-    <button class="tn-refresh" id="refresh-btn" onclick="manualRefresh()">⟳ Refresh</button>
-  </div>
-</div>
-<div class="main">
-  <div id="week-strip" style="background:var(--bg2);border-bottom:1px solid var(--border);padding:6px 16px;display:flex;align-items:center;gap:6px;overflow-x:auto;flex-shrink:0;-webkit-overflow-scrolling:touch;">
-    <span style="font-size:9px;color:var(--text3);font-family:'DM Mono',monospace;letter-spacing:1px;text-transform:uppercase;white-space:nowrap;margin-right:4px">WEEK</span>
-    <div id="week-pills" style="display:flex;gap:4px;flex-shrink:0"></div>
-  </div>
-  <div class="page active" id="page-dashboard"><div class="content fade" id="content"></div></div>
-  <div class="page" id="page-monthly">
-    <div style="background:var(--bg2);border-bottom:1px solid var(--border);padding:6px 16px;display:flex;align-items:center;gap:6px;overflow-x:auto;-webkit-overflow-scrolling:touch;">
-      <span style="font-size:9px;color:var(--text3);font-family:'DM Mono',monospace;letter-spacing:1px;text-transform:uppercase;white-space:nowrap;margin-right:4px">MONTH</span>
-      <div id="month-pills" style="display:flex;gap:4px;flex-shrink:0"></div>
-    </div>
-    <div class="content" id="content-monthly"><div class="no-data">Select Monthly tab to load</div></div>
-  </div>
-  <div class="page" id="page-cost"><div class="content" id="content-cost"><div class="no-data">Select Cost tab to load</div></div></div>
-  <div class="page" id="page-downtime">
-    <div style="background:var(--bg2);border-bottom:1px solid var(--border);padding:6px 16px;display:flex;align-items:center;gap:6px;overflow-x:auto;-webkit-overflow-scrolling:touch;">
-      <span style="font-size:9px;color:var(--text3);font-family:'DM Mono',monospace;letter-spacing:1px;text-transform:uppercase;white-space:nowrap;margin-right:4px">MONTH</span>
-      <div id="dt-month-pills" style="display:flex;gap:4px;flex-shrink:0"></div>
-    </div>
-    <div class="content" id="content-downtime"><div class="no-data">Select Downtime tab to load</div></div>
-    <div id="dt-data-wrap"></div>
-  </div>
-  <div class="page" id="page-production"><div class="content" id="content-production"><div class="no-data">Select Production tab to load</div></div></div>
-  <div class="page" id="page-oee"><div class="content" id="content-oee"><div class="no-data">Select OEE tab to load</div></div></div>
-  <div class="page" id="page-cost_analytics"><div class="content" id="content-cost_analytics"><div class="no-data">Select Cost Analytics tab to load</div></div></div>
-  <div class="page" id="page-quality_energy"><div class="content" id="content-quality_energy"><div class="no-data">Select Quality &amp; Energy tab to load</div></div></div>
-</div>
-<script src="app.js?v=1780014014"></script>
-</body>
-</html>
+const GAS = 'https://script.google.com/macros/s/AKfycbznHnsf5gs6NT5Ps4s7PDj1HlbXRjcCF8F0713Q752pGBlBZwPvDVY0Y2zeX2w_5qgrEQ/exec';
+const SITES = ['NATIONAL','AC','PFMIS','HOREB','BUKID','ARGAO','CCPC','SOUTH'];
+const PROD_SITES = ['AC','PFMIS','HOREB','BUKID','ARGAO','CCPC','SOUTH'];
+const SL = {NATIONAL:'National',AC:'AC · Bulacan',PFMIS:'PFMIS · Isabela',HOREB:'Horeb · Cebu',BUKID:'Bukidnon',ARGAO:'Argao · Cebu',CCPC:'CCPC · CDO',SOUTH:'South · Davao'};
+const SC = {NATIONAL:'#3fb950',AC:'#388bfd',PFMIS:'#d29922',HOREB:'#1abc9c',BUKID:'#f85149',ARGAO:'#a371f7',CCPC:'#58a6ff',SOUTH:'#ffa657'};
+const WEEKLY_TARGET = {AC:1375,PFMIS:1000,HOREB:875,BUKID:1750,CCPC:125,ARGAO:875,SOUTH:1000,NATIONAL:7000};
+const DAILY_TARGET  = {AC:230,PFMIS:165,HOREB:145,BUKID:290,CCPC:20,ARGAO:145,SOUTH:165,NATIONAL:1160};
+const LIMITS = {UDT_PCT:5,KWH_TON:35,FUEL_TON:3.5,COAL_TON:12};
+const MONTHLY_TARGET = {AC:5500,PFMIS:4000,HOREB:3500,BUKID:7000,CCPC:500,ARGAO:3500,SOUTH:4000,NATIONAL:28000};
+const DT_CATS = {'Mechanical':'cat-mech','Electrical':'cat-elec','PLC':'cat-elec','Process':'cat-proc','Warehouse':'cat-proc','Raw Materials':'cat-rm','Change Over':'cat-co','Change Die':'cat-co','Change Screen':'cat-co','Power Interruption':'cat-pwr'};
+let DATA={}, activeSite='NATIONAL', activeWeek=1, activePage='dashboard', charts={}, refreshTimer=null;
+var activeMonth='';
+var _monthsList=[];
+// ── JSONP FETCH ────────────────────────────────────────────
+function gasGet(tab, extra) {
+  return new Promise(function(resolve, reject) {
+    var cb = 'vpi' + Date.now() + Math.floor(Math.random()*1000);
+    var p = 'tab='+encodeURIComponent(tab)
+      +'&site='+encodeURIComponent(activeSite)
+      +'&week='+encodeURIComponent(activeWeek)
+      +'&callback='+cb;
+    if(extra) Object.keys(extra).forEach(function(k){
+      p += '&'+encodeURIComponent(k)+'='+encodeURIComponent(extra[k]);
+    });
+    var s = document.createElement('script');
+    var done = false;
+    var timer = setTimeout(function(){
+      if(done) return; done=true;
+      try{document.head.removeChild(s);}catch(e){}
+      delete window[cb];
+      reject(new Error('Timeout for tab:'+tab));
+    }, 30000);
+    window[cb] = function(data){
+      if(done) return; done=true;
+      clearTimeout(timer);
+      try{document.head.removeChild(s);}catch(e){}
+      delete window[cb];
+      if(data&&data.error) reject(new Error(data.error));
+      else resolve(data);
+    };
+    s.onerror = function(){
+      if(done) return; done=true;
+      clearTimeout(timer);
+      try{document.head.removeChild(s);}catch(e){}
+      delete window[cb];
+      reject(new Error('Script error for tab:'+tab));
+    };
+    s.src = GAS + '?' + p;
+    document.head.appendChild(s);
+  });
+}
+// ── HELPERS ────────────────────────────────────────────────
+function gf(r){
+  for(var i=1;i<arguments.length;i++){
+    var k=arguments[i];
+    if(r[k]!==undefined&&r[k]!==null&&r[k]!==''){
+      var v=parseFloat(String(r[k]).replace(/,/g,''));
+      if(!isNaN(v)) return v;
+    }
+  }
+  return 0;
+}
+function fv(n,d){d=d===undefined?1:d;return(!n||isNaN(n))?'—':Number(n).toFixed(d);}
+function fKK(n){return(!n||n===0)?'—':n>=1000000?(n/1000000).toFixed(2)+'M':n>=1000?(n/1000).toFixed(1)+'k':n.toFixed(0);}
+function clamp(v,a,b){return Math.max(a,Math.min(b,v));}
+function dot(s){return '<span style="display:inline-block;width:5px;height:5px;border-radius:50%;background:'+(SC[s]||'#8b949e')+';margin-right:5px;vertical-align:middle"></span>';}
+function catCls(c){return DT_CATS[c]||'cat-other';}
+function setStatus(s){
+  var dot=document.getElementById('status-dot'),txt=document.getElementById('status-txt'),btn=document.getElementById('refresh-btn');
+  if(s==='fetching'){dot.className='pulse fetching';txt.textContent='Syncing...';if(btn)btn.disabled=true;}
+  else if(s==='live'){dot.className='pulse';txt.textContent='Live';if(btn)btn.disabled=false;}
+  else{dot.className='pulse error';txt.textContent='Error';if(btn)btn.disabled=false;}
+}
+function setMsg(m){var e=document.getElementById('loading-msg');if(e)e.textContent=m;}
+function showLoading(){var e=document.getElementById('loading');if(e)e.style.display='flex';}
+function hideLoading(){var e=document.getElementById('loading');if(e)e.style.display='none';}
+function scheduleRefresh(){if(refreshTimer)clearInterval(refreshTimer);refreshTimer=setInterval(function(){loadData(true);},5*60*1000);}
+function manualRefresh(){loadData(true);}
+function destroyCharts(){Object.keys(charts).forEach(function(k){try{charts[k].destroy();}catch(e){}});charts={};}
+function mkChart(id,type,labels,datasets,opts){
+  var cv=document.getElementById(id);if(!cv)return;
+  var gc='rgba(255,255,255,0.04)';
+  var sc={grid:{color:gc},ticks:{color:'#484f58',font:{size:9,family:"'DM Mono',monospace"}}};
+  var c=new Chart(cv.getContext('2d'),{type:type,data:{labels:labels,datasets:datasets},
+    options:Object.assign({responsive:true,maintainAspectRatio:false,animation:{duration:200},
+      plugins:{legend:{display:false},tooltip:{backgroundColor:'#1f2631',borderColor:'rgba(255,255,255,.1)',borderWidth:1,bodyFont:{family:"'DM Mono',monospace",size:10}}},
+      scales:{x:sc,y:sc}},opts||{})});
+  charts[id]=c;
+}
+// ── LOAD DATA ──────────────────────────────────────────────
+async function loadData(isRefresh) {
+  setStatus('fetching');
+  setMsg(isRefresh?'Syncing...':'Connecting to Google Sheets...');
+  if(!isRefresh) showLoading();
+  try {
+    var weekly = await gasGet('weekly',{site:'National'});
+    DATA.weekly = weekly;
+    var weeks = (weekly.weeks||[]).map(function(w){return +w;}).filter(function(w){return w>0;}).sort(function(a,b){return a-b;});
+    if(!isRefresh) activeWeek = weeks[weeks.length-1]||1;
+    setStatus('live');
+    document.getElementById('last-updated').textContent = new Date().toLocaleTimeString('en-PH',{hour:'2-digit',minute:'2-digit'});
+    hideLoading();
+    buildNav();
+    try{render();}catch(re){console.error('Render error:',re);}
+    scheduleRefresh();
+    ['downtime','cost','production','oee','cost_analytics','quality_energy'].forEach(function(tab){
+      gasGet(tab).then(function(d){DATA[tab]=d;}).catch(function(){});
+    });
+    gasGet('daily_detail',{site:'National',week:activeWeek}).then(function(d){
+      DATA.daily_detail=d;
+      buildDailyChart(); // trigger chart once data arrives
+    }).catch(function(){});
+  } catch(err) {
+    setStatus('error');
+    console.error('LoadData error:',err);
+    if(!isRefresh){
+      var el=document.getElementById('loading');
+      if(el) el.innerHTML='<div style="font-size:28px;color:var(--red)">✕</div>'+
+        '<div style="font-family:Barlow Condensed,sans-serif;font-size:20px;color:var(--red)">Connection Failed</div>'+
+        '<div style="font-size:11px;color:var(--text2);font-family:DM Mono,monospace;max-width:380px;text-align:center;line-he style="padding:8px 20px;font-size:11px;font-family:DM Mono,monospace;border:1px solid var(--red);border-radius:4px;background:none;color:var(--red);cursor:pointer;margin-top:8px">⟳ Retry</button>';
+    }
+  }
+}
+// ── NAV ─────────────────────────────────────────────────────
+function buildNav(){
+  var ss=document.getElementById('site-select');
+  if(ss) ss.innerHTML=SITES.map(function(s){return '<option value="'+s+'"'+(s===activeSite?' selected':'')+'>'+SL[s]+'</option>';}).join('');
+  var weeks=(DATA.weekly&&DATA.weekly.weeks||[]).map(function(w){return +w;}).filter(function(w){return w>0;}).sort(function(a,b){return a-b;});
+  var ws=document.getElementById('week-select');
+  if(ws) ws.innerHTML=weeks.map(function(w){return '<option value="'+w+'"'+(w===activeWeek?' selected':'')+'>Wk '+w+'</option>';}).join('');
+  var pills=document.getElementById('week-pills');
+  if(pills){
+    pills.innerHTML=weeks.map(function(w){return '<button class="wk-pill'+(w===activeWeek?' active':'')+'" onclick="setWeek('+w+')">W'+w+'</button>';}).join('');
+    setTimeout(function(){var a=pills.querySelector('.wk-pill.active');if(a)a.scrollIntoView({behavior:'smooth',block:'nearest',inline:'center'});},100);
+  }
+}
+function setSite(s){
+  activeSite=s;
+  buildNav();
+  var fns={dashboard:render,monthly:renderMonthly,cost:renderCost,downtime:renderDowntime,production:renderProduction,oee:renderOEE,cost_analytics:renderCostAnalytics,quality_energy:renderQualityEnergy};
+  if(fns[activePage]) fns[activePage]();
+  else render();
+}
+function setWeek(w){
+  activeWeek=+w;
+  buildNav();
+  var fns={dashboard:render,monthly:renderMonthly,cost:renderCost,downtime:renderDowntime,production:renderProduction,oee:renderOEE,cost_analytics:renderCostAnalytics,quality_energy:renderQualityEnergy};
+  if(fns[activePage]) fns[activePage]();
+  else render();
+}
+// ── PAGE NAV ──────────────────────────────────────────────
+function setPage(p){
+  activePage=p;
+  document.querySelectorAll('.page').forEach(function(x){x.classList.remove('active');});
+  document.querySelectorAll('.page-tab').forEach(function(x){x.classList.remove('active');});
+  var pg=document.getElementById('page-'+p);if(pg)pg.classList.add('active');
+  document.querySelectorAll('.page-tab').forEach(function(x){if(x.getAttribute('onclick')&&x.getAttribute('onclick').indexOf("'"+p+"'")>=0)x.classList.add('active');});
+  var fns={dashboard:render,monthly:renderMonthly,cost:renderCost,downtime:renderDowntime,production:renderProduction,oee:renderOEE,cost_analytics:renderCostAnalytics,quality_energy:renderQualityEnergy};
+  if(fns[p]) fns[p]();
+}
+// ── RENDER WEEKLY PULSE ────────────────────────────────────
+function render(){
+  destroyCharts();
+  var ct=document.getElementById('content');
+  var wd=DATA.weekly;
+  if(!wd||!wd.rows){ct.innerHTML='<div class="no-data">⟳ Loading...</div>';return;}
+  var rows=wd.rows||[];
+  var allWeeks=(wd.weeks||[]).map(function(w){return +w;}).filter(function(w){return w>0;}).sort(function(a,b){return a-b;});
+  var wkRows=rows.filter(function(r){return +(r.Week||r.week||0)===+activeWeek;});
+  var natRow=wkRows.filter(function(r){return (r.Plant||r.plant||'').toUpperCase()==='NATIONAL';});
+  var kpiRows=activeSite==='NATIONAL'?natRow:wkRows.filter(function(r){return (r.Plant||r.plant||'').toUpperCase()===activeSite;});
+  var lbl=allWeeks.map(function(w){return 'W'+w;});
+  var sf=activeSite==='NATIONAL'?function(r){return (r.Plant||r.plant||'').toUpperCase()==='NATIONAL';}:function(r){return (r.Plant||r.plant||'').toUpperCase()===activeSite;};
+  // National total = CF + MG + VT + RP + Mash(Argao only)
+  // Confirmed: 3580.83 + 41.75 + 0 + 16.5 + 48.25 = 3687.33
+  // Per site = AM column only (CCPC uses CF+VT since AM=0)
+  var totOut=(function(){
+    if(activeSite==='NATIONAL'){
+      var natR=wkRows.filter(function(r){return (r.Plant||r.plant||'').toUpperCase()==='NATIONAL';});
+      var cf=natR.reduce(function(a,r){return a+gf(r,'COMPLETE FEEDS, mt');},0);
+      var mg=natR.reduce(function(a,r){return a+gf(r,'Mixgrain');},0);
+      var vt=natR.reduce(function(a,r){return a+gf(r,'Vietop');},0);
+      var rp=natR.reduce(function(a,r){return a+gf(r,'Total Repack (MG+CF), mt');},0);
+      var argaoRows=wkRows.filter(function(r){return (r.Plant||r.plant||'').toUpperCase()==='ARGAO';});
+      var ms=argaoRows.reduce(function(a,r){return a+gf(r,'Mash,mt');},0);
+      return cf+mg+vt+rp+ms;
+    } else {
+      // Per site: use AM column. CCPC AM=0 so fall back to CF+VT+RP
+      var am=kpiRows.reduce(function(a,r){
+        var v=gf(r,'Total Plant Output,mt w/o toll','Total Plant Output,mt','Total Plant Output, mt');
+        if(v>0) return a+v;
+        return a+gf(r,'COMPLETE FEEDS, mt')+gf(r,'Mixgrain')+gf(r,'Vietop')+gf(r,'Total Repack (MG+CF), mt');
+      },0);
+      return am;
+    }
+  })();
+  var totCF=kpiRows.reduce(function(a,r){return a+gf(r,'COMPLETE FEEDS, mt');},0);
+  var totMG=kpiRows.reduce(function(a,r){return a+gf(r,'Mixgrain');},0);
+  var totVT=kpiRows.reduce(function(a,r){return a+gf(r,'Vietop');},0);
+  var totRP=kpiRows.reduce(function(a,r){return a+gf(r,'Total Repack (MG+CF), mt');},0);
+  var totMash=activeSite==='ARGAO'?kpiRows.reduce(function(a,r){return a+gf(r,'Mash,mt');},0):0;
+  var totUDT=kpiRows.reduce(function(a,r){return a+gf(r,'Unscheduled Down Time, hr');},0);
+  var totSDT=kpiRows.reduce(function(a,r){return a+gf(r,'Scheduled Down Time, hr');},0);
+  var cuRaw=kpiRows.length?kpiRows.reduce(function(a,r){return a+gf(r,'Capacity Utilization Rate,%');},0)/kpiRows.length:0;
+  var totCU=cuRaw*100;
+  var oeeRaw=kpiRows.length?kpiRows.reduce(function(a,r){return a+gf(r,'OEE');},0)/kpiRows.length:0;
+  var avgOEE=oeeRaw*100;
+  var totPDR=kpiRows.reduce(function(a,r){return a+gf(r,'Plant Daily Pelleting Rate,ton/day');},0);
+  var totPlan=kpiRows.reduce(function(a,r){return a+gf(r,'Planned, mt','Total Plant Input, mt');},0);
+  var pC=totCU>=80?'var(--green-b)':totCU>=60?'var(--amber)':'var(--red)';
+  var oC=avgOEE>=85?'var(--green-b)':avgOEE>=70?'var(--amber)':'var(--red)';
+  var udtC=totUDT>20?'var(--red)':totUDT>10?'var(--amber)':'var(--text)';
+  var scorecard='';
+  if(activeSite==='NATIONAL'){
+    scorecard='<div class="sec"><div class="sec-hdr"><div class="sec-title">National Scorecard — Week '+activeWeek+'</div><div class="sec-line"></div></div>'
+      +'<div style="display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px">'
+      +PROD_SITES.map(function(s){
+        var sr=wkRows.filter(function(r){return (r.Plant||r.plant||'').toUpperCase()===s;});
+        var out=sr.reduce(function(a,r){
+          var am=gf(r,'Total Plant Output,mt w/o toll','Total Plant Output,mt','Total Plant Output, mt');
+          if(am>0) return a+am;
+          // AM=0: use component sum (CCPC tolling, SOUTH field name mismatch)
+          return a+gf(r,'COMPLETE FEEDS, mt')+gf(r,'Mixgrain')+gf(r,'Vietop')+gf(r,'Total Repack (MG+CF), mt');
+        },0);
+        var cf=sr.reduce(function(a,r){return a+gf(r,'COMPLETE FEEDS, mt');},0);
+        var mg=sr.reduce(function(a,r){return a+gf(r,'Mixgrain');},0);
+        var vt=sr.reduce(function(a,r){return a+gf(r,'Vietop');},0);
+        var rp=sr.reduce(function(a,r){return a+gf(r,'Total Repack (MG+CF), mt');},0);
+        var mash=s==='ARGAO'?sr.reduce(function(a,r){return a+gf(r,'Mash,mt');},0):0;
+        var cuR=sr.length?sr.reduce(function(a,r){return a+gf(r,'Capacity Utilization Rate,%');},0)/sr.length:0;
+        var cu=cuR*100;
+        var oeeR=sr.length?sr.reduce(function(a,r){return a+gf(r,'OEE');},0)/sr.length:0;
+        var oee=oeeR*100;
+        var udt=sr.reduce(function(a,r){return a+gf(r,'Unscheduled Down Time, hr');},0);
+        var cuC=cu>=80?'var(--green)':cu>=60?'var(--amber)':'var(--red)';
+        var oeeC=oee>=85?'var(--green-b)':oee>=70?'var(--amber)':'var(--red)';
+        var udtC2=udt>20?'var(--red)':udt>10?'var(--amber)':'var(--text3)';
+        var cfD=cf>0?cf:(out-mg-vt-rp-mash);
+        return '<div style="background:var(--bg2);border:1px solid var(--border);border-top:2px solid '+cuC+';border-radius:var(--rl);padding:10px 8px;text-align:center">'
+          +'<div style="margin-bottom:5px">'+dot(s)+'<span style="font-size:10px;font-weight:700;color:var(--text)">'+s+'</span></div>'
+          +'<div style="border-bottom:1px solid var(--border);padding-bottom:6px;margin-bottom:6px">'
+          +'<div style="font-size:8px;color:var(--text3);text-transform:uppercase;letter-spacing:1px;margin-bottom:2px">Output mt</div>'
+          +'<div style="font-family:Barlow Condensed,sans-serif;font-size:22px;font-weight:700;color:var(--text);line-height:1">'+(out>0?out.toFixed(1):'—')+'</div>'
+          +'<div style="display:flex;justify-content:center;gap:3px;margin-top:4px;flex-wrap:wrap">'
+          +(cfD>0?'<span style="font-size:8px;background:rgba(56,139,253,0.15);color:#388bfd;padding:1px 5px;border-radius:3px">CF '+cfD.toFixed(1)+'</span>':'')
+          +(mg>0?'<span style="font-size:8px;background:rgba(163,113,247,0.15);color:#a371f7;padding:1px 5px;border-radius:3px">MG '+mg.toFixed(1)+'</span>':'')
+          +(vt>0?'<span style="font-size:8px;background:rgba(26,188,156,0.15);color:#1abc9c;padding:1px 5px;border-radius:3px">VT '+vt.toFixed(1)+'</span>':'')
+          +(rp>0?'<span style="font-size:8px;background:rgba(255,166,87,0.15);color:#ffa657;padding:1px 5px;border-radius:3px">RP '+rp.toFixed(1)+'</span>':'')
+          +(mash>0?'<span style="font-size:8px;background:rgba(210,153,34,0.15);color:#d29922;padding:1px 5px;border-radius:3px">MS '+mash.toFixed(1)+'</span>':'')
+          +'</div></div>'
+          +'<div style="display:flex;flex-direction:column;gap:5px">'
+          +'<div style="display:flex;justify-content:space-between"><span style="font-size:9px;color:var(--text3)">Cap Util</span><span style="font-family:DM Mono,monospace;font-size:10px;font-weight:600;color:'+cuC+'">'+(cu>0?cu.toFixed(1)+'%':'—')+'</span></div>'
+          +'<div style="display:flex;justify-content:space-between"><span style="font-size:9px;color:var(--text3)">OEE</span><span style="font-family:DM Mono,monospace;font-size:10px;font-weight:600;color:'+oeeC+'">'+(oee>0?oee.toFixed(1)+'%':'—')+'</span></div>'
+          +'<div style="display:flex;justify-content:space-between"><span style="font-size:9px;color:var(--text3)">UDT</span><span style="font-family:DM Mono,monospace;font-size:10px;font-weight:600;color:'+udtC2+'">'+(udt>0?udt.toFixed(2)+'h':'—')+'</span></div>'
+          +'</div></div>';
+      }).join('')+'</div></div>';
+  }
+  ct.innerHTML = scorecard
+  +'<div class="sec"><div class="sec-hdr"><div class="sec-title">'+SL[activeSite]+' · Week '+activeWeek+'</div><div class="sec-line"></div></div>'
+  +'<div class="g5">'
+  +'<div class="kc" style="--kc-color:var(--blue)"><div class="kc-lbl">Output</div>'
+  +'<div class="kc-val" style="color:var(--blue)">'+(totOut>0?totOut.toFixed(1):'—')+'<span style="font-size:12px;color:var(--text2)"> mt</span></div>'
+  +'<div style="display:flex;gap:3px;flex-wrap:wrap;margin-top:4px">'
+  +(totCF>0?'<span style="font-size:8px;background:rgba(56,139,253,0.15);color:#388bfd;padding:1px 5px;border-radius:3px">CF '+totCF.toFixed(1)+'</span>':'')
+  +(totMG>0?'<span style="font-size:8px;background:rgba(163,113,247,0.15);color:#a371f7;padding:1px 5px;border-radius:3px">MG '+totMG.toFixed(1)+'</span>':'')
+  +(totVT>0?'<span style="font-size:8px;background:rgba(26,188,156,0.15);color:#1abc9c;padding:1px 5px;border-radius:3px">VT '+totVT.toFixed(1)+'</span>':'')
+  +(totRP>0?'<span style="font-size:8px;background:rgba(255,166,87,0.15);color:#ffa657;padding:1px 5px;border-radius:3px">RP '+totRP.toFixed(1)+'</span>':'')
+  +(totMash>0?'<span style="font-size:8px;background:rgba(210,153,34,0.15);color:#d29922;padding:1px 5px;border-radius:3px">MS '+totMash.toFixed(1)+'</span>':'')
+  +'</div></div>'
+  +'<div class="kc" style="--kc-color:'+pC+'"><div class="kc-lbl">Capacity Utilization</div>'
+  +'<div class="kc-val" style="color:'+pC+'">'+(totCU>0?totCU.toFixed(1):'—')+'<span style="font-size:12px;color:var(--text2)">%</span></div>'
+  +'<div class="kc-sub">vs Demo Capacity</div>'
+  +'<span class="bdg '+(totCU>=80?'g':totCU>=60?'a':'r')+'">'+(totCU>=80?'On Track':totCU>=60?'Moderate':'Low')+'</span></div>'
+  +'<div class="kc" style="--kc-color:'+(totUDT>20?'var(--red)':totUDT>10?'var(--amber)':'var(--border2)')+'"><div class="kc-lbl">Downtime</div>'
+  +'<div style="display:flex;gap:8px;align-items:flex-end;margin-bottom:4px">'
+  +'<div><div style="font-size:9px;color:var(--red);font-weight:600">UDT</div>'
+  +'<div style="font-family:Barlow Condensed,sans-serif;font-size:22px;font-weight:700;color:'+udtC+'">'+(totUDT>0?totUDT.toFixed(2):'—')+'<span style="font-size:11px;color:var(--text2)"> hr</span></div></div>'
+  +'<div style="width:1px;height:32px;background:var(--border)"></div>'
+  +'<div><div style="font-size:9px;color:var(--text3);font-weight:600">SDT</div>'
+  +'<div style="font-family:Barlow Condensed,sans-serif;font-size:22px;font-weight:700;color:var(--text2)">'+(totSDT>0?totSDT.toFixed(2):'—')+'<span style="font-size:11px;color:var(--text3)"> hr</span></div></div>'
+  +'</div><span class="bdg '+(totUDT>20?'r':totUDT>10?'a':'g')+'">'+(totUDT>20?'High UDT':totUDT>10?'Moderate':'Low DT')+'</span></div>'
+  +'<div class="kc" style="--kc-color:'+oC+'"><div class="kc-lbl">OEE</div>'
+  +'<div class="kc-val" style="color:'+oC+'">'+(avgOEE>0?avgOEE.toFixed(1):'N/A')+'<span style="font-size:12px;color:var(--text2)">'+(avgOEE>0?'%':'')+'</span></div>'
+  +'<span class="bdg '+(avgOEE>=85?'g':avgOEE>=70?'a':avgOEE>0?'r':'b')+'">'+(avgOEE>=85?'World Class':avgOEE>=70?'Acceptable':avgOEE>0?'Needs Attn':'N/A')+'</span></div>'
+  +'<div class="kc" style="--kc-color:var(--teal)"><div class="kc-lbl">Plant Daily Rate</div>'
+  +'<div class="kc-val" style="font-size:22px;color:var(--teal)">'+(totPDR>0?totPDR.toFixed(2):'—')+'<span style="font-size:12px;color:var(--text2)"> t/day</span></div></div>'
+  +'</div></div>'
+  +(function(){
+    var kwh=kpiRows.length?kpiRows.reduce(function(a,r){return a+gf(r,'kWh/ton');},0)/kpiRows.length:0;
+    var fuel=kpiRows.length?kpiRows.reduce(function(a,r){return a+gf(r,'Li/ton');},0)/kpiRows.length:0;
+    var coal=kpiRows.length?kpiRows.reduce(function(a,r){return a+gf(r,'kg/ton');},0)/kpiRows.length:0;
+    var rmv=kpiRows.length?kpiRows.reduce(function(a,r){return a+gf(r,'RM Variance, %');},0)/kpiRows.length:0;
+    var rmvws=kpiRows.length?kpiRows.reduce(function(a,r){return a+gf(r,'RM Variance (w/o used sacks), %');},0)/kpiRows.length:0;
+    return '<div class="g5" style="margin-top:8px">'
+    +'<div class="kc" style="--kc-color:var(--purple)"><div class="kc-lbl">Power</div>'
+    +'<div class="kc-val" style="font-size:22px;color:var(--purple)">'+(kwh>0?kwh.toFixed(2):'—')+'<span style="font-size:12px;color:var(--text2)"> kWh/t</span></div>'
+    +'<div class="kc-sub">Electricity per ton</div>'
+    +'<span class="bdg '+(kwh>35?'r':kwh>31.5?'a':'g')+'">'+(kwh>35?'Over limit':kwh>31.5?'Near limit':kwh>0?'Within limit':'N/A')+'</span></div>'
+    +'<div class="kc" style="--kc-color:var(--amber)"><div class="kc-lbl">Fuel</div>'
+    +'<div class="kc-val" style="font-size:22px;color:var(--amber)">'+(fuel>0?fuel.toFixed(2):'—')+'<span style="font-size:12px;color:var(--text2)"> L/t</span></div>'
+    +'<div class="kc-sub">Diesel per ton</div>'
+    +'<span class="bdg '+(fuel>3.5?'r':fuel>3.15?'a':'g')+'">'+(fuel>3.5?'Over limit':fuel>3.15?'Near limit':fuel>0?'Within limit':'N/A')+'</span></div>'
+    +'<div class="kc" style="--kc-color:var(--text3)"><div class="kc-lbl">Coal</div>'
+    +'<div class="kc-val" style="font-size:22px">'+(coal>0?coal.toFixed(2):'—')+'<span style="font-size:12px;color:var(--text2)">'+(coal>0?' kg/t':'')+'</span></div>'
+    +'<div class="kc-sub">Coal per ton</div></div>'
+    +'<div class="kc" style="--kc-color:'+(rmv*100<0?'var(--red)':'var(--green)')+'"><div class="kc-lbl">RM Variance</div>'
+    +'<div class="kc-val" style="font-size:20px;color:'+(rmv*100<0?'var(--red)':'var(--green-b)')+'">'+(rmv!==0?(rmv*100>=0?'+':'')+(rmv*100).toFixed(3)+'%':'—')+'</div>'
+    +'<span class="bdg '+(rmv*100<0?'r':'g')+'">'+(rmv*100<0?'Under':'Over')+'</span></div>'
+    +'<div class="kc" style="--kc-color:'+(rmvws*100<0?'var(--red)':'var(--green)')+'"><div class="kc-lbl">RM Var w/o Sacks</div>'
+    +'<div class="kc-val" style="font-size:20px;color:'+(rmvws*100<0?'var(--red)':'var(--green-b)')+'">'+(rmvws!==0?(rmvws*100>=0?'+':'')+(rmvws*100).toFixed(3)+'%':'—')+'</div></div>'
+    +'</div>';
+  })()
+  // Operational KPI Trends section with all 6 charts
+  +'<div class="sec"><div class="sec-hdr"><div class="sec-title">Operational KPI Trends — '+(activeSite==='NATIONAL'?'National':SL[activeSite])+'</div><div class="sec-line"></div></div>'
+  +'<div class="g2" style="margin-bottom:8px">'
+  +'<div class="cc"><div class="cc-title">Weekly Output — '+(activeSite==='NATIONAL'?'National':SL[activeSite])+' (mt)</div><div style="position:relative;height:160px"><canvas id="c-out"></canvas></div></div>'
+  +'<div class="cc"><div class="cc-title">Daily Output — Week '+activeWeek+' (mt)</div><div style="position:relative;height:160px"><canvas id="c-daily-out"></canvas></div></div>'
+  +'</div>'
+  +'<div class="g2" style="margin-bottom:8px">'
+  +'<div class="cc"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><div class="cc-title" style="margin-bottom:0">Unscheduled Downtime — hrs &amp; % (Limit: 5%)</div><div id="udt-status"></div></div><div style="position:relative;height:160px"><canvas id="c-udt-combo"></canvas></div></div>'
+  +'<div class="cc"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><div class="cc-title" style="margin-bottom:0">Power kWh/ton (Limit: 35)</div><div id="kwh-status"></div></div><div style="position:relative;height:160px"><canvas id="c-kwh-trend"></canvas></div></div>'
+  +'</div>'
+  +'<div class="g2">'
+  +'<div class="cc"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><div class="cc-title" style="margin-bottom:0">Fuel L/ton (Limit: 3.5)</div><div id="fuel-status"></div></div><div style="position:relative;height:160px"><canvas id="c-fuel-trend"></canvas></div></div>'
+  +'<div class="cc"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><div class="cc-title" style="margin-bottom:0">Coal kg/ton (Limit: 12)</div><div id="coal-status"></div></div><div style="position:relative;height:160px"><canvas id="c-coal-trend"></canvas></div></div>'
+  +'</div></div>'
+  +'<div class="sec"><div class="sec-hdr"><div class="sec-title">'+(activeSite==='NATIONAL'?'Site Summary — Week '+activeWeek:SL[activeSite]+' · Daily Detail — Week '+activeWeek)+'</div><div class="sec-line"></div></div>'
+  +'<div class="cc" id="detail-table-wrap">'
+  +(activeSite==='NATIONAL'?buildNatTable(wkRows):'<div class="no-data" style="padding:20px">⟳ Loading daily data...</div>')
+  +'</div></div>';
+  ct.className='content fade';
+  if(activeSite!=='NATIONAL'){
+    var wrap=document.getElementById('detail-table-wrap');
+    (function(){
+    var _site=activeSite, _week=activeWeek;
+    gasGet('daily_detail',{site:_site,week:_week}).then(function(d){
+      var wrap=document.getElementById('detail-table-wrap');
+      if(!wrap)return;
+      var drows=(d.rows||[]);
+      if(!drows.length){wrap.innerHTML='<div class="no-data">No daily data for Week '+activeWeek+'</div>';return;}
+      var fmtD=function(r){return r._dateFormatted||String(r.Date||r.date||'—').split('T')[0];};
+      var dateCols=drows.map(fmtD);
+      var metrics=[
+        {label:'Output mt',fn:function(r){return gf(r,'Total Plant Output,mt w/o toll','Total Plant Output,mt');},lim:0,cls:function(v,l){return '';}},
+        {label:'SDT Hr',fn:function(r){return gf(r,'Scheduled Down Time, hr');},lim:0,cls:function(v,l){return '';}},
+        {label:'UDT Hr',fn:function(r){return gf(r,'Unscheduled Down Time, hr');},lim:8,cls:function(v,l){return v>l?'tr':v>l*0.8?'ta':'tg';}},
+        {label:'kWh/ton',fn:function(r){return gf(r,'kWh/ton');},lim:35,cls:function(v,l){return v>l?'tr':v>l*0.9?'ta':'tg';}},
+        {label:'Fuel L/ton',fn:function(r){return gf(r,'Li/ton');},lim:3.5,cls:function(v,l){return v>l?'tr':v>l*0.9?'ta':'tg';}},
+        {label:'Coal kg/ton',fn:function(r){return gf(r,'kg/ton');},lim:12,cls:function(v,l){return v>l?'tr':v>l*0.9?'ta':'tg';}}
+      ];
+      wrap.innerHTML='<div class="tbl-wrap"><table style="width:100%;border-collapse:collapse">'
+        +'<thead><tr><th style="text-align:left;min-width:110px;background:var(--bg3);padding:8px 12px;font-size:9px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--text3);border-bottom:1px solid var(--border)">Metric</th>'
+        +dateCols.map(function(d){return '<th style="white-space:nowrap;background:var(--bg3);padding:8px 12px;font-size:9px;font-weight:600;text-transform:uppercase;color:var(--text3);border-bottom:1px solid var(--border);text-align:center">'+d+'</th>';}).join('')
+        +'</tr></thead><tbody>'
+        +metrics.map(function(m){
+          return '<tr style="border-bottom:1px solid var(--border)">'
+            +'<td style="text-align:left;font-family:Barlow,sans-serif;font-size:12px;font-weight:600;color:var(--text);padding:10px 12px;background:var(--bg3);border-right:1px solid var(--border2);white-space:nowrap">'+m.label+'</td>'
+            +drows.map(function(r){
+              var v=m.fn(r);
+              var cls=v>0?m.cls(v,m.lim):'';
+              var bg=cls==='tr'?'rgba(248,81,73,0.12)':cls==='ta'?'rgba(210,153,34,0.12)':cls==='tg'&&m.lim>0?'rgba(46,160,67,0.08)':'';
+              return '<td class="'+cls+'" style="text-align:center;font-family:DM Mono,monospace;font-size:13px;font-weight:600;padding:10px 12px;letter-spacing:.5px;background:'+bg+'">'+(v>0?'<span style="font-size:14px">'+v.toFixed(2)+'</span>':'<span style="color:var(--text3);font-size:11px">—</span>')+'</td>';
+            }).join('')+'</tr>';
+        }).join('')+'</tbody></table></div>';
+    }).catch(function(e){
+      var wrap=document.getElementById('detail-table-wrap');
+      if(wrap)wrap.innerHTML='<div class="no-data" style="color:var(--red)">Error: '+e.message+'</div>';
+    });
+  })();
+  }
+  var ptC=function(v,lim){if(!v)return 'rgba(139,148,158,0.4)';return v>lim?'#f85149':v>lim*0.9?'#d29922':'#3fb950';};
+  var setBadge=function(id,val,lim,unit){
+    var el=document.getElementById(id);if(!el)return;
+    var over=val>lim,near=val>lim*0.9;
+    el.textContent=(over?'▲ ':near?'◉ ':'▼ ')+val.toFixed(2)+unit+(over?' over':near?' near':' ok');
+    el.style.cssText='font-size:9px;font-family:DM Mono,monospace;padding:2px 8px;border-radius:10px;background:'+(over?'rgba(248,81,73,0.15)':near?'rgba(210,153,34,0.15)':'rgba(46,160,67,0.15)')+';color:'+(over?'#f85149':near?'#d29922':'#3fb950')+';border:1px solid '+(over?'rgba(248,81,73,0.3)':near?'rgba(210,153,34,0.3)':'rgba(46,160,67,0.3)')+';';
+  };
+  var wkOutData=allWeeks.map(function(w){
+    var wr=rows.filter(function(r){return +(r.Week||r.week||0)===+w&&sf(r);});
+    return +wr.reduce(function(a,r){return a+gf(r,'Total Plant Output,mt w/o toll','Total Plant Output,mt');},0).toFixed(1);
+  });
+  var wkTgt=WEEKLY_TARGET[activeSite]||WEEKLY_TARGET.NATIONAL;
+  var wkPtColors=wkOutData.map(function(v,i){return +allWeeks[i]===+activeWeek?'#ffffff':v>0&&v<wkTgt?'#f85149':'#3fb950';});
+  mkChart('c-out','line',lbl,[
+    {label:'Output mt',data:wkOutData,borderColor:'#388bfd',backgroundColor:'rgba(56,139,253,0.08)',fill:true,tension:.3,pointRadius:wkOutData.map(function(_,i){return +allWeeks[i]===+activeWeek?7:4;}),pointBackgroundColor:wkPtColors,pointBorderColor:wkPtColors,spanGaps:true},
+    {label:'Target '+wkTgt,data:allWeeks.map(function(){return wkTgt;}),borderColor:'rgba(248,81,73,0.5)',borderDash:[4,4],borderWidth:1.5,pointRadius:0,fill:false}
+  ],{plugins:{legend:{display:true,labels:{color:'#8b949e',font:{size:9},boxWidth:10}},tooltip:{backgroundColor:'#1f2631',borderColor:'rgba(255,255,255,.1)',borderWidth:1,bodyFont:{family:"'DM Mono',monospace",size:10}}}});
+  buildDailyChart();
+  var kpiWkRows=activeSite==='NATIONAL'?rows.filter(function(r){return (r.Plant||r.plant||'').toUpperCase()==='NATIONAL';}):rows.filter(function(r){return (r.Plant||r.plant||'').toUpperCase()===activeSite;});
+  var perWk=function(field){return allWeeks.map(function(w){var r=kpiWkRows.find(function(x){return +(x.Week||x.week||0)===+w;});return r?+gf(r,field).toFixed(2):null;});};
+  var udtHrs=perWk('Unscheduled Down Time, hr');
+  var udtPct=allWeeks.map(function(w){var r=kpiWkRows.find(function(x){return +(x.Week||x.week||0)===+w;});if(!r)return null;var p=gf(r,'Unscheduled Down Time, %','Total Downtime Rate, %');return p>1?+p.toFixed(2):+(p*100).toFixed(2);});
+  setBadge('udt-status',udtPct.filter(function(v){return v!==null;}).slice(-1)[0]||0,LIMITS.UDT_PCT,'%');
+  var udtCanvas=document.getElementById('c-udt-combo');
+  if(udtCanvas){charts['c-udt-combo']=new Chart(udtCanvas.getContext('2d'),{data:{labels:lbl,datasets:[
+    {type:'bar',label:'UDT Hours',data:udtHrs,backgroundColor:udtHrs.map(function(v){return v>0?'rgba(248,81,73,0.6)':'rgba(56,139,253,0.3)';}),borderRadius:3,yAxisID:'y'},
+    {type:'line',label:'UDT %',data:udtPct,borderColor:'#f85149',backgroundColor:'transparent',tension:.3,pointRadius:4,pointBackgroundColor:udtPct.map(function(v){return ptC(v,LIMITS.UDT_PCT);}),spanGaps:true,yAxisID:'y1'},
+    {type:'line',label:'5% Limit',data:allWeeks.map(function(){return LIMITS.UDT_PCT;}),borderColor:'rgba(248,81,73,0.5)',borderDash:[4,4],borderWidth:1.5,pointRadius:0,fill:false,yAxisID:'y1'}
+  ]},options:{responsive:true,maintainAspectRatio:false,animation:{duration:200},plugins:{legend:{display:true,labels:{color:'#8b949e',font:{size:9},boxWidth:10}},tooltip:{backgroundColor:'#1f2631',borderColor:'rgba(255,255,255,.1)',borderWidth:1,bodyFont:{family:"'DM Mono',monospace",size:10}}},scales:{x:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'#484f58',font:{size:9}}},y:{position:'left',grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'#484f58',font:{size:9}},title:{display:true,text:'Hours',color:'#484f58',font:{size:9}}},y1:{position:'right',grid:{display:false},ticks:{color:'#484f58',font:{size:9},callback:function(v){return v+'%';}}}}}}); }
+  var kwhData=perWk('kWh/ton');
+  setBadge('kwh-status',kwhData.filter(function(v){return v!==null;}).slice(-1)[0]||0,LIMITS.KWH_TON,' kWh/t');
+  mkChart('c-kwh-trend','line',lbl,[
+    {label:'kWh/ton',data:kwhData,borderColor:'#a371f7',backgroundColor:'rgba(163,113,247,0.08)',fill:true,tension:.3,pointRadius:4,spanGaps:true,pointBackgroundColor:kwhData.map(function(v){return ptC(v,LIMITS.KWH_TON);})},
+    {label:'Limit 35',data:allWeeks.map(function(){return LIMITS.KWH_TON;}),borderColor:'rgba(248,81,73,0.5)',borderDash:[4,4],borderWidth:1.5,pointRadius:0,fill:false}
+  ],{plugins:{legend:{display:true,labels:{color:'#8b949e',font:{size:9},boxWidth:10}},tooltip:{backgroundColor:'#1f2631',borderColor:'rgba(255,255,255,.1)',borderWidth:1,bodyFont:{family:"'DM Mono',monospace",size:10}}}});
+  var fuelData=perWk('Li/ton');
+  setBadge('fuel-status',fuelData.filter(function(v){return v!==null;}).slice(-1)[0]||0,LIMITS.FUEL_TON,' L/t');
+  mkChart('c-fuel-trend','line',lbl,[
+    {label:'L/ton',data:fuelData,borderColor:'#d29922',backgroundColor:'rgba(210,153,34,0.08)',fill:true,tension:.3,pointRadius:4,spanGaps:true,pointBackgroundColor:fuelData.map(function(v){return ptC(v,LIMITS.FUEL_TON);})},
+    {label:'Limit 3.5',data:allWeeks.map(function(){return LIMITS.FUEL_TON;}),borderColor:'rgba(248,81,73,0.5)',borderDash:[4,4],borderWidth:1.5,pointRadius:0,fill:false}
+  ],{plugins:{legend:{display:true,labels:{color:'#8b949e',font:{size:9},boxWidth:10}},tooltip:{backgroundColor:'#1f2631',borderColor:'rgba(255,255,255,.1)',borderWidth:1,bodyFont:{family:"'DM Mono',monospace",size:10}}}});
+  var coalData=perWk('kg/ton');
+  setBadge('coal-status',coalData.filter(function(v){return v!==null;}).slice(-1)[0]||0,LIMITS.COAL_TON,' kg/t');
+  mkChart('c-coal-trend','line',lbl,[
+    {label:'kg/ton',data:coalData,borderColor:'#8b949e',backgroundColor:'rgba(139,148,158,0.08)',fill:true,tension:.3,pointRadius:4,spanGaps:true,pointBackgroundColor:coalData.map(function(v){return ptC(v,LIMITS.COAL_TON);})},
+    {label:'Limit 12',data:allWeeks.map(function(){return LIMITS.COAL_TON;}),borderColor:'rgba(248,81,73,0.5)',borderDash:[4,4],borderWidth:1.5,pointRadius:0,fill:false}
+  ],{plugins:{legend:{display:true,labels:{color:'#8b949e',font:{size:9},boxWidth:10}},tooltip:{backgroundColor:'#1f2631',borderColor:'rgba(255,255,255,.1)',borderWidth:1,bodyFont:{family:"'DM Mono',monospace",size:10}}}});
+}
+function buildDailyChart(){
+  var dRows=(DATA.daily_detail&&DATA.daily_detail.rows||[]).filter(function(r){
+    var rSite=(r.Plant||r.plant||'').toUpperCase();
+    var rWeek=String(r['Week Num']||r['Week']||r['week']||'').trim();
+    var siteMatch=activeSite==='NATIONAL'?true:rSite===activeSite;
+    return siteMatch&&rWeek===String(activeWeek);
+  }).sort(function(a,b){return new Date(a.Date||a.date||0)-new Date(b.Date||b.date||0);});
+  var byDate={};
+  dRows.forEach(function(r){var raw=String(r.Date||r.date||'').split('T')[0];if(!raw||raw==='undefined')return;byDate[raw]=(byDate[raw]||0)+gf(r,'Total Plant Output,mt w/o toll','Total Plant Output,mt');});
+  var dates=Object.keys(byDate).sort();
+  var vals=dates.map(function(d){return +byDate[d].toFixed(2);});
+  var lbls=dates.map(function(d){try{var dt=new Date(d+'T12:00:00');return dt.toLocaleDateString('en-PH',{month:'short',day:'numeric',weekday:'short'});}catch(e){return d;}});
+  if(charts['c-daily-out']){try{charts['c-daily-out'].destroy();}catch(e){}}
+  if(!dates.length){
+    if(!buildDailyChart._retries) buildDailyChart._retries=0;
+    if(buildDailyChart._retries<5){
+      buildDailyChart._retries++;
+      setTimeout(buildDailyChart,2000);
+    } else {
+      buildDailyChart._retries=0;
+      var cv2=document.getElementById('c-daily-out');
+      if(cv2){var ctx2=cv2.getContext('2d');ctx2.fillStyle='#484f58';ctx2.font='11px DM Mono,monospace';ctx2.textAlign='center';ctx2.fillText('No daily data for Week '+activeWeek,cv2.width/2,cv2.height/2);}
+    }
+    return;
+  }
+  buildDailyChart._retries=0;
+  var dayTgt=DAILY_TARGET[activeSite]||DAILY_TARGET.NATIONAL;
+  var dayPtC=vals.map(function(v){return v>0&&v<dayTgt?'#f85149':'#3fb950';});
+  var cv=document.getElementById('c-daily-out');
+  if(cv) charts['c-daily-out']=new Chart(cv.getContext('2d'),{type:'line',data:{labels:lbls,datasets:[
+    {label:'Output mt',data:vals,borderColor:'#3fb950',backgroundColor:'rgba(63,185,80,0.08)',fill:true,tension:.3,pointRadius:5,pointBackgroundColor:dayPtC,pointBorderColor:dayPtC,spanGaps:true},
+    {label:'Target '+dayTgt,data:vals.map(function(){return dayTgt;}),borderColor:'rgba(248,81,73,0.5)',borderDash:[4,4],borderWidth:1.5,pointRadius:0,fill:false}
+  ]},options:{responsive:true,maintainAspectRatio:false,animation:{duration:200},plugins:{legend:{display:true,labels:{color:'#8b949e',font:{size:9},boxWidth:10}},tooltip:{backgroundColor:'#1f2631',borderColor:'rgba(255,255,255,.1)',borderWidth:1,bodyFont:{family:"'DM Mono',monospace",size:10}}},scales:{x:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'#484f58',font:{size:9}}},y:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'#484f58',font:{size:9}}}}}});
+}
+function buildNatTable(wkRows){
+  var siteRows=wkRows.filter(function(r){return (r.Plant||r.plant||'').toUpperCase()!=='NATIONAL';});
+  if(!siteRows.length)return '<div class="no-data">No data</div>';
+  return '<div class="tbl-wrap"><table><thead><tr><th>Site</th><th>Output mt</th><th>PDR t/day</th><th>Cap Util%</th><th>SDT Hr</th><th>UDT Hr</th><th>OEE%</th><th>kWh/ton</th><th>Fuel L/ton</th><th>Coal kg/ton</th><th>RM Var%</th><th>RM Var w/o Sacks%</th></tr></thead><tbody>'
+  +siteRows.map(function(r){
+    var s=(r.Plant||r.plant||'').toString().toUpperCase();
+    var out=gf(r,'Total Plant Output,mt w/o toll','Total Plant Output,mt');
+    var udt=gf(r,'Unscheduled Down Time, hr');
+    var sdt=gf(r,'Scheduled Down Time, hr');
+    var oee=gf(r,'OEE')*100;
+    var cu=gf(r,'Capacity Utilization Rate,%')*100;
+    var pdr=gf(r,'Plant Daily Pelleting Rate,ton/day');
+    var kwh=gf(r,'kWh/ton');var fuel=gf(r,'Li/ton');var coal=gf(r,'kg/ton');
+    var rmvR=gf(r,'RM Variance, %');var rmv=rmvR*100;
+    var rmvwR=gf(r,'RM Variance (w/o used sacks), %');var rmvw=rmvwR*100;
+    return '<tr><td>'+dot(s)+(SL[s]||s)+'</td>'
+      +'<td>'+(out>0?out.toFixed(1):'—')+'</td>'
+      +'<td>'+(pdr>0?pdr.toFixed(2):'—')+'</td>'
+      +'<td class="'+(cu>=80?'tg':cu>=60?'ta':'tr')+'">'+(cu>0?cu.toFixed(1)+'%':'—')+'</td>'
+      +'<td>'+(sdt>0?sdt.toFixed(2):'—')+'</td>'
+      +'<td class="'+(udt>20?'tr':udt>10?'ta':'')+'">'+(udt>0?udt.toFixed(2):'—')+'</td>'
+      +'<td class="'+(oee>=85?'tg':oee>=70?'ta':oee>0?'tr':'')+'">'+(oee>0?oee.toFixed(1)+'%':'—')+'</td>'
+      +'<td>'+(kwh>0?kwh.toFixed(2):'—')+'</td>'
+      +'<td>'+(fuel>0?fuel.toFixed(2):'—')+'</td>'
+      +'<td>'+(coal>0?coal.toFixed(2):'—')+'</td>'
+      +'<td class="'+(rmv<0?'tr':rmv>0?'tg':'')+'">'+(rmvR!==0?rmv.toFixed(3)+'%':'—')+'</td>'
+      +'<td class="'+(rmvw<0?'tr':rmvw>0?'tg':'')+'">'+(rmvwR!==0?rmvw.toFixed(3)+'%':'—')+'</td>'
+      +'</tr>';
+  }).join('')+'</tbody></table></div>';
+}
+// ── OTHER TABS (stubs) ─────────────────────────────────────
+
+// ── MONTHLY STATE ─────────────────────────────────────────
+function setMonth(idx){
+  if(_monthsList[idx]){activeMonth=_monthsList[idx];renderMonthly();}
+}
+function renderMonthly(){
+  var ct=document.getElementById('content-monthly');
+  if(!DATA.monthly){
+    ct.innerHTML='<div class="no-data">⟳ Loading monthly data...</div>';
+    gasGet('monthly').then(function(d){DATA.monthly=d;renderMonthly();}).catch(function(e){ct.innerHTML='<div class="no-data" style="color:var(--red)">Error: '+e.message+'</div>';});
+    return;
+  }
+  var rows=DATA.monthly.rows||[];
+  var months=DATA.monthly.months||[];
+  if(!activeMonth||months.indexOf(activeMonth)<0) activeMonth=months[months.length-1]||'';
+  var mRows=rows.filter(function(r){return String(r.MONTH||r.Month||'').trim()===activeMonth;});
+  var pills=document.getElementById('month-pills');
+  if(pills){
+    _monthsList=months;
+    pills.innerHTML=months.map(function(m,i){
+      return '<button class="wk-pill'+(m===activeMonth?' active':'')+'" onclick="setMonth('+i+')">'+m.slice(0,3)+'</button>';
+    }).join('');
+    setTimeout(function(){var a=pills.querySelector('.wk-pill.active');if(a)a.scrollIntoView({behavior:'smooth',block:'nearest',inline:'center'});},100);
+  }
+  // Helper: get output for a site row (same formula as weekly)
+  function siteOut(sr,s){
+    var am=sr.reduce(function(a,r){return a+gf(r,'Total Plant Output,mt','Total Plant Output,mt w/o toll');},0);
+    if(am===0) am=sr.reduce(function(a,r){return a+gf(r,'COMPLETE FEEDS, mt','COMPLETE FEEDS,mt')+gf(r,'Mixgrain')+gf(r,'Vietop')+gf(r,'Total Repack (MG+CF), mt');},0);
+    return am;
+  }
+  // National total = CF+MG+VT+RP from NATIONAL row + Argao Mash
+  function natOut(){
+    var natR=mRows.filter(function(r){return (r.Plant||'').toUpperCase()==='NATIONAL';});
+    var cf=natR.reduce(function(a,r){return a+gf(r,'COMPLETE FEEDS, mt','COMPLETE FEEDS,mt');},0);
+    var mg=natR.reduce(function(a,r){return a+gf(r,'Mixgrain');},0);
+    var vt=natR.reduce(function(a,r){return a+gf(r,'Vietop');},0);
+    var rp=natR.reduce(function(a,r){return a+gf(r,'Total Repack (MG+CF), mt');},0);
+    var argaoR=mRows.filter(function(r){return (r.Plant||'').toUpperCase()==='ARGAO';});
+    var ms=argaoR.reduce(function(a,r){return a+gf(r,'Mash','Mash,mt');},0);
+    return cf+mg+vt+rp+ms;
+  }
+  var scorecard='<div class="sec"><div class="sec-hdr"><div class="sec-title">National Scorecard — '+activeMonth+'</div><div class="sec-line"></div></div>'
+    +'<div style="display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px">'
+    +PROD_SITES.map(function(s){
+      var sr=mRows.filter(function(r){return (r.Plant||r.plant||'').toUpperCase()===s;});
+      var out=siteOut(sr,s);
+      var cf=sr.reduce(function(a,r){return a+gf(r,'COMPLETE FEEDS, mt','COMPLETE FEEDS,mt','COMPLETE FEEDS');},0);
+      var mg=sr.reduce(function(a,r){return a+gf(r,'Mixgrain');},0);
+      var vt=sr.reduce(function(a,r){return a+gf(r,'Vietop');},0);
+      var rp=sr.reduce(function(a,r){return a+gf(r,'Total Repack (MG+CF), mt');},0);
+      var mash=s==='ARGAO'?sr.reduce(function(a,r){return a+gf(r,'Mash','Mash,mt');},0):0;
+      var cfD=cf>0?cf:out-mg-vt-rp-mash;
+      var cuR=sr.length?sr.reduce(function(a,r){return a+gf(r,'Capacity Utilization Rate,%','Capacity Utilization,%');},0)/sr.length:0;
+      var cu=cuR>1?cuR:cuR*100;
+      var oeeR=sr.length?sr.reduce(function(a,r){return a+gf(r,'OEE');},0)/sr.length:0;
+      var oee=oeeR>1?oeeR:oeeR*100;
+      var udt=sr.reduce(function(a,r){return a+gf(r,'Unscheduled Down Time, hr','Unscheduled Downtime, hr');},0);
+      var cuC=cu>=80?'var(--green)':cu>=60?'var(--amber)':'var(--red)';
+      var oeeC=oee>=85?'var(--green-b)':oee>=70?'var(--amber)':'var(--red)';
+      var udtC=udt>80?'var(--red)':udt>40?'var(--amber)':'var(--text3)';
+      return '<div style="background:var(--bg2);border:1px solid var(--border);border-top:2px solid '+cuC+';border-radius:var(--rl);padding:10px 8px;text-align:center">'
+        +'<div style="margin-bottom:5px">'+dot(s)+'<span style="font-size:10px;font-weight:700;color:var(--text)">'+s+'</span></div>'
+        +'<div style="border-bottom:1px solid var(--border);padding-bottom:6px;margin-bottom:6px">'
+        +'<div style="font-size:8px;color:var(--text3);text-transform:uppercase;letter-spacing:1px;margin-bottom:2px">Output mt</div>'
+        +'<div style="font-family:Barlow Condensed,sans-serif;font-size:22px;font-weight:700;color:var(--text);line-height:1">'+(out>0?out.toFixed(1):'—')+'</div>'
+        +'<div style="display:flex;justify-content:center;gap:3px;margin-top:4px;flex-wrap:wrap">'
+        +(cfD>0?'<span style="font-size:8px;background:rgba(56,139,253,0.15);color:#388bfd;padding:1px 5px;border-radius:3px">CF '+cfD.toFixed(1)+'</span>':'')
+        +(mg>0?'<span style="font-size:8px;background:rgba(163,113,247,0.15);color:#a371f7;padding:1px 5px;border-radius:3px">MG '+mg.toFixed(1)+'</span>':'')
+        +(vt>0?'<span style="font-size:8px;background:rgba(26,188,156,0.15);color:#1abc9c;padding:1px 5px;border-radius:3px">VT '+vt.toFixed(1)+'</span>':'')
+        +(rp>0?'<span style="font-size:8px;background:rgba(255,166,87,0.15);color:#ffa657;padding:1px 5px;border-radius:3px">RP '+rp.toFixed(1)+'</span>':'')
+        +(mash>0?'<span style="font-size:8px;background:rgba(210,153,34,0.15);color:#d29922;padding:1px 5px;border-radius:3px">MS '+mash.toFixed(1)+'</span>':'')
+        +'</div></div>'
+        +'<div style="display:flex;flex-direction:column;gap:5px">'
+        +'<div style="display:flex;justify-content:space-between"><span style="font-size:9px;color:var(--text3)">Cap Util</span><span style="font-family:DM Mono,monospace;font-size:10px;font-weight:600;color:'+cuC+'">'+(cu>0?cu.toFixed(1)+'%':'—')+'</span></div>'
+        +'<div style="display:flex;justify-content:space-between"><span style="font-size:9px;color:var(--text3)">OEE</span><span style="font-family:DM Mono,monospace;font-size:10px;font-weight:600;color:'+oeeC+'">'+(oee>0?oee.toFixed(1)+'%':'—')+'</span></div>'
+        +'<div style="display:flex;justify-content:space-between"><span style="font-size:9px;color:var(--text3)">UDT</span><span style="font-family:DM Mono,monospace;font-size:10px;font-weight:600;color:'+udtC+'">'+(udt>0?udt.toFixed(2)+'h':'—')+'</span></div>'
+        +'</div></div>';
+    }).join('')+'</div></div>';
+  var kpiR2=activeSite==='NATIONAL'
+    ? mRows.filter(function(r){return (r.Plant||'').toUpperCase()==='NATIONAL';})
+    : mRows.filter(function(r){return (r.Plant||'').toUpperCase()===activeSite;});
+  var natR2=kpiR2;
+  var mOut=(function(){
+    if(activeSite==='NATIONAL') return kpiR2.reduce(function(a,r){return a+gf(r,'Total Plant Output,mt');},0);
+    var am=kpiR2.reduce(function(a,r){return a+gf(r,'Total Plant Output,mt','Total Plant Output,mt w/o toll');},0);
+    if(am===0) am=kpiR2.reduce(function(a,r){return a+gf(r,'COMPLETE FEEDS, mt','COMPLETE FEEDS,mt')+gf(r,'Mixgrain')+gf(r,'Vietop')+gf(r,'Total Repack (MG+CF), mt');},0);
+    return am;
+  })();
+  var mCF=kpiR2.reduce(function(a,r){return a+gf(r,'COMPLETE FEEDS, mt','COMPLETE FEEDS,mt','COMPLETE FEEDS');},0);
+  var mMG=kpiR2.reduce(function(a,r){return a+gf(r,'Mixgrain');},0);
+  var mVT=kpiR2.reduce(function(a,r){return a+gf(r,'Vietop');},0);
+  var mRP=kpiR2.reduce(function(a,r){return a+gf(r,'Total Repack (MG+CF), mt');},0);
+  var mMS=(activeSite==='ARGAO'||activeSite==='NATIONAL')
+    ? mRows.filter(function(r){return (r.Plant||'').toUpperCase()==='ARGAO';}).reduce(function(a,r){return a+gf(r,'Mash','Mash,mt');},0)
+    : 0;
+  var cuRN=kpiR2.length?kpiR2.reduce(function(a,r){return a+gf(r,'Capacity Utilization Rate,%','Capacity Utilization,%');},0)/kpiR2.length:0;
+  var mCU=cuRN>1?cuRN:cuRN*100;
+  var oeeRN=kpiR2.length?kpiR2.reduce(function(a,r){return a+gf(r,'OEE');},0)/kpiR2.length:0;
+  var mOEE=oeeRN>1?oeeRN:oeeRN*100;
+  var mUDT=kpiR2.reduce(function(a,r){return a+gf(r,'Unscheduled Down Time, hr','Unscheduled Downtime, hr','UDT, hr');},0);
+  var mSDT=kpiR2.reduce(function(a,r){return a+gf(r,'Scheduled Down Time, hr','SDT, hr');},0);
+  var mPDR=kpiR2.reduce(function(a,r){return a+gf(r,'Plant Daily Pelleting Rate,ton/day','Plant Daily Rate, ton/day');},0);
+  var cuC2=mCU>=80?'var(--green-b)':mCU>=60?'var(--amber)':'var(--red)';
+  var oeeC2=mOEE>=85?'var(--green-b)':mOEE>=70?'var(--amber)':'var(--red)';
+  var udtC2=mUDT>80?'var(--red)':mUDT>40?'var(--amber)':'var(--text)';
+  var kpiCards='<div class="sec"><div class="sec-hdr"><div class="sec-title">'+(activeSite==='NATIONAL'?'National':SL[activeSite])+' · '+activeMonth+'</div><div class="sec-line"></div></div>'
+    +'<div class="g5">'
+    +'<div class="kc" style="--kc-color:var(--blue)"><div class="kc-lbl">Output</div>'
+    +'<div class="kc-val" style="color:var(--blue)">'+(mOut>0?mOut.toFixed(1):'—')+'<span style="font-size:12px;color:var(--text2)"> mt</span></div>'
+    +'<div style="display:flex;gap:3px;flex-wrap:wrap;margin-top:4px">'
+    +(mCF>0?'<span style="font-size:8px;background:rgba(56,139,253,0.15);color:#388bfd;padding:1px 5px;border-radius:3px">CF '+mCF.toFixed(1)+'</span>':'')
+    +(mMG>0?'<span style="font-size:8px;background:rgba(163,113,247,0.15);color:#a371f7;padding:1px 5px;border-radius:3px">MG '+mMG.toFixed(1)+'</span>':'')
+    +(mVT>0?'<span style="font-size:8px;background:rgba(26,188,156,0.15);color:#1abc9c;padding:1px 5px;border-radius:3px">VT '+mVT.toFixed(1)+'</span>':'')
+    +(mRP>0?'<span style="font-size:8px;background:rgba(255,166,87,0.15);color:#ffa657;padding:1px 5px;border-radius:3px">RP '+mRP.toFixed(1)+'</span>':'')
+    +(mMS>0?'<span style="font-size:8px;background:rgba(210,153,34,0.15);color:#d29922;padding:1px 5px;border-radius:3px">MS '+mMS.toFixed(1)+'</span>':'')
+    +'</div></div>'
+    +'<div class="kc" style="--kc-color:'+cuC2+'"><div class="kc-lbl">Capacity Utilization</div>'
+    +'<div class="kc-val" style="color:'+cuC2+'">'+(mCU>0?mCU.toFixed(1):'—')+'<span style="font-size:12px;color:var(--text2)">%</span></div>'
+    +'<span class="bdg '+(mCU>=80?'g':mCU>=60?'a':'r')+'">'+(mCU>=80?'On Track':mCU>=60?'Moderate':'Low')+'</span></div>'
+    +'<div class="kc" style="--kc-color:'+udtC2+'"><div class="kc-lbl">Downtime</div>'
+    +'<div style="display:flex;gap:8px;align-items:flex-end;margin-bottom:4px">'
+    +'<div><div style="font-size:9px;color:var(--red);font-weight:600">UDT</div>'
+    +'<div style="font-family:Barlow Condensed,sans-serif;font-size:22px;font-weight:700;color:'+udtC2+'">'+(mUDT>0?mUDT.toFixed(1):'—')+'<span style="font-size:11px;color:var(--text2)"> hr</span></div></div>'
+    +'<div style="width:1px;height:32px;background:var(--border)"></div>'
+    +'<div><div style="font-size:9px;color:var(--text3);font-weight:600">SDT</div>'
+    +'<div style="font-family:Barlow Condensed,sans-serif;font-size:22px;font-weight:700;color:var(--text2)">'+(mSDT>0?mSDT.toFixed(1):'—')+'<span style="font-size:11px;color:var(--text3)"> hr</span></div></div>'
+    +'</div></div>'
+    +'<div class="kc" style="--kc-color:'+oeeC2+'"><div class="kc-lbl">OEE</div>'
+    +'<div class="kc-val" style="color:'+oeeC2+'">'+(mOEE>0?mOEE.toFixed(1):'N/A')+'<span style="font-size:12px;color:var(--text2)">'+(mOEE>0?'%':'')+'</span></div>'
+    +'<span class="bdg '+(mOEE>=85?'g':mOEE>=70?'a':mOEE>0?'r':'b')+'">'+(mOEE>=85?'World Class':mOEE>=70?'Acceptable':mOEE>0?'Needs Attn':'N/A')+'</span></div>'
+    +'<div class="kc" style="--kc-color:var(--teal)"><div class="kc-lbl">Plant Daily Rate</div>'
+    +'<div class="kc-val" style="color:var(--teal)">'+(mPDR>0?mPDR.toFixed(2):'—')+'<span style="font-size:12px;color:var(--text2)"> t/day</span></div></div>'
+    +'</div></div>';
+  // Row 2 KPI cards: Power, Fuel, Coal, RM Variance, RM Var w/o Sacks
+  var mKwh=natR2.length?natR2.reduce(function(a,r){return a+gf(r,'kWh/ton');},0)/natR2.length:0;
+  var mFuel=natR2.length?natR2.reduce(function(a,r){return a+gf(r,'Li/ton');},0)/natR2.length:0;
+  var mCoal=natR2.length?natR2.reduce(function(a,r){return a+gf(r,'kg/ton');},0)/natR2.length:0;
+  var mRMV=natR2.length?natR2.reduce(function(a,r){return a+gf(r,'RM Variance, %');},0)/natR2.length:0;
+  var mRMVWS=natR2.length?natR2.reduce(function(a,r){return a+gf(r,'RM Variance (w/o used sacks), %');},0)/natR2.length:0;
+  var mRMVpct=Math.abs(mRMV)>1?mRMV:mRMV*100;
+  var mRMVWSpct=Math.abs(mRMVWS)>1?mRMVWS:mRMVWS*100;
+  var kpiCards2='<div class="g5" style="margin-top:8px">'
+    +'<div class="kc" style="--kc-color:var(--purple)"><div class="kc-lbl">Power</div>'
+    +'<div class="kc-val" style="font-size:22px;color:var(--purple)">'+(mKwh>0?mKwh.toFixed(2):'—')+'<span style="font-size:12px;color:var(--text2)"> kWh/t</span></div>'
+    +'<div class="kc-sub">Electricity per ton</div>'
+    +'<span class="bdg '+(mKwh>35?'r':mKwh>31.5?'a':'g')+'">'+(mKwh>35?'Over limit':mKwh>31.5?'Near limit':mKwh>0?'Within limit':'N/A')+'</span></div>'
+    +'<div class="kc" style="--kc-color:var(--amber)"><div class="kc-lbl">Fuel</div>'
+    +'<div class="kc-val" style="font-size:22px;color:var(--amber)">'+(mFuel>0?mFuel.toFixed(2):'—')+'<span style="font-size:12px;color:var(--text2)"> L/t</span></div>'
+    +'<div class="kc-sub">Diesel per ton</div>'
+    +'<span class="bdg '+(mFuel>3.5?'r':mFuel>3.15?'a':'g')+'">'+(mFuel>3.5?'Over limit':mFuel>3.15?'Near limit':mFuel>0?'Within limit':'N/A')+'</span></div>'
+    +'<div class="kc" style="--kc-color:var(--text3)"><div class="kc-lbl">Coal</div>'
+    +'<div class="kc-val" style="font-size:22px">'+(mCoal>0?mCoal.toFixed(2):'—')+'<span style="font-size:12px;color:var(--text2)">'+(mCoal>0?' kg/t':'')+'</span></div>'
+    +'<div class="kc-sub">Coal per ton</div>'
+    +'<span class="bdg '+(mCoal>12?'r':mCoal>10.8?'a':mCoal>0?'g':'b')+'">'+(mCoal>12?'Over limit':mCoal>10.8?'Near limit':mCoal>0?'Within limit':'N/A')+'</span></div>'
+    +'<div class="kc" style="--kc-color:'+(mRMVpct<0?'var(--red)':'var(--green)')+'"><div class="kc-lbl">RM Variance</div>'
+    +'<div class="kc-val" style="font-size:20px;color:'+(mRMVpct<0?'var(--red)':'var(--green-b)')+'">'+(mRMV!==0?(mRMVpct>=0?'+':'')+mRMVpct.toFixed(3)+'%':'—')+'</div>'
+    +'<span class="bdg '+(mRMVpct<0?'r':'g')+'">'+(mRMVpct<0?'Under':'Over')+'</span></div>'
+    +'<div class="kc" style="--kc-color:'+(mRMVWSpct<0?'var(--red)':'var(--green)')+'"><div class="kc-lbl">RM Var w/o Sacks</div>'
+    +'<div class="kc-val" style="font-size:20px;color:'+(mRMVWSpct<0?'var(--red)':'var(--green-b)')+'">'+(mRMVWS!==0?(mRMVWSpct>=0?'+':'')+mRMVWSpct.toFixed(3)+'%':'—')+'</div>'
+    +'</div></div>';
+  // ── MONTHLY CHARTS ─────────────────────────────────────
+  var chartSection='<div class="sec"><div class="sec-hdr"><div class="sec-title">Monthly Trends — '+(activeSite==='NATIONAL'?'National':SL[activeSite])+'</div><div class="sec-line"></div></div>'
+    +'<div class="g2" style="margin-bottom:8px">'
+    +'<div class="cc"><div class="cc-title">Monthly Output vs Target (mt)</div><div style="position:relative;height:180px"><canvas id="cm-out"></canvas></div></div>'
+    +'<div class="cc"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><div class="cc-title" style="margin-bottom:0">Unscheduled Downtime — hrs &amp; % (Limit: 5%)</div><div id="cm-udt-badge" style="font-size:9px;font-family:DM Mono,monospace;padding:2px 8px;border-radius:10px"></div></div><div style="position:relative;height:160px"><canvas id="cm-udt"></canvas></div></div>'
+    +'</div>'
+    +'<div class="g2" style="margin-bottom:8px">'
+    +'<div class="cc"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><div class="cc-title" style="margin-bottom:0">Power kWh/ton (Limit: 35)</div><div id="cm-kwh-badge" style="font-size:9px;font-family:DM Mono,monospace;padding:2px 8px;border-radius:10px"></div></div><div style="position:relative;height:160px"><canvas id="cm-kwh"></canvas></div></div>'
+    +'<div class="cc"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><div class="cc-title" style="margin-bottom:0">Fuel L/ton (Limit: 3.5)</div><div id="cm-fuel-badge" style="font-size:9px;font-family:DM Mono,monospace;padding:2px 8px;border-radius:10px"></div></div><div style="position:relative;height:160px"><canvas id="cm-fuel"></canvas></div></div>'
+    +'</div>'
+    +'<div class="g2">'
+    +'<div class="cc"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><div class="cc-title" style="margin-bottom:0">Coal kg/ton (Limit: 12)</div><div id="cm-coal-badge" style="font-size:9px;font-family:DM Mono,monospace;padding:2px 8px;border-radius:10px"></div></div><div style="position:relative;height:160px"><canvas id="cm-coal"></canvas></div></div>'
+    +'<div class="cc"><div class="cc-title">OEE % by Month</div><div style="position:relative;height:160px"><canvas id="cm-cu"></canvas></div></div>'
+    +'</div></div>';
+  // ── PROJECTED VOLUME TABLE ─────────────────────────────
+  // Remaining days = calendar days in month - days elapsed
+  // Use today's date to compute days remaining for current month
+  var today=new Date();
+  var todayMonth=today.toLocaleString('en-PH',{month:'long'}).toUpperCase();
+  var isCurrentMonth=(activeMonth.toUpperCase()===todayMonth);
+  var projRows=[];
+  var sitesToShow=activeSite==='NATIONAL'?PROD_SITES:[activeSite];
+  sitesToShow.forEach(function(s){
+    var sr=mRows.filter(function(r){return (r.Plant||'').toUpperCase()===s;});
+    if(!sr.length)return;
+    // Use AM column (Total Plant Output,mt) - same as scorecard
+    var mtdOut=sr.reduce(function(a,r){
+      var am=gf(r,'Total Plant Output,mt','Total Plant Output,mt w/o toll');
+      if(am===0) am=gf(r,'COMPLETE FEEDS, mt','COMPLETE FEEDS,mt')+gf(r,'Mixgrain')+gf(r,'Vietop')+gf(r,'Total Repack (MG+CF), mt');
+      return a+am;
+    },0);
+    // ARGAO: add Mash only if AM doesn't already include it
+    // Check: if AM > CF+MG+VT+RP, Mash is already included in AM
+    if(s==='ARGAO'){
+      var argaoCF=sr.reduce(function(a,r){return a+gf(r,'COMPLETE FEEDS, mt','COMPLETE FEEDS,mt');},0);
+      var argaoMG=sr.reduce(function(a,r){return a+gf(r,'Mixgrain');},0);
+      var argaoVT=sr.reduce(function(a,r){return a+gf(r,'Vietop');},0);
+      var argaoRP=sr.reduce(function(a,r){return a+gf(r,'Total Repack (MG+CF), mt');},0);
+      var argaoMash=sr.reduce(function(a,r){return a+gf(r,'Mash','Mash,mt');},0);
+      var cfSum=argaoCF+argaoMG+argaoVT+argaoRP;
+      // If AM already includes Mash (AM ≈ CF+MG+VT+RP+Mash), don't add again
+      if(mtdOut < cfSum+argaoMash*0.5){
+        mtdOut+=argaoMash;
+      }
+    }
+    var pdr=sr.reduce(function(a,r){return a+gf(r,'Plant Daily Pelleting Rate,ton/day','Plant Daily Rate, ton/day');},0);
+    var calDays=sr.reduce(function(a,r){return a+gf(r,'CALENDAR DA','CALENDAR DAYS','Calendar Days');},0);
+    // Remaining days = calendar days in month - today's day number
+    // e.g. May 28 with 31 calendar days = 31-28 = 3 remaining days
+    var remaining=0;
+    if(isCurrentMonth){
+      var dayOfMonth=today.getDate();
+      // Use calDays from sheet, or fallback to last day of month
+      var totalDays=calDays>0?calDays:new Date(today.getFullYear(),today.getMonth()+1,0).getDate();
+      remaining=Math.max(0,totalDays-dayOfMonth);
+    }
+    var projected=pdr>0?(pdr*remaining)+mtdOut:mtdOut;
+    var target=MONTHLY_TARGET[s]||0;
+    var gap=target>0?projected-target:0;
+    projRows.push({
+      site:s,label:SL[s]||s,
+      mtdOut:mtdOut,pdr:pdr,calDays:calDays,
+      remaining:remaining,projected:projected,
+      target:target,gap:gap
+    });
+  });
+  if(activeSite==='NATIONAL'){
+    var natProjTotal=projRows.reduce(function(a,r){return a+r.projected;},0);
+    var natMTD=projRows.reduce(function(a,r){return a+r.mtdOut;},0);
+    var natTarget=MONTHLY_TARGET.NATIONAL||0;
+    projRows.push({
+      site:'NATIONAL',label:'NATIONAL',isTotal:true,
+      mtdOut:natMTD,pdr:0,remaining:0,
+      projected:natProjTotal,target:natTarget,gap:natProjTotal-natTarget
+    });
+  }
+  var projTable='<div class="sec"><div class="sec-hdr"><div class="sec-title">Projected Volume — '+activeMonth+(isCurrentMonth?' (Current Month)':' (Final)')+'</div><div class="sec-line"></div></div>'
+    +'<div class="cc"><div class="tbl-wrap"><table>'
+    +'<thead><tr>'
+    +'<th style="text-align:left">Plant</th>'
+    +'<th>MTD Output mt</th>'
+    +'<th>PDR t/day</th>'
+    +'<th>Remaining Days</th>'
+    +'<th>Projected mt</th>'
+    +'<th>Target mt</th>'
+    +'<th>Gap mt</th>'
+    +'</tr></thead><tbody>'
+    +projRows.map(function(r){
+      var projC=r.target>0?(r.projected>=r.target?'tg':'tr'):'';
+      var gapC=r.gap>=0?'tg':'tr';
+      return '<tr style="'+(r.isTotal?'font-weight:700;background:var(--bg3);border-top:2px solid var(--border)':'')+'">'
+        +'<td style="text-align:left">'+dot(r.site)+(r.isTotal?'<strong>'+r.label+'</strong>':SL[r.site]||r.label)+'</td>'
+        +'<td>'+(r.mtdOut>0?r.mtdOut.toFixed(1):'—')+'</td>'
+        +'<td>'+(r.pdr>0?r.pdr.toFixed(2):'—')+'</td>'
+        +'<td style="color:var(--text2)">'+(r.isTotal?'—':r.remaining+'d')+'</td>'
+        +'<td class="'+projC+'" style="font-family:DM Mono,monospace;font-weight:600">'+(r.projected>0?r.projected.toFixed(1):'—')+'</td>'
+        +'<td style="color:var(--text3)">'+(r.target>0?r.target.toFixed(0):'—')+'</td>'
+        +'<td class="'+gapC+'" style="font-family:DM Mono,monospace">'+(r.target>0?(r.gap>=0?'+':'')+r.gap.toFixed(1):'—')+'</td>'
+        +'</tr>';
+    }).join('')
+    +'</tbody></table></div></div></div>';
+  ct.innerHTML=(activeSite==='NATIONAL'?scorecard:'')+kpiCards+kpiCards2+chartSection+projTable;
+  // ── RENDER MONTHLY CHARTS ───────────────────────────────
+  ['cm-out','cm-udt','cm-kwh','cm-fuel','cm-coal','cm-cu'].forEach(function(id){
+    if(charts[id]){try{charts[id].destroy();}catch(e){}}
+  });
+  var mLabels=months;
+  var gc='rgba(255,255,255,0.04)';
+  var sc={grid:{color:gc},ticks:{color:'#484f58',font:{size:9}}};
+  var mTip={backgroundColor:'#1f2631',borderColor:'rgba(255,255,255,.1)',borderWidth:1,bodyFont:{family:"'DM Mono',monospace",size:10}};
+  function perMonth(field){
+    return months.map(function(m){
+      var mr=rows.filter(function(r){
+        var p=(r.Plant||'').toUpperCase();
+        var match=activeSite==='NATIONAL'?p==='NATIONAL':p===activeSite;
+        return match&&String(r.MONTH||r.Month||'').trim()===m;
+      });
+      if(!mr.length) return null;
+      var v=mr.reduce(function(a,r){return a+gf(r,field);},0);
+      return v>0?+v.toFixed(2):null;
+    });
+  }
+  function avgPerMonth(field){
+    return months.map(function(m){
+      var mr=rows.filter(function(r){
+        var p=(r.Plant||'').toUpperCase();
+        var match=activeSite==='NATIONAL'?p==='NATIONAL':p===activeSite;
+        return match&&String(r.MONTH||r.Month||'').trim()===m;
+      });
+      if(!mr.length) return null;
+      var v=mr.reduce(function(a,r){return a+gf(r,field);},0)/mr.length;
+      return v>0?+v.toFixed(2):null;
+    });
+  }
+  var mTgt=MONTHLY_TARGET[activeSite]||MONTHLY_TARGET.NATIONAL;
+  var ptC=function(v,lim){if(!v)return 'rgba(139,148,158,0.4)';return v>lim?'#f85149':v>lim*0.9?'#d29922':'#3fb950';};
+  var setBadge=function(id,val,lim,unit){
+    var el=document.getElementById(id);if(!el)return;
+    var over=val>lim,near=val>lim*0.9;
+    el.textContent=(over?'▲ ':near?'◉ ':'▼ ')+val.toFixed(2)+unit+(over?' over':near?' near':' ok');
+    el.style.cssText='font-size:9px;font-family:DM Mono,monospace;padding:2px 8px;border-radius:10px;background:'+(over?'rgba(248,81,73,0.15)':near?'rgba(210,153,34,0.15)':'rgba(46,160,67,0.15)')+';color:'+(over?'#f85149':near?'#d29922':'#3fb950')+';border:1px solid '+(over?'rgba(248,81,73,0.3)':near?'rgba(210,153,34,0.3)':'rgba(46,160,67,0.3)')+';';
+  };
+  var outData=perMonth('Total Plant Output,mt');
+  var cuData=avgPerMonth('Capacity Utilization Rate,%').map(function(v){return v?+(v>1?v:v*100).toFixed(1):null;});
+  var outC=document.getElementById('cm-out');
+  if(outC) charts['cm-out']=new Chart(outC.getContext('2d'),{
+    data:{labels:mLabels,datasets:[
+      {type:'bar',label:'Output mt',data:outData,
+       backgroundColor:outData.map(function(v){return v&&v>=mTgt?'rgba(63,185,80,0.5)':'rgba(248,81,73,0.4)';}),
+       borderRadius:3,yAxisID:'y'},
+      {type:'line',label:'Target '+mTgt+' mt',data:months.map(function(){return mTgt;}),
+       borderColor:'rgba(248,81,73,0.6)',borderDash:[4,4],borderWidth:1.5,pointRadius:0,fill:false,yAxisID:'y'},
+      {type:'line',label:'Cap Util %',data:cuData,
+       borderColor:'#388bfd',backgroundColor:'transparent',tension:.3,pointRadius:4,
+       pointBackgroundColor:cuData.map(function(v){return v>=80?'#3fb950':v>=60?'#d29922':'#f85149';}),
+       spanGaps:true,yAxisID:'y1'}
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,animation:{duration:200},
+      plugins:{legend:{display:true,labels:{color:'#8b949e',font:{size:9},boxWidth:10}},tooltip:{backgroundColor:'#1f2631',borderColor:'rgba(255,255,255,.1)',borderWidth:1,bodyFont:{family:"'DM Mono',monospace",size:10}}},
+      scales:{
+        x:sc,
+        y:{position:'left',grid:{color:gc},ticks:{color:'#484f58',font:{size:9}},title:{display:true,text:'mt',color:'#484f58',font:{size:9}}},
+        y1:{position:'right',grid:{display:false},ticks:{color:'#484f58',font:{size:9},callback:function(v){return v+'%';}},min:0,max:100}
+      }}
+  });
+  var udtHrs=perMonth('Unscheduled Down Time, hr');
+  var udtPct=avgPerMonth('Unscheduled Down Time, %').map(function(v){return v?(v>1?+v.toFixed(2):+(v*100).toFixed(2)):null;});
+  var latestUDT=udtPct.filter(function(v){return v!==null;}).slice(-1)[0]||0;
+  setBadge('cm-udt-badge',latestUDT,LIMITS.UDT_PCT,'%');
+  var udtC=document.getElementById('cm-udt');
+  if(udtC) charts['cm-udt']=new Chart(udtC.getContext('2d'),{
+    data:{labels:mLabels,datasets:[
+      {type:'bar',label:'UDT Hours',data:udtHrs,backgroundColor:udtHrs.map(function(v){return v>0?'rgba(248,81,73,0.6)':'rgba(56,139,253,0.3)';}),borderRadius:3,yAxisID:'y'},
+      {type:'line',label:'UDT %',data:udtPct,borderColor:'#f85149',backgroundColor:'transparent',tension:.3,pointRadius:4,pointBackgroundColor:udtPct.map(function(v){return ptC(v,LIMITS.UDT_PCT);}),spanGaps:true,yAxisID:'y1'},
+      {type:'line',label:'5% Limit',data:months.map(function(){return LIMITS.UDT_PCT;}),borderColor:'rgba(248,81,73,0.5)',borderDash:[4,4],borderWidth:1.5,pointRadius:0,fill:false,yAxisID:'y1'}
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,animation:{duration:200},
+      plugins:{legend:{display:true,labels:{color:'#8b949e',font:{size:9},boxWidth:10}},tooltip:{backgroundColor:'#1f2631',borderColor:'rgba(255,255,255,.1)',borderWidth:1,bodyFont:{family:"'DM Mono',monospace",size:10}}},
+      scales:{x:sc,y:{position:'left',grid:{color:gc},ticks:{color:'#484f58',font:{size:9}},title:{display:true,text:'Hours',color:'#484f58',font:{size:9}}},y1:{position:'right',grid:{display:false},ticks:{color:'#484f58',font:{size:9},callback:function(v){return v+'%';}}}}}
+  });
+  var kwhData=avgPerMonth('kWh/ton');
+  setBadge('cm-kwh-badge',kwhData.filter(function(v){return v!==null;}).slice(-1)[0]||0,LIMITS.KWH_TON,' kWh/t');
+  var kwhC=document.getElementById('cm-kwh');
+  if(kwhC) charts['cm-kwh']=new Chart(kwhC.getContext('2d'),{type:'line',data:{labels:mLabels,datasets:[
+    {label:'kWh/ton',data:kwhData,borderColor:'#a371f7',backgroundColor:'rgba(163,113,247,0.08)',fill:true,tension:.3,pointRadius:4,spanGaps:true,pointBackgroundColor:kwhData.map(function(v){return ptC(v,LIMITS.KWH_TON);})},
+    {label:'Limit 35',data:months.map(function(){return LIMITS.KWH_TON;}),borderColor:'rgba(248,81,73,0.5)',borderDash:[4,4],borderWidth:1.5,pointRadius:0,fill:false}
+  ]},options:{responsive:true,maintainAspectRatio:false,animation:{duration:200},plugins:{legend:{display:true,labels:{color:'#8b949e',font:{size:9},boxWidth:10}},tooltip:mTip},scales:{x:sc,y:sc}}});
+  var fuelData=avgPerMonth('Li/ton');
+  setBadge('cm-fuel-badge',fuelData.filter(function(v){return v!==null;}).slice(-1)[0]||0,LIMITS.FUEL_TON,' L/t');
+  var fuelC=document.getElementById('cm-fuel');
+  if(fuelC) charts['cm-fuel']=new Chart(fuelC.getContext('2d'),{type:'line',data:{labels:mLabels,datasets:[
+    {label:'L/ton',data:fuelData,borderColor:'#d29922',backgroundColor:'rgba(210,153,34,0.08)',fill:true,tension:.3,pointRadius:4,spanGaps:true,pointBackgroundColor:fuelData.map(function(v){return ptC(v,LIMITS.FUEL_TON);})},
+    {label:'Limit 3.5',data:months.map(function(){return LIMITS.FUEL_TON;}),borderColor:'rgba(248,81,73,0.5)',borderDash:[4,4],borderWidth:1.5,pointRadius:0,fill:false}
+  ]},options:{responsive:true,maintainAspectRatio:false,animation:{duration:200},plugins:{legend:{display:true,labels:{color:'#8b949e',font:{size:9},boxWidth:10}},tooltip:mTip},scales:{x:sc,y:sc}}});
+  var coalData=avgPerMonth('kg/ton');
+  setBadge('cm-coal-badge',coalData.filter(function(v){return v!==null;}).slice(-1)[0]||0,LIMITS.COAL_TON,' kg/t');
+  var coalC=document.getElementById('cm-coal');
+  if(coalC) charts['cm-coal']=new Chart(coalC.getContext('2d'),{type:'line',data:{labels:mLabels,datasets:[
+    {label:'kg/ton',data:coalData,borderColor:'#8b949e',backgroundColor:'rgba(139,148,158,0.08)',fill:true,tension:.3,pointRadius:4,spanGaps:true,pointBackgroundColor:coalData.map(function(v){return ptC(v,LIMITS.COAL_TON);})},
+    {label:'Limit 12',data:months.map(function(){return LIMITS.COAL_TON;}),borderColor:'rgba(248,81,73,0.5)',borderDash:[4,4],borderWidth:1.5,pointRadius:0,fill:false}
+  ]},options:{responsive:true,maintainAspectRatio:false,animation:{duration:200},plugins:{legend:{display:true,labels:{color:'#8b949e',font:{size:9},boxWidth:10}},tooltip:mTip},scales:{x:sc,y:sc}}});
+  var oeeMonthData=avgPerMonth('OEE').map(function(v){return v?(v>1?+v.toFixed(1):+(v*100).toFixed(1)):null;});
+  var cuC2=document.getElementById('cm-cu');
+  if(cuC2) charts['cm-cu']=new Chart(cuC2.getContext('2d'),{type:'line',data:{labels:mLabels,datasets:[
+    {label:'OEE %',data:oeeMonthData,borderColor:'#3fb950',backgroundColor:'rgba(63,185,80,0.08)',fill:true,tension:.3,pointRadius:4,spanGaps:true,
+     pointBackgroundColor:oeeMonthData.map(function(v){return !v?'grey':v>=85?'#3fb950':v>=70?'#d29922':'#f85149';})},
+    {label:'Target 85%',data:months.map(function(){return 85;}),borderColor:'rgba(63,185,80,0.5)',borderDash:[4,4],borderWidth:1.5,pointRadius:0,fill:false}
+  ]},options:{responsive:true,maintainAspectRatio:false,animation:{duration:200},plugins:{legend:{display:true,labels:{color:'#8b949e',font:{size:9},boxWidth:10}},tooltip:mTip},scales:{x:sc,y:{grid:{color:gc},ticks:{color:'#484f58',font:{size:9},callback:function(v){return v+'%';}},min:0,max:120}}}});
+}
+function renderCost(){var ct=document.getElementById('content-cost');if(!DATA.cost){ct.innerHTML='<div class="no-data">⟳ Loading...</div>';gasGet('cost').then(function(d){DATA.cost=d;renderCost();}).catch(function(e){ct.innerHTML='<div class="no-data">Error: '+e.message+'</div>';});return;}ct.innerHTML='<div class="no-data">Cost data loaded — '+( DATA.cost.rows||[]).length+' rows</div>';}
+function renderDowntime(){
+  var ct=document.getElementById('content-downtime');
+  if(!DATA.monthly){
+    ct.innerHTML='<div class="no-data">⟳ Loading...</div>';
+    gasGet('monthly').then(function(d){DATA.monthly=d;renderDowntime();}).catch(function(e){ct.innerHTML='<div class="no-data" style="color:var(--red)">Error: '+e.message+'</div>';});
+    return;
+  }
+  var rows=DATA.monthly.rows||[];
+  var months=DATA.monthly.months||[];
+  if(!activeMonth||months.indexOf(activeMonth)<0) activeMonth=months[months.length-1]||'';
+  var dtPills=document.getElementById('dt-month-pills');
+  if(dtPills){
+    _monthsList=months;
+    dtPills.innerHTML=months.map(function(m,i){
+      return '<button class="wk-pill'+(m===activeMonth?' active':'')+'" onclick="setMonth('+i+');renderDowntime()">'+m.slice(0,3)+'</button>';
+    }).join('');
+    setTimeout(function(){var a=dtPills.querySelector('.wk-pill.active');if(a)a.scrollIntoView({behavior:'smooth',block:'nearest',inline:'center'});},100);
+  }
+  var mRows=rows.filter(function(r){return String(r.MONTH||r.Month||'').trim()===activeMonth;});
+  var dRows=activeSite==='NATIONAL'
+    ? mRows.filter(function(r){return (r.Plant||'').toUpperCase()==='NATIONAL';})
+    : mRows.filter(function(r){return (r.Plant||'').toUpperCase()===activeSite;});
+  function dtHr(r,f1,f2){return gf(r,f1,f2||f1);}
+  function dtPct(r,f1,f2){var v=gf(r,f1,f2||f1);return v>1?v:v*100;}
+  function sumHr(f1,f2){return dRows.reduce(function(a,r){return a+dtHr(r,f1,f2);},0);}
+  function avgPct(f1,f2){
+    var v=dRows.reduce(function(a,r){return a+gf(r,f1,f2||f1);},0)/Math.max(dRows.length,1);
+    return v>1?v:v*100;
+  }
+  var sdt  = sumHr('Scheduled Down Time, hr','Scheduled Downtime, hr');
+  var udt  = sumHr('Unscheduled Down Time, hr','Unscheduled Downtime, hr');
+  var udtP = avgPct('Unscheduled Down Time, %','Unscheduled Downtime, %');
+  var eqH  = sumHr('Equipment Downtime, hr','Equipment Down Time, hr');
+  var eqP  = avgPct('Equipment Downtime, %','Equipment Down Time, %');
+  var prH  = sumHr('Process, hr');
+  var prP  = avgPct('Process, %');
+  var whH  = sumHr('Warehouse, hr');
+  var whP  = avgPct('Warehouse, %');
+  var rmH  = sumHr('Raw Materials, hr','Raw Materials, h');
+  var rmP  = avgPct('Raw Materials, %');
+  var coH  = sumHr('Change Over Downtime, hr');
+  var coP  = avgPct('Change Over Downtime, %');
+  var pfH  = sumHr('Power Failure, hr','Power Failure, h');
+  var pfP  = avgPct('Power Failure, %');
+  function dtColor(hrs){return hrs>80?'var(--red)':hrs>40?'var(--amber)':'var(--text)';}
+  function pctColor(pct){return pct>5?'var(--red)':pct>3?'var(--amber)':'var(--green-b)';}
+  function dtCard(label,hrs,pct,color){
+    var hrsC=dtColor(hrs);
+    var pctC=pct!==null?pctColor(pct):'var(--text3)';
+    return '<div style="background:var(--bg2);border:1px solid var(--border);border-top:2px solid '+hrsC+';border-radius:var(--rl);padding:12px 10px;flex:1;min-width:0">'
+      +'<div style="font-size:8px;color:var(--text3);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;white-space:nowrap">'+label+'</div>'
+      +'<div style="font-family:Barlow Condensed,sans-serif;font-size:28px;font-weight:700;color:'+hrsC+';line-height:1">'+(hrs>0?hrs.toFixed(2):'—')+'<span style="font-size:12px;color:var(--text2);font-family:Barlow,sans-serif"> hr</span></div>'
+      +(pct!==null?'<div style="font-family:DM Mono,monospace;font-size:11px;font-weight:600;color:'+pctC+';margin-top:4px">'+(pct>0?pct.toFixed(2)+'%':'0.00%')+'</div>':'')
+      +'</div>';
+  }
+  var elH  = sumHr('Electrical, hr');
+  var elP  = avgPct('Electrical, %');
+  var meH  = sumHr('Mechanical, hr');
+  var meP  = avgPct('Mechanical, %');
+  var plH  = sumHr('PLC, hr');
+  var plP  = avgPct('PLC, %');
+  // Row 2: Change Over = col AC/AF, Change Die = col AD/AG
+  var coACH = sumHr('Change Over, hr');
+  var coACP = avgPct('Change Over, %');
+  var cdH  = sumHr('Change Die, hr');
+  var cdP  = avgPct('Change Die, %');
+  var csH  = sumHr('Change Screen, hr');
+  var csP  = avgPct('Change Screen, %');
+  ct.innerHTML='<div class="sec"><div class="sec-hdr"><div class="sec-title">Downtime Scorecard — '+(activeSite==='NATIONAL'?'National':SL[activeSite])+' · '+activeMonth+'</div><div class="sec-line"></div></div>'
+    +'<div style="font-size:8px;color:var(--text3);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;font-family:DM Mono,monospace">Overall Downtime</div>'
+    +'<div style="display:flex;gap:6px;flex-wrap:nowrap;overflow-x:auto;margin-bottom:10px">'
+    +dtCard('Scheduled DT',sdt,null,'var(--text3)')
+    +dtCard('Unscheduled DT',udt,udtP,'var(--red)')
+    +dtCard('Equipment',eqH,eqP,'var(--red)')
+    +dtCard('Process',prH,prP,'var(--amber)')
+    +dtCard('Warehouse',whH,whP,'var(--blue)')
+    +dtCard('Raw Materials',rmH,rmP,'var(--purple)')
+    +dtCard('Change Over DT',coH,coP,'var(--teal)')
+    +dtCard('Power Failure',pfH,pfP,'var(--amber)')
+    +'</div>'
+    +'<div style="font-size:8px;color:var(--text3);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;font-family:DM Mono,monospace">Equipment &amp; Change Over Breakdown</div>'
+    +'<div style="display:flex;gap:6px;flex-wrap:nowrap;overflow-x:auto">'
+    +dtCard('Electrical',elH,elP,'var(--red)')
+    +dtCard('Mechanical',meH,meP,'var(--red)')
+    +dtCard('PLC',plH,plP,'var(--amber)')
+    +dtCard('Change Over',coACH,coACP,'var(--teal)')
+    +dtCard('Change Die',cdH,cdP,'var(--teal)')
+    +dtCard('Change Screen',csH,csP,'var(--teal)')
+    +'</div></div>';
+  // ── LOAD DOWNTIME SHEET DATA ─────────────────────────────
+  var dtWrap=document.getElementById('dt-data-wrap');
+  if(dtWrap) dtWrap.innerHTML='<div class="no-data">⟳ Loading downtime records...</div>';
+  gasGet('downtime',{site:activeSite,week:''}).then(function(d){
+    DATA.downtime=d;
+    var dtWrap=document.getElementById('dt-data-wrap');
+    if(!dtWrap) return;
+    var allRows=d.rows||[];
+    var udtTotal=d.udtTotal||0;
+    var uniqueMonths=[...new Set(allRows.map(function(r){return r.Month||''}))].filter(Boolean);
+    var uniquePlants=[...new Set(allRows.map(function(r){return r.Plant||''}))].filter(Boolean);
+    console.log('DT months:',uniqueMonths,'plants:',uniqueMonths,'activeMonth:',activeMonth,'activeSite:',activeSite,'total rows:',allRows.length);
+    console.log('Available months:',d.uniqueMonths,'Total rows:',d.totalRows);
+    // Filter by active month - use _monthUpper for reliability
+    var mFiltered=allRows.filter(function(r){
+      var rMonth=r._monthUpper||String(r.Month||'').trim().toUpperCase();
+      return rMonth===activeMonth.toUpperCase();
+    });
+    console.log('Filtered rows for',activeMonth,':',mFiltered.length);
+    if(!mFiltered.length&&allRows.length>0){
+      var dtWrap2=document.getElementById('dt-data-wrap');
+      if(dtWrap2) dtWrap2.innerHTML='<div class="no-data" style="color:var(--amber)">No records for '+activeMonth+'. Available months: '+(d.uniqueMonths||[]).join(', ')+'<br>Total records: '+allRows.length+'</div>';
+      return;
+    }
+    var mPareto={};
+    mFiltered.forEach(function(r){
+      if(r['Unscheduled Downtime']>0){
+        mPareto[r.Category]=(mPareto[r.Category]||0)+r['Unscheduled Downtime'];
+      }
+    });
+    var paretoArr=Object.keys(mPareto).map(function(k){return {category:k,hrs:mPareto[k]};})
+      .sort(function(a,b){return b.hrs-a.hrs;});
+    var mUDTTotal=paretoArr.reduce(function(a,x){return a+x.hrs;},0);
+    var cumPct=0;
+    var pareto80=[];
+    paretoArr.forEach(function(p){
+      cumPct+=mUDTTotal>0?p.hrs/mUDTTotal*100:0;
+      pareto80.push({category:p.category,hrs:p.hrs,cumPct:cumPct});
+    });
+    var paretoSection='<div class="sec"><div class="sec-hdr"><div class="sec-title">UDT Pareto Analysis — '+activeMonth+'</div><div class="sec-line"></div></div>'
+      +'<div class="g2">'
+      +'<div class="cc"><div class="cc-title">Pareto Chart — UDT by Category</div>'
+      +'<div style="position:relative;height:220px"><canvas id="dt-pareto-chart"></canvas></div></div>'
+      +'<div class="cc"><div class="cc-title">80% Contribution Summary</div>'
+      +'<div class="tbl-wrap"><table><thead><tr>'
+      +'<th style="text-align:left">Category</th><th>UDT hrs</th><th>%</th><th>Cum%</th>'
+      +'</tr></thead><tbody>'
+      +pareto80.map(function(p,i){
+        var pct=mUDTTotal>0?(p.hrs/mUDTTotal*100):0;
+        var is80=p.cumPct<=80.01;
+        return '<tr style="'+(is80?'background:rgba(248,81,73,0.07)':'')+'">'
+          +'<td style="text-align:left">'+(is80?'<span style="color:var(--red);font-weight:700">':'')
+          +p.category+(is80?'</span>':'')+'</td>'
+          +'<td>'+p.hrs.toFixed(2)+'</td>'
+          +'<td>'+pct.toFixed(1)+'%</td>'
+          +'<td class="'+(p.cumPct<=80?'tr':'')+'">'+(p.cumPct>100?100:p.cumPct).toFixed(1)+'%</td>'
+          +'</tr>';
+      }).join('')
+      +'</tbody></table></div></div>'
+      +'</div></div>';
+    function dtTable(title,rows,dtField){
+      if(!rows.length) return '<div class="cc"><div class="cc-title">'+title+'</div><div class="no-data">No records</div></div>';
+      return '<div class="cc"><div class="cc-title">'+title+' ('+rows.length+' records)</div>'
+        +'<div class="tbl-wrap" style="max-height:320px;overflow-y:auto"><table>'
+        +'<thead><tr>'
+        +'<th>Plant</th><th>Month</th><th>Wk</th><th>Shift</th><th>Machine Line</th>'
+        +'<th style="text-align:left">Category</th><th style="text-align:left">Sub-Category</th>'
+        +'<th style="text-align:left">Reason of Delay</th><th>'+dtField+'</th>'
+        +'</tr></thead><tbody>'
+        +rows.slice(0,200).map(function(r){
+          var val=r[dtField]||0;
+          return '<tr>'
+            +'<td>'+dot((r.Plant||'').toUpperCase())+(r.Plant||'—')+'</td>'
+            +'<td>'+(r.Month||'—')+'</td>'
+            +'<td>'+(r.Week||'—')+'</td>'
+            +'<td>'+(r.Shift||'—')+'</td>'
+            +'<td>'+(r['Machine Line']||'—')+'</td>'
+            +'<td style="text-align:left"><span class="cat-pill '+(DT_CATS[r.Category||'']||'cat-other')+'">'+(r.Category||'—')+'</span></td>'
+            +'<td style="text-align:left;font-size:10px;color:var(--text2)">'+(r['Sub-Category']||'—')+'</td>'
+            +'<td style="text-align:left;font-size:10px;color:var(--text3);max-width:200px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+(r['Reason of Delay']||'—')+'</td>'
+            +'<td class="'+(val>0?'tr':'')+'">'+(val>0?val.toFixed(2):'—')+'</td>'
+            +'</tr>';
+        }).join('')
+        +'</tbody></table></div></div>';
+    }
+    var udtRows=mFiltered.filter(function(r){return r['Unscheduled Downtime']>0;})
+      .sort(function(a,b){return b['Unscheduled Downtime']-a['Unscheduled Downtime'];});
+    var sdtRows=mFiltered.filter(function(r){return r['Scheduled Downtime']>0;})
+      .sort(function(a,b){return b['Scheduled Downtime']-a['Scheduled Downtime'];});
+    var coRows=mFiltered.filter(function(r){return r['No. Of Change Over']>0;})
+      .sort(function(a,b){return b['No. Of Change Over']-a['No. Of Change Over'];});
+    // Build 80% UDT breakdown table - grouped and totaled
+    var breakdown80={};
+    var cumHrs=0;
+    // Only include rows from categories in the 80% pareto
+    pareto80.filter(function(p){return p.cumPct<=80.01;}).forEach(function(p){
+      mFiltered.filter(function(r){
+        return r.Category===p.category && r['Unscheduled Downtime']>0;
+      }).forEach(function(r){
+        var key=r.Plant+'||'+r.Category+'||'+(r['Sub-Category']||'')+'||'+(r['Reason of Delay']||'');
+        if(!breakdown80[key]){
+          breakdown80[key]={
+            Plant:r.Plant, Month:r.Month, Category:r.Category,
+            'Sub-Category':r['Sub-Category']||'',
+            'Reason of Delay':r['Reason of Delay']||'',
+            'Unscheduled Downtime':0
+          };
+        }
+        breakdown80[key]['Unscheduled Downtime']+=r['Unscheduled Downtime'];
+      });
+    });
+    var bd80Rows=Object.values(breakdown80)
+      .sort(function(a,b){return b['Unscheduled Downtime']-a['Unscheduled Downtime'];});
+    var bd80Total=bd80Rows.reduce(function(a,r){return a+r['Unscheduled Downtime'];},0);
+    var bd80Section='<div class="sec"><div class="sec-hdr"><div class="sec-title">80% UDT Breakdown — '+activeMonth+' (Grouped &amp; Totaled)</div><div class="sec-line"></div></div>'
+      +(bd80Rows.length?
+        '<div class="cc"><div class="tbl-wrap" style="max-height:360px;overflow-y:auto"><table>'
+        +'<thead><tr>'
+        +'<th>Plant</th><th>Month</th>'
+        +'<th style="text-align:left">Category</th>'
+        +'<th style="text-align:left">Sub-Category</th>'
+        +'<th style="text-align:left">Reason of Delay</th>'
+        +'<th>UDT hrs</th><th>%</th>'
+        +'</tr></thead><tbody>'
+        +bd80Rows.map(function(r){
+          var pct=bd80Total>0?(r['Unscheduled Downtime']/bd80Total*100):0;
+          return '<tr>'
+            +'<td>'+dot((r.Plant||'').toUpperCase())+(r.Plant||'—')+'</td>'
+            +'<td>'+(r.Month||activeMonth)+'</td>'
+            +'<td style="text-align:left"><span class="cat-pill '+(DT_CATS[r.Category||'']||'cat-other')+'">'+(r.Category||'—')+'</span></td>'
+            +'<td style="text-align:left;font-size:10px;color:var(--text2)">'+(r['Sub-Category']||'—')+'</td>'
+            +'<td style="text-align:left;font-size:10px;color:var(--text3);max-width:220px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+(r['Reason of Delay']||'—')+'</td>'
+            +'<td class="tr" style="font-family:DM Mono,monospace;font-weight:600">'+r['Unscheduled Downtime'].toFixed(2)+'</td>'
+            +'<td style="color:var(--text2);font-size:10px">'+pct.toFixed(1)+'%</td>'
+            +'</tr>';
+        }).join('')
+        +'<tr style="border-top:2px solid var(--border);background:var(--bg3)">'
+        +'<td colspan="5" style="text-align:right;font-weight:700;color:var(--text)">TOTAL</td>'
+        +'<td class="tr" style="font-family:DM Mono,monospace;font-weight:700">'+bd80Total.toFixed(2)+'</td>'
+        +'<td style="color:var(--text2)">100%</td>'
+        +'</tr>'
+        +'</tbody></table></div></div>'
+        :'<div class="no-data">No 80% breakdown data</div>')
+      +'</div>';
+    var tablesSection='<div class="sec"><div class="sec-hdr"><div class="sec-title">Downtime Detail Records — '+activeMonth+'</div><div class="sec-line"></div></div>'
+      +dtTable('Unscheduled Downtime Records',udtRows,'Unscheduled Downtime')
+      +'<div style="margin-top:8px"></div>'
+      +dtTable('Scheduled Downtime Records',sdtRows,'Scheduled Downtime')
+      +'<div style="margin-top:8px"></div>'
+      +dtTable('Change Over Records',coRows,'No. Of Change Over')
+      +'</div>';
+    dtWrap.innerHTML=paretoSection+bd80Section+tablesSection;
+    var ctx=document.getElementById('dt-pareto-chart');
+    if(ctx){
+      if(charts['dt-pareto']){try{charts['dt-pareto'].destroy();}catch(e){}}
+      charts['dt-pareto']=new Chart(ctx.getContext('2d'),{
+        data:{
+          labels:paretoArr.map(function(p){return p.category;}),
+          datasets:[
+            {type:'bar',label:'UDT hrs',data:paretoArr.map(function(p){return +p.hrs.toFixed(2);}),
+             backgroundColor:'rgba(248,81,73,0.6)',borderRadius:3,yAxisID:'y'},
+            {type:'line',label:'Cumulative %',
+             data:(function(){var c=0;return paretoArr.map(function(p){c+=mUDTTotal>0?p.hrs/mUDTTotal*100:0;return +c.toFixed(1);});}()),
+             borderColor:'#388bfd',backgroundColor:'transparent',tension:.3,pointRadius:4,spanGaps:true,yAxisID:'y1'},
+            {type:'line',label:'80% line',data:paretoArr.map(function(){return 80;}),
+             borderColor:'rgba(63,185,80,0.6)',borderDash:[4,4],borderWidth:1.5,pointRadius:0,yAxisID:'y1'}
+          ]
+        },
+        options:{responsive:true,maintainAspectRatio:false,animation:{duration:200},
+          plugins:{legend:{display:true,labels:{color:'#8b949e',font:{size:9},boxWidth:10}},
+            tooltip:{backgroundColor:'#1f2631',borderColor:'rgba(255,255,255,.1)',borderWidth:1,bodyFont:{family:"'DM Mono',monospace",size:10}}},
+          scales:{
+            x:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'#484f58',font:{size:9},maxRotation:30}},
+            y:{position:'left',grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'#484f58',font:{size:9}},title:{display:true,text:'Hours',color:'#484f58',font:{size:9}}},
+            y1:{position:'right',grid:{display:false},ticks:{color:'#484f58',font:{size:9},callback:function(v){return v+'%';}},min:0,max:100}
+          }}
+      });
+    }
+  }).catch(function(e){
+    var dtWrap=document.getElementById('dt-data-wrap');
+    if(dtWrap) dtWrap.innerHTML='<div class="no-data" style="color:var(--red)">Error loading downtime data: '+e.message+'</div>';
+  });
+}
+function renderProduction(){var ct=document.getElementById('content-production');ct.innerHTML='<div class="no-data">Production tab</div>';}
+function renderOEE(){
+  var ct=document.getElementById('content-oee');
+  ct.innerHTML='<div class="no-data">OEE tab — coming soon</div>';
+}
+
+function renderCostAnalytics(){var ct=document.getElementById('content-cost_analytics');ct.innerHTML='<div class="no-data">Cost Analytics tab</div>';}
+function renderQualityEnergy(){var ct=document.getElementById('content-quality_energy');ct.innerHTML='<div class="no-data">Quality & Energy tab</div>';}
+// ── START ──────────────────────────────────────────────────
+loadData(false);
