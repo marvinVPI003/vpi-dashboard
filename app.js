@@ -480,3 +480,16 @@ function buildNatTable(wkRows){
   }).join('')+'</tbody></table></div>';
 }
 // ── OTHER TABS (stubs) ─────────────────────────────────────
+// Stubs - real implementations in app2.js
+function renderMonthly(){var ct=document.getElementById('content-monthly');if(ct)ct.innerHTML='<div class="no-data">⟳ Loading...</div>';}
+function renderDowntime(){var ct=document.getElementById('content-downtime');if(ct)ct.innerHTML='<div class="no-data">⟳ Loading...</div>';}
+function renderProduction(){var ct=document.getElementById('content-production');if(ct)ct.innerHTML='<div class="no-data">Production tab</div>';}
+function renderOEE(){var ct=document.getElementById('content-oee');if(ct)ct.innerHTML='<div class="no-data">⟳ Loading...</div>';}
+function renderCostAnalytics(){var ct=document.getElementById('content-cost_analytics');if(ct)ct.innerHTML='<div class="no-data">Cost Analytics tab</div>';}
+function renderQualityEnergy(){var ct=document.getElementById('content-quality_energy');if(ct)ct.innerHTML='<div class="no-data">Quality & Energy tab</div>';}
+function renderCost(){var ct=document.getElementById('content-cost');if(ct)ct.innerHTML='<div class="no-data">Cost tab</div>';}
+function setMonth(i){if(_monthsList&&_monthsList[i]){activeMonth=_monthsList[i];if(activePage==='dashboard')renderMonthly();else if(activePage==='downtime')renderDowntime();}}
+var _monthsList=[];
+
+// ── START ──────────────────────────────────────────────────
+loadData(false);
