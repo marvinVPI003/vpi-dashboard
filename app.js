@@ -936,14 +936,17 @@ function renderDowntime(){
     +'</div></div>';
 
   // Load downtime detail from Downtime sheet
-  if(dtWrap) dtWrap.innerHTML='<div class="no-data">⟳ Loading downtime records...</div>';
-  var dtMonth=activeMonth||new Date().toLocaleString('en-US',{month:'long'}).toUpperCase();
+  if(dtWrap) dtWrap.innerHTML='<div class="no-data">⟳ Loading downtime records for '+dtMonth+'...</div>';
+  var dtMonth=activeMonth||(function(){
+    var months=['JANUARY','FEBRUARY','MARCH','APRIL','MAY','JUNE','JULY','AUGUST','SEPTEMBER','OCTOBER','NOVEMBER','DECEMBER'];
+    return months[new Date().getMonth()];
+  })();
   gasGet('downtime',{site:activeSite,week:dtMonth}).then(function(d){
     var dtWrap=document.getElementById('dt-data-wrap');
     if(!dtWrap) return;
     var allRows=d.rows||[];
     if(!allRows.length){
-      dtWrap.innerHTML='<div class="no-data">No downtime records for '+dtMonth+'.</div>';
+      dtWrap.innerHTML='<div class="no-data">No downtime records found for '+dtMonth+'.<br><small style="color:var(--text3)">Total rows returned: '+(allRows.length)+'</small></div>';
       return;
     }
 
