@@ -29,7 +29,7 @@ function gasGet(tab, extra) {
       try{document.head.removeChild(s);}catch(e){}
       delete window[cb];
       reject(new Error('Timeout for tab:'+tab));
-    }, 30000);
+    }, 60000);
     window[cb] = function(data){
       if(done) return; done=true;
       clearTimeout(timer);
@@ -853,6 +853,8 @@ function renderMonthly(){
 function renderCost(){var ct=document.getElementById('content-cost');if(!DATA.cost){ct.innerHTML='<div class="no-data">⟳ Loading...</div>';gasGet('cost').then(function(d){DATA.cost=d;renderCost();}).catch(function(e){ct.innerHTML='<div class="no-data">Error: '+e.message+'</div>';});return;}ct.innerHTML='<div class="no-data">Cost data loaded — '+( DATA.cost.rows||[]).length+' rows</div>';}
 function renderDowntime(){
   var ct=document.getElementById('content-downtime');
+  // Reset downtime cache when month changes
+  DATA.downtime=null;
   if(!DATA.monthly){
     ct.innerHTML='<div class="no-data">⟳ Loading...</div>';
     gasGet('monthly').then(function(d){DATA.monthly=d;renderDowntime();}).catch(function(e){ct.innerHTML='<div class="no-data" style="color:var(--red)">Error: '+e.message+'</div>';});
@@ -943,7 +945,7 @@ function renderDowntime(){
   // ── LOAD DOWNTIME SHEET DATA ─────────────────────────────
   var dtWrap=document.getElementById('dt-data-wrap');
   if(dtWrap) dtWrap.innerHTML='<div class="no-data">⟳ Loading downtime records...</div>';
-  gasGet('downtime',{site:activeSite,week:''}).then(function(d){
+  gasGet('downtime',{site:activeSite,week:activeMonth}).then(function(d){
     DATA.downtime=d;
     var dtWrap=document.getElementById('dt-data-wrap');
     if(!dtWrap) return;
@@ -1033,18 +1035,16 @@ function renderDowntime(){
       .sort(function(a,b){return b['No. Of Change Over']-a['No. Of Change Over'];});
     // Build 80% UDT breakdown table - grouped and totaled
     var breakdown80={};
-    var cumHrs=0;
-    // Only include rows from categories in the 80% pareto
+    // Group by Plant+Category+SubCategory only - sum UDT hrs
     pareto80.filter(function(p){return p.cumPct<=80.01;}).forEach(function(p){
       mFiltered.filter(function(r){
         return r.Category===p.category && r['Unscheduled Downtime']>0;
       }).forEach(function(r){
-        var key=r.Plant+'||'+r.Category+'||'+(r['Sub-Category']||'')+'||'+(r['Reason of Delay']||'');
+        var key=r.Plant+'||'+r.Category+'||'+(r['Sub-Category']||'');
         if(!breakdown80[key]){
           breakdown80[key]={
-            Plant:r.Plant, Month:r.Month, Category:r.Category,
+            Plant:r.Plant, Category:r.Category,
             'Sub-Category':r['Sub-Category']||'',
-            'Reason of Delay':r['Reason of Delay']||'',
             'Unscheduled Downtime':0
           };
         }
@@ -1069,8 +1069,8 @@ function renderDowntime(){
             +'<td>'+dot((r.Plant||'').toUpperCase())+(r.Plant||'—')+'</td>'
             +'<td style="text-align:left"><span class="cat-pill '+(DT_CATS[r.Category||'']||'cat-other')+'">'+(r.Category||'—')+'</span></td>'
             +'<td style="text-align:left;font-size:11px;color:var(--text2)">'+(r['Sub-Category']||'—')+'</td>'
-            +'<td class="tr" style="font-family:DM Mono,monospace;font-weight:600">'+r['Unscheduled Downtime'].toFixed(2)+'</td>'
-            +'<td style="color:var(--text2);font-size:10px">'+pct.toFixed(1)+'%</td>'
+            +'<td style="font-family:DM Mono,monospace;font-weight:600;text-align:center;color:var(--red)">'+r['Unscheduled Downtime'].toFixed(2)+'</td>'
+            +'<td style="color:var(--text2);font-size:10px;text-align:center">'+pct.toFixed(1)+'%</td>'
             +'</tr>';
         }).join('')
         +'<tr style="border-top:2px solid var(--border);background:var(--bg3)">'
