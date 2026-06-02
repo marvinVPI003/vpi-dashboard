@@ -971,7 +971,7 @@ function renderDowntime(){
     var dtPills2=document.getElementById('dt-month-pills');
     if(dtPills2 && dtMonths.length){
       dtPills2.innerHTML=dtMonths.map(function(m){
-        return '<button class="wk-pill'+(m===dtActive?' active':'')+'" onclick="dtSetMonth(''+m+'')">'+m.slice(0,3)+'</button>';
+        return '<button class="wk-pill'+(m===dtActive?' active':'')+'" onclick="dtSetMonth(this.dataset.m)" data-m="'+m+'">'+m.slice(0,3)+'</button>';
       }).join('');
     }
 
