@@ -853,8 +853,6 @@ function renderMonthly(){
 function renderCost(){var ct=document.getElementById('content-cost');if(!DATA.cost){ct.innerHTML='<div class="no-data">⟳ Loading...</div>';gasGet('cost').then(function(d){DATA.cost=d;renderCost();}).catch(function(e){ct.innerHTML='<div class="no-data">Error: '+e.message+'</div>';});return;}ct.innerHTML='<div class="no-data">Cost data loaded — '+( DATA.cost.rows||[]).length+' rows</div>';}
 function renderDowntime(){
   var ct=document.getElementById('content-downtime');
-  // Reset downtime cache when month changes
-  DATA.downtime=null;
   if(!DATA.monthly){
     ct.innerHTML='<div class="no-data">⟳ Loading...</div>';
     gasGet('monthly').then(function(d){DATA.monthly=d;renderDowntime();}).catch(function(e){ct.innerHTML='<div class="no-data" style="color:var(--red)">Error: '+e.message+'</div>';});
