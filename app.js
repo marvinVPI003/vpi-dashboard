@@ -852,6 +852,12 @@ function renderMonthly(){
   ]},options:{responsive:true,maintainAspectRatio:false,animation:{duration:200},plugins:{legend:{display:true,labels:{color:'#8b949e',font:{size:9},boxWidth:10}},tooltip:mTip},scales:{x:sc,y:{grid:{color:gc},ticks:{color:'#484f58',font:{size:9},callback:function(v){return v+'%';}},min:0,max:120}}}});
 }
 function renderCost(){var ct=document.getElementById('content-cost');if(!DATA.cost){ct.innerHTML='<div class="no-data">⟳ Loading...</div>';gasGet('cost').then(function(d){DATA.cost=d;renderCost();}).catch(function(e){ct.innerHTML='<div class="no-data">Error: '+e.message+'</div>';});return;}ct.innerHTML='<div class="no-data">Cost data loaded — '+( DATA.cost.rows||[]).length+' rows</div>';}
+function renderDowntimeMonth(m){
+  // Re-render downtime tables for selected month
+  var dtW=document.getElementById('dt-data-wrap');
+  if(!dtW||!DATA.dtLastResponse) return;
+  renderDowntimeTables(DATA.dtLastResponse, dtW, m, activeSite);
+}
 function dtSetMonth(m){
   activeMonth=m;
   if(DATA.dtCache) DATA.dtCache=null;
@@ -941,6 +947,7 @@ function renderDowntime(){
   gasGet('downtime',{site:activeSite,week:''}).then(function(d){
     var dtW=document.getElementById('dt-data-wrap');
     if(!dtW) return;
+    DATA.dtLastResponse=d; // cache for month switching
     renderDowntimeTables(d, dtW, activeMonth, activeSite);
   }).catch(function(e){
     var dtW=document.getElementById('dt-data-wrap');
@@ -957,21 +964,24 @@ function renderDowntimeTables(d, dtW, filterMonth, filterSite){
   allRows.forEach(function(r){ if(r.Month) seenMonths[r.Month.toUpperCase()]=true; });
   var availMonths=monthOrder.filter(function(m){ return seenMonths[m]; });
 
-  // Determine which month to show
-  var showMonth=filterMonth?filterMonth.toUpperCase():'';
-  if(!showMonth || !seenMonths[showMonth]){
-    // Use latest available month from downtime data
-    showMonth=availMonths[availMonths.length-1]||'';
-  }
+  // Always use LATEST month from downtime sheet data
+  // Do NOT rely on filterMonth/activeMonth - use actual data
+  var showMonth = availMonths[availMonths.length-1]||'';
 
-  // Filter by month
+  // Filter by month - case insensitive
   var rows=allRows.filter(function(r){
     return r.Month && r.Month.toUpperCase()===showMonth;
   });
 
+  if(!rows.length && allRows.length){
+    // Try first available month
+    showMonth = Object.keys(seenMonths)[0]||'';
+    rows=allRows.filter(function(r){return r.Month&&r.Month.toUpperCase()===showMonth;});
+  }
+
   if(!rows.length){
-    dtW.innerHTML='<div class="no-data">No records for '+showMonth
-      +'<br><small style="color:var(--text3)">Available: '+availMonths.join(', ')+'</small></div>';
+    dtW.innerHTML='<div class="no-data" style="padding:20px">'
+      +'No records found.<br><small style="color:var(--text3)">Total rows: '+allRows.length+'<br>Months in data: '+availMonths.join(', ')+'</small></div>';
     return;
   }
 
@@ -1037,6 +1047,15 @@ function renderDowntimeTables(d, dtW, filterMonth, filterSite){
   }
 
   var html='';
+
+  // Month pills from downtime data
+  html+='<div style="background:var(--bg2);border-bottom:1px solid var(--border);padding:6px 12px;display:flex;align-items:center;gap:4px;flex-wrap:wrap;margin-bottom:8px">'
+    +'<span style="font-size:9px;color:var(--text3);font-family:DM Mono,monospace;letter-spacing:1px;margin-right:4px">MONTH</span>'
+    +availMonths.map(function(m){
+      var active=m===showMonth?' active':'';
+      return '<button class="wk-pill'+active+'" data-dtm="'+m+'" onclick="renderDowntimeMonth(this.dataset.dtm)">'+m.slice(0,3)+'</button>';
+    }).join('')
+    +'</div>';
 
   // 1. Pareto chart + table side by side
   html+='<div class="sec"><div class="sec-hdr"><div class="sec-title">UDT Pareto — '+showMonth+'</div><div class="sec-line"></div></div>'
