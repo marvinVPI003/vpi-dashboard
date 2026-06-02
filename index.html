@@ -1,0 +1,830 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>VPI Operations Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#071528;--bg2:#0d1e38;--bg3:#132848;--bg4:#1a3358;
+  --border:#1e3a6e;--border2:#2a4f8a;
+  --text:#e2f0ff;--text2:#7aadcc;--text3:#3d6b8a;
+  --green:#00d26a;--greenb:#00ff85;--greend:rgba(0,210,106,.12);
+  --amber:#ffb700;--amberd:rgba(255,183,0,.12);
+  --red:#ff4757;--redd:rgba(255,71,87,.12);
+  --blue:#2196f3;--blueb:#64b5f6;--blued:rgba(33,150,243,.12);
+  --teal:#00bcd4;--purple:#9c27b0;--orange:#ff6d00;
+  --r:6px;
+}
+body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;font-size:13px;min-height:100vh}
+
+/* LOADING */
+#ld{position:fixed;inset:0;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:9999;gap:14px}
+.ld-logo{font-size:38px;font-weight:700;letter-spacing:2px;color:#fff}
+.ld-sub{font-size:11px;color:var(--text3);letter-spacing:2px}
+.ld-bar{width:240px;height:3px;background:var(--bg3);border-radius:2px;overflow:hidden}
+.ld-fill{height:100%;background:var(--blue);animation:lb 1.5s ease-in-out infinite}
+@keyframes lb{0%{width:0;margin-left:0}50%{width:60%;margin-left:0}100%{width:0;margin-left:100%}}
+.ld-msg{font-size:11px;color:var(--text3)}
+.ld-err{color:var(--red);font-size:14px;text-align:center;max-width:400px;line-height:1.6}
+.retry-btn{margin-top:12px;padding:8px 24px;border:1px solid var(--blue);border-radius:var(--r);background:none;color:var(--blueb);cursor:pointer;font-size:12px}
+
+/* NAV */
+.nav{position:fixed;top:0;left:0;right:0;height:52px;background:var(--bg2);border-bottom:2px solid var(--border2);display:flex;align-items:center;padding:0 16px;gap:8px;z-index:100;box-shadow:0 2px 16px rgba(0,0,0,.5)}
+.brand{font-size:16px;font-weight:700;color:#fff;letter-spacing:1px;white-space:nowrap;line-height:1}
+.brand small{display:block;font-size:8px;color:var(--text3);letter-spacing:2px;font-weight:400}
+.sep{width:1px;height:26px;background:var(--border2);flex-shrink:0}
+.user{font-size:10px;color:var(--text2);white-space:nowrap}
+.user b{display:block;font-size:11px;color:var(--text)}
+.tabs{display:flex;gap:2px}
+.tab{padding:5px 11px;font-size:10px;font-weight:600;border:1px solid var(--border2);border-radius:var(--r);background:none;color:var(--text2);cursor:pointer;white-space:nowrap;font-family:'Inter',sans-serif;transition:all .15s}
+.tab.on{background:var(--blue);color:#fff;border-color:var(--blue)}
+.tab:hover:not(.on){background:var(--bg3);color:var(--text)}
+.frow{display:flex;align-items:center;gap:6px;margin-left:auto}
+.flbl{font-size:9px;color:var(--text3);letter-spacing:1px;white-space:nowrap}
+.fsel{padding:4px 22px 4px 7px;background:var(--bg3);color:var(--text);border:1px solid var(--border2);border-radius:var(--r);font-size:11px;cursor:pointer;outline:none;appearance:none;font-family:'Inter',sans-serif;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath fill='%237aadcc' d='M5 6L0 0h10z'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 6px center}
+.live{font-size:10px;color:var(--text3);white-space:nowrap}
+.dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--greenb);margin-right:4px;vertical-align:middle}
+.dot.err{background:var(--red)}
+.rbtn{padding:4px 10px;font-size:10px;border:1px solid var(--border2);border-radius:var(--r);background:none;color:var(--text2);cursor:pointer;font-family:'Inter',sans-serif}
+
+/* MAIN */
+.main{margin-top:52px}
+.page{display:none}.page.on{display:block}
+.wrap{padding:14px 18px 40px}
+
+/* CARDS */
+.g4{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:12px}
+.g5{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:12px}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px}
+.g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:12px}
+.kc{background:var(--bg2);border:1px solid var(--border);border-top:3px solid var(--kcc,var(--border2));border-radius:var(--r);padding:12px 14px}
+.kc-l{font-size:9px;font-weight:600;letter-spacing:1.5px;text-transform:uppercase;color:var(--text3);margin-bottom:5px}
+.kc-v{font-size:26px;font-weight:700;line-height:1.1;margin-bottom:3px}
+.kc-s{font-size:10px;color:var(--text3)}
+.bdg{display:inline-block;padding:2px 7px;border-radius:10px;font-size:9px;font-weight:600;margin-top:4px}
+.g{background:var(--greend);color:var(--greenb)}
+.a{background:var(--amberd);color:var(--amber)}
+.r{background:var(--redd);color:var(--red)}
+.b{background:var(--blued);color:var(--blueb)}
+
+/* SECTION */
+.sec{margin-bottom:12px}
+.sech{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.sect{font-size:10px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--text2);white-space:nowrap}
+.secl{flex:1;height:1px;background:var(--border)}
+
+/* BOX */
+.cc{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:12px 14px;margin-bottom:10px}
+.cct{font-size:9px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--text3);margin-bottom:8px}
+
+/* SCORECARD */
+.sc-strip{display:grid;grid-template-columns:repeat(7,1fr);gap:8px;margin-bottom:12px}
+.sc{background:var(--bg2);border:1px solid var(--border);border-top:3px solid var(--scc,var(--border2));border-radius:var(--r);padding:8px;text-align:center}
+.sc-s{font-size:9px;color:var(--text3);font-weight:600;margin-bottom:3px}
+.sc-o{font-size:20px;font-weight:700;line-height:1}
+.sc-p{font-size:10px;color:var(--text3);margin-top:2px}
+.sc-e{font-size:10px;padding-top:4px;border-top:1px solid var(--border);margin-top:4px}
+
+/* TABLE */
+.tw{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:11px}
+th{font-size:9px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--text3);padding:6px 8px;border-bottom:1px solid var(--border2);text-align:right;background:var(--bg3);white-space:nowrap}
+th:first-child{text-align:left}
+td{padding:5px 8px;border-bottom:1px solid var(--border);text-align:right;font-size:10px;color:var(--text2)}
+td:first-child{text-align:left;font-size:11px;color:var(--text)}
+tr:hover td{background:rgba(255,255,255,.02)}
+.tot td{border-top:2px solid var(--border2);color:var(--greenb)!important;font-weight:600}
+.tg{color:var(--greenb)!important}
+.ta{color:var(--amber)!important}
+.tr{color:var(--red)!important}
+.nodata{padding:60px;text-align:center;color:var(--text3)}
+</style>
+</head>
+<body>
+
+<div id="ld">
+  <div class="ld-logo">VPI OPS</div>
+  <div class="ld-sub">FEED FOR LIFE · LIVE OPERATIONS DASHBOARD</div>
+  <div class="ld-bar"><div class="ld-fill"></div></div>
+  <div class="ld-msg" id="ldmsg">Connecting to data sources...</div>
+</div>
+
+<nav class="nav">
+  <div class="brand">VPI OPS<small>FEED FOR LIFE</small></div>
+  <div class="sep"></div>
+  <div class="user"><b>Marvin Rosario</b>Operations Manager</div>
+  <div class="sep"></div>
+  <div class="tabs">
+    <button class="tab on" id="tab-weekly" onclick="setPage('weekly')">⚡ Weekly Pulse</button>
+    <button class="tab" id="tab-downtime" onclick="setPage('downtime')">⚠ Downtime</button>
+    <button class="tab" id="tab-monthly" onclick="setPage('monthly')">📅 Monthly</button>
+    <button class="tab" id="tab-cost" onclick="setPage('cost')">💰 Cost</button>
+  </div>
+  <div class="frow">
+    <span class="flbl">SITE</span>
+    <select id="f-site" class="fsel" onchange="setSite(this.value)" style="min-width:130px"></select>
+    <span class="flbl">MONTH</span>
+    <select id="f-month" class="fsel" onchange="setMonth(this.value)" style="min-width:100px"></select>
+    <span class="flbl">WEEK</span>
+    <select id="f-week" class="fsel" onchange="setWeek(+this.value)" style="min-width:120px"></select>
+  </div>
+  <span class="live"><span class="dot" id="dot"></span><span id="stat">Loading...</span></span>
+  <button class="rbtn" onclick="boot(true)">⟳ Refresh</button>
+</nav>
+
+<div class="main">
+  <div class="page on" id="page-weekly"><div class="wrap" id="ct-weekly"></div></div>
+  <div class="page" id="page-downtime"><div class="wrap" id="ct-downtime"></div></div>
+  <div class="page" id="page-monthly"><div class="wrap" id="ct-monthly"></div></div>
+  <div class="page" id="page-cost"><div class="wrap" id="ct-cost"></div></div>
+</div>
+
+<script>
+// ============================================================
+// CONFIG — all URLs hardcoded, no template substitution
+// ============================================================
+var GAS = 'https://script.google.com/macros/s/AKfycbwwUjBAjE5yYYqQzvaPdWQuLEQO4IDh_sSIln7j9QoWy4XEoVdWm5JykWfrDtJ5m-fP/exec';
+var COST_CSV = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRRx7S_rqgygPQifVep4DtnDFK8gGjAPVbrzCq6sCJcTF6omIGXb73iK8mQZoZjOgUq8CnZ9t7fR_2a/pub?gid=66553768&single=true&output=csv';
+var MON_CSV  = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRRx7S_rqgygPQifVep4DtnDFK8gGjAPVbrzCq6sCJcTF6omIGXb73iK8mQZoZjOgUq8CnZ9t7fR_2a/pub?gid=542702606&single=true&output=csv';
+
+// Constants
+var SITES  = ['NATIONAL','AC','PFMIS','HOREB','BUKID','ARGAO','CCPC','SOUTH'];
+var PSITES = ['AC','PFMIS','HOREB','BUKID','ARGAO','CCPC','SOUTH'];
+var SLBL   = {NATIONAL:'National',AC:'AC · Bulacan',PFMIS:'PFMIS · Isabela',HOREB:'Horeb · Cebu',BUKID:'Bukidnon',ARGAO:'Argao · Cebu',CCPC:'CCPC · CDO',SOUTH:'South · Davao'};
+var SCOL   = {NATIONAL:'#2196f3',AC:'#00ff85',PFMIS:'#ffca28',HOREB:'#00e5cc',BUKID:'#ff5252',ARGAO:'#e040fb',CCPC:'#40c4ff',SOUTH:'#ff6d00'};
+var DEMO   = {AC:5500,PFMIS:4000,HOREB:3500,ARGAO:3500,BUKID:7000,CCPC:500,SOUTH:4000,NATIONAL:28000};
+var DSGN   = {AC:6500,PFMIS:5000,HOREB:4000,ARGAO:4000,BUKID:8000,CCPC:500,SOUTH:4000,NATIONAL:32000};
+var WCOM   = {AC:1375,PFMIS:1000,HOREB:875,ARGAO:875,BUKID:1750,CCPC:125,SOUTH:1000,NATIONAL:7000};
+var MORD   = ['JANUARY','FEBRUARY','MARCH','APRIL','MAY','JUNE','JULY','AUGUST','SEPTEMBER','OCTOBER','NOVEMBER','DECEMBER'];
+var BCOLS  = ['#ff4757','#ff6b35','#ffca28','#00e5cc','#00d26a','#9c27b0','#2196f3','#e040fb','#40c4ff','#8b949e'];
+
+// State
+var PROD=[], DTRAW=[], CDATA=[], MDATA=[];
+var activeSite='NATIONAL', activeWeek=null, activeMonth=null, activePage='weekly';
+var CHARTS={};
+
+// ============================================================
+// HELPERS
+// ============================================================
+function fv(n,d){n=n||0;d=d===undefined?1:d;return n!==0?n.toFixed(d):'—';}
+function fvs(n,d){d=d===undefined?2:d;return n!==0?(n>0?'+':'')+n.toFixed(d):'—';}
+function fPM(n){return n>0?'₱'+(n/1000000).toFixed(3)+'M':'—';}
+function fMT(kg){return kg>0?(kg/1000).toFixed(1):'—';}
+function bsc(v,hi,md){return v>=hi?'g':v>=md?'a':'r';}
+function dot2(s){return '<span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:'+SCOL[s]+';margin-right:5px;vertical-align:middle"></span>';}
+function ci(col){col=col.toUpperCase();var r=0;for(var i=0;i<col.length;i++)r=r*26+(col.charCodeAt(i)-64);return r-1;}
+function gv(row,col,def){def=def===undefined?0:def;try{var v=row[ci(col)];if(v===undefined||v===null||v==='')return def;var n=parseFloat(String(v).replace(/,/g,'').replace(/%/g,''));return isNaN(n)?def:n;}catch(e){return def;}}
+function gs(row,col){try{return String(row[ci(col)]||'').trim();}catch(e){return '';}}
+function setMsg(m){var el=document.getElementById('ldmsg');if(el)el.textContent=m;}
+function killLoading(){var el=document.getElementById('ld');if(el&&el.parentNode)el.parentNode.removeChild(el);}
+
+function parseCSV(text){
+  var rows=[],row=[],cur='',inQ=false;
+  for(var i=0;i<text.length;i++){
+    var c=text[i];
+    if(c==='"'){if(inQ&&text[i+1]==='"'){cur+='"';i++;}else inQ=!inQ;}
+    else if(c===','&&!inQ){row.push(cur.trim());cur='';}
+    else if((c==='\n'||c==='\r')&&!inQ){
+      if(c==='\r'&&text[i+1]==='\n')i++;
+      row.push(cur.trim());
+      if(row.some(function(x){return x!=='';}))rows.push(row);
+      row=[];cur='';
+    }else cur+=c;
+  }
+  if(cur!==''||row.length){row.push(cur.trim());if(row.some(function(x){return x!=='';}))rows.push(row);}
+  return rows;
+}
+
+function destroyCharts(){Object.keys(CHARTS).forEach(function(k){try{CHARTS[k].destroy();}catch(e){}});CHARTS={};}
+
+function mkChart(id,type,labels,datasets,extraOpts){
+  var el=document.getElementById(id);if(!el)return;
+  if(CHARTS[id])CHARTS[id].destroy();
+  var opts={
+    responsive:true,maintainAspectRatio:false,
+    plugins:{legend:{labels:{color:'#7aadcc',font:{size:10}}}},
+    scales:{
+      x:{ticks:{color:'#3d6b8a',font:{size:9}},grid:{color:'rgba(255,255,255,0.04)'}},
+      y:{ticks:{color:'#3d6b8a',font:{size:9}},grid:{color:'rgba(255,255,255,0.05)'},beginAtZero:true}
+    }
+  };
+  if(extraOpts)Object.assign(opts,extraOpts);
+  CHARTS[id]=new Chart(el,{type:type,data:{labels:labels,datasets:datasets},options:opts});
+}
+
+// ============================================================
+// DATA ACCESS
+// ============================================================
+function get(site,wk){for(var i=0;i<PROD.length;i++){if(PROD[i].plant===site&&PROD[i].week===wk)return PROD[i];}return null;}
+function allWeeks(){var ws={};PROD.forEach(function(r){if(r.plant==='NATIONAL')ws[r.week]=1;});return Object.keys(ws).map(Number).sort(function(a,b){return a-b;});}
+function wkMon(w){for(var i=0;i<PROD.length;i++){if(PROD[i].plant==='NATIONAL'&&PROD[i].week===w)return PROD[i].month;}return null;}
+function histSite(s){return PROD.filter(function(r){return r.plant===s;}).sort(function(a,b){return a.week-b.week;});}
+
+// ============================================================
+// NAV
+// ============================================================
+function setPage(p){
+  activePage=p;
+  document.querySelectorAll('.page').forEach(function(el){el.classList.remove('on');});
+  document.querySelectorAll('.tab').forEach(function(el){el.classList.remove('on');});
+  var pg=document.getElementById('page-'+p);if(pg)pg.classList.add('on');
+  var tb=document.getElementById('tab-'+p);if(tb)tb.classList.add('on');
+  destroyCharts();
+  if(p==='weekly')renderWeekly();
+  else if(p==='downtime')renderDowntime();
+  else if(p==='monthly')renderMonthly();
+  else if(p==='cost')renderCost();
+}
+function setSite(s){activeSite=s;destroyCharts();if(activePage==='weekly')renderWeekly();else if(activePage==='downtime')renderDowntime();}
+function setMonth(m){
+  activeMonth=m;
+  var ws=PROD.filter(function(r){return r.plant==='NATIONAL'&&r.month===m;}).map(function(r){return r.week;}).sort(function(a,b){return a-b;});
+  if(ws.length)activeWeek=ws[ws.length-1];
+  buildFilters();destroyCharts();if(activePage==='weekly')renderWeekly();else if(activePage==='downtime')renderDowntime();
+}
+function setWeek(w){
+  activeWeek=w;activeMonth=wkMon(w);
+  buildFilters();destroyCharts();if(activePage==='weekly')renderWeekly();
+}
+
+function buildFilters(){
+  var ss=document.getElementById('f-site');
+  if(ss)ss.innerHTML=SITES.map(function(s){return '<option value="'+s+'"'+(s===activeSite?' selected':'')+'>'+SLBL[s]+'</option>';}).join('');
+  var ums={};PROD.filter(function(r){return r.plant==='NATIONAL';}).forEach(function(r){ums[r.month]=1;});
+  var months=Object.keys(ums).sort(function(a,b){return MORD.indexOf(a)-MORD.indexOf(b);});
+  var ms=document.getElementById('f-month');
+  if(ms)ms.innerHTML=months.map(function(m){return '<option value="'+m+'"'+(m===activeMonth?' selected':'')+'>'+m.slice(0,3)+'</option>';}).join('');
+  var ws=document.getElementById('f-week');
+  if(ws)ws.innerHTML=allWeeks().map(function(w){var m=(wkMon(w)||'').slice(0,3);return '<option value="'+w+'"'+(w===activeWeek?' selected':'')+'>'+m+' Wk '+w+'</option>';}).join('');
+}
+
+// ============================================================
+// FETCH PRODUCTION (via GAS)
+// ============================================================
+async function fetchProd(){
+  setMsg('Loading production data...');
+  var resp=await fetch(GAS+'?sheet=prod');
+  var text=await resp.text();
+  if(!text||text.length<100)throw new Error('Empty production response. Check GAS deployment.');
+  if(text.indexOf('Sheet not found')>=0)throw new Error(text.trim());
+  var rows=parseCSV(text);
+  var hi=-1;
+  for(var i=0;i<Math.min(rows.length,5);i++){if((rows[i][0]||'').trim().toLowerCase()==='plant'){hi=i;break;}}
+  if(hi<0)throw new Error('No header row found. Got: '+text.slice(0,80));
+  var data=[];
+  var VS=new Set(SITES);
+  for(var i=hi+1;i<rows.length;i++){
+    var r=rows[i];if(!r||r.length<5)continue;
+    var pl=(r[0]||'').trim().toUpperCase();if(!VS.has(pl))continue;
+    var wk=parseInt(r[1]);if(!wk||isNaN(wk))continue;
+    var mon='';
+    for(var j=r.length-1;j>=0;j--){var v=(r[j]||'').trim().toUpperCase();if(MORD.indexOf(v)>=0){mon=v;break;}}
+    if(!mon)continue;
+    data.push({
+      plant:pl,week:wk,month:mon,
+      plan:gv(r,'AJ'),output:gv(r,'AM'),workingHours:gv(r,'E'),
+      scheduledDT:gv(r,'G'),unscheduledDT:gv(r,'H'),dtRate:gv(r,'X'),
+      runRate:gv(r,'BD'),
+      oee:gv(r,'CR')*100,performance:gv(r,'CW')*100,quality:gv(r,'CX')*100,availability:gv(r,'CY')*100,
+      outrightRejectMt:gv(r,'BL'),outrightRejectPct:gv(r,'BM'),
+      otherRejectMt:gv(r,'BO'),otherRejectPct:gv(r,'BP'),
+      shrinkageMt:gv(r,'BR'),shrinkagePct:gv(r,'BS'),
+      rmVarQty:gv(r,'CD'),rmVarPct:gv(r,'CE'),
+      rmVarWoQty:gv(r,'CK'),rmVarWoPct:gv(r,'CL'),
+      kwhTotal:gv(r,'BU'),kwhTon:gv(r,'BV'),
+      liTotal:gv(r,'BW'),liTon:gv(r,'BX'),fuelPrice:gv(r,'CA'),
+      mechDT:gv(r,'L'),elecDT:gv(r,'K'),procDT:gv(r,'P'),cooDT:gv(r,'V'),
+    });
+  }
+  console.log('PROD:',data.length,'rows');
+  return data;
+}
+
+// ============================================================
+// FETCH DOWNTIME (via GAS) — stores raw rows
+// ============================================================
+async function fetchDT(){
+  setMsg('Loading downtime data...');
+  var resp=await fetch(GAS+'?sheet=dt');
+  var text=await resp.text();
+  if(!text||text.length<50){console.warn('DT empty');return[];}
+  if(text.indexOf('Sheet not found')>=0){console.warn('DT:',text);return[];}
+  var rows=parseCSV(text);
+  var hi=-1;
+  for(var i=0;i<Math.min(rows.length,5);i++){if((rows[i][0]||'').trim().toLowerCase()==='plant'){hi=i;break;}}
+  if(hi<0){console.warn('DT no header');return[];}
+  var data=[];
+  var VS=new Set(SITES);
+  for(var i=hi+1;i<rows.length;i++){
+    var r=rows[i];if(!r||r.length<8)continue;
+    var pl=(r[0]||'').trim().toUpperCase();if(!VS.has(pl))continue;
+    var wk=parseInt(r[3]);if(!wk||isNaN(wk))continue;
+    var udt=parseFloat(r[10])||0;
+    var sdt=parseFloat(r[11])||0;
+    if(udt===0&&sdt===0)continue;
+    data.push({
+      plant:pl,week:wk,
+      cat:  (r[7]||'').trim(),
+      sub:  (r[8]||'').trim(),
+      udt:  udt, sdt: sdt,
+      pmOp: (r[13]||'').trim(),
+      ccr:  (r[14]||'').trim(),
+    });
+  }
+  console.log('DT raw rows:',data.length);
+  return data;
+}
+
+// ============================================================
+// BOOT
+// ============================================================
+async function boot(isRefresh){
+  var ldEl=document.getElementById('ld');
+  if(!isRefresh&&ldEl)ldEl.style.display='flex';
+  var to=!isRefresh?setTimeout(function(){
+    var el=document.getElementById('ld');
+    if(!el)return;
+    el.innerHTML='<div class="ld-err">⏱ Taking too long to load.<br>Check your internet connection or GAS deployment.</div><button class="retry-btn" onclick="boot(false)">⟳ Retry</button>';
+  },25000):null;
+  try{
+    // Load prod first (required)
+    PROD=await fetchProd();
+    // Load DT (non-fatal if fails)
+    try{DTRAW=await fetchDT();}catch(e){console.warn('DT failed:',e.message);DTRAW=[];}
+    // Set initial filters
+    if(!isRefresh){
+      var ws=allWeeks();
+      activeWeek=ws[ws.length-1];
+      activeMonth=wkMon(activeWeek);
+    }
+    buildFilters();
+    if(to)clearTimeout(to);
+    killLoading();
+    document.getElementById('dot').className='dot';
+    document.getElementById('stat').textContent='Live · '+new Date().toLocaleTimeString('en-PH',{hour:'2-digit',minute:'2-digit'});
+    renderWeekly();
+    // Background: cost + monthly
+    fetch(COST_CSV).then(function(r){return r.text();}).then(function(t){CDATA=parseCostCSV(t);console.log('Cost:',CDATA.length);}).catch(function(e){console.warn('Cost:',e.message);});
+    fetch(MON_CSV).then(function(r){return r.text();}).then(function(t){MDATA=parseMonCSV(t);console.log('Monthly:',MDATA.length);}).catch(function(e){console.warn('Monthly:',e.message);});
+    setInterval(function(){boot(true);},5*60*1000);
+  }catch(err){
+    console.error('Boot error:',err);
+    if(to)clearTimeout(to);
+    var el=document.getElementById('ld');
+    if(el)el.innerHTML='<div class="ld-err">⚠ '+err.message+'</div><button class="retry-btn" onclick="boot(false)">⟳ Retry</button>';
+    document.getElementById('dot').className='dot err';
+    document.getElementById('stat').textContent='Error';
+  }
+}
+boot(false);
+</script>
+<script>
+function renderWeekly(){
+  var ct=document.getElementById('ct-weekly');
+  if(!ct||!PROD.length){if(ct)ct.innerHTML='<div class="nodata">No data loaded.</div>';return;}
+  var d=get(activeSite,activeWeek);
+  if(!d){ct.innerHTML='<div class="nodata">No data for '+activeSite+' Week '+activeWeek+'</div>';return;}
+  var wc=WCOM[activeSite]||WCOM.NATIONAL;
+  var pp=wc>0?d.output/wc*100:0;
+  var pC=pp>=100?'var(--greenb)':pp>=85?'var(--amber)':'var(--red)';
+  var oC=d.oee>=85?'var(--greenb)':d.oee>=70?'var(--amber)':d.oee>0?'var(--red)':'var(--text3)';
+  var udt=activeSite==='NATIONAL'?PSITES.reduce(function(a,s){var r=get(s,activeWeek);return a+(r?r.unscheduledDT:0);},0):d.unscheduledDT;
+  var sdt=activeSite==='NATIONAL'?PSITES.reduce(function(a,s){var r=get(s,activeWeek);return a+(r?r.scheduledDT:0);},0):d.scheduledDT;
+  var udtP=d.workingHours>0?udt/d.workingHours*100:0;
+  var sdtP=d.workingHours>0?sdt/d.workingHours*100:0;
+  var hd=histSite(activeSite);
+  var wkL=hd.map(function(r){return 'Wk'+r.week;});
+  var natOut=PSITES.reduce(function(a,s){var r=get(s,activeWeek);return a+(r?r.output:0);},0);
+  var natUDT=PSITES.reduce(function(a,s){var r=get(s,activeWeek);return a+(r?r.unscheduledDT:0);},0);
+
+  // Scorecard strip
+  var sc=PSITES.map(function(s){
+    var sd=get(s,activeWeek);var out=sd?sd.output:0;var wc2=WCOM[s]||0;var p=wc2>0?out/wc2*100:0;
+    var col=p>=100?'var(--green)':p>=85?'var(--amber)':'var(--red)';
+    return '<div class="sc" style="--scc:'+col+'">'+
+      '<div class="sc-s">'+dot2(s)+s+'</div>'+
+      '<div class="sc-o" style="color:'+col+'">'+(out>0?fv(out,1):'—')+'</div>'+
+      '<div class="sc-p">'+(wc2>0?p.toFixed(1)+'% commit':'—')+'</div>'+
+      '<div class="sc-e">OEE: <b style="color:'+(sd&&sd.oee>=85?'var(--greenb)':sd&&sd.oee>=70?'var(--amber)':'var(--red)')+'">'+
+        (sd&&sd.oee>0?sd.oee.toFixed(1)+'%':'—')+'</b><br>UDT: '+(sd&&sd.unscheduledDT>0?sd.unscheduledDT.toFixed(1)+'h':'—')+
+      '</div></div>';
+  }).join('');
+
+  // Quality rows
+  var rejR=PSITES.map(function(s){
+    var sd=get(s,activeWeek);
+    if(!sd||sd.output===0)return '<tr><td>'+dot2(s)+s+'</td><td colspan="6" style="color:var(--text3)">No data</td></tr>';
+    var tot=sd.outrightRejectPct+sd.otherRejectPct;
+    return '<tr><td>'+dot2(s)+s+'</td>'+
+      '<td>'+fv(sd.outrightRejectMt,3)+'</td><td class="'+(sd.outrightRejectPct>0.3?'tr':sd.outrightRejectPct>0.15?'ta':'tg')+'">'+fv(sd.outrightRejectPct,3)+'%</td>'+
+      '<td>'+fv(sd.otherRejectMt,3)+'</td><td class="'+(sd.otherRejectPct>0.7?'tr':sd.otherRejectPct>0.35?'ta':'tg')+'">'+fv(sd.otherRejectPct,3)+'%</td>'+
+      '<td>'+fv(sd.outrightRejectMt+sd.otherRejectMt,3)+'</td><td class="'+(tot>1?'tr':'tg')+'">'+fv(tot,3)+'%</td></tr>';
+  }).join('');
+  var lossR=PSITES.map(function(s){
+    var sd=get(s,activeWeek);
+    if(!sd||sd.output===0)return '<tr><td>'+dot2(s)+s+'</td><td colspan="3" style="color:var(--text3)">No data</td></tr>';
+    var cls=sd.shrinkagePct<-0.5?'tr':sd.shrinkagePct<0?'ta':'tg';
+    return '<tr><td>'+dot2(s)+s+'</td>'+
+      '<td class="'+cls+'">'+(sd.shrinkageMt>=0?'+':'')+fv(sd.shrinkageMt,3)+' mt</td>'+
+      '<td class="'+cls+'">'+(sd.shrinkagePct>=0?'+':'')+fv(sd.shrinkagePct,3)+'%</td>'+
+      '<td><span class="bdg '+(sd.shrinkagePct<-0.5?'r':sd.shrinkagePct<0?'a':'g')+'">'+(sd.shrinkagePct<0?'Loss':'Gain')+'</span></td></tr>';
+  }).join('');
+  var varR=PSITES.map(function(s){
+    var sd=get(s,activeWeek);
+    if(!sd||sd.output===0)return '<tr><td>'+dot2(s)+s+'</td><td colspan="4" style="color:var(--text3)">No data</td></tr>';
+    var c1=sd.rmVarQty>0?'tg':sd.rmVarQty<0?'tr':'';
+    var c2=sd.rmVarWoQty>0?'tg':sd.rmVarWoQty<0?'tr':'';
+    return '<tr><td>'+dot2(s)+s+'</td>'+
+      '<td class="'+c1+'">'+fvs(sd.rmVarQty,2)+' mt</td><td class="'+c1+'">'+fvs(sd.rmVarPct,3)+'%</td>'+
+      '<td class="'+c2+'">'+fvs(sd.rmVarWoQty,2)+' mt</td><td class="'+c2+'">'+fvs(sd.rmVarWoPct,3)+'%</td></tr>';
+  }).join('');
+  var enR=PSITES.map(function(s){
+    var sd=get(s,activeWeek);
+    if(!sd||sd.output===0)return '<tr><td>'+dot2(s)+s+'</td><td colspan="4" style="color:var(--text3)">No data</td></tr>';
+    var fc=sd.liTon>0&&sd.fuelPrice>0?sd.liTon*sd.fuelPrice:0;
+    return '<tr><td>'+dot2(s)+s+'</td>'+
+      '<td>'+fv(sd.kwhTotal,0)+'</td><td>'+fv(sd.kwhTon,2)+'</td>'+
+      '<td>'+fv(sd.liTon,3)+'</td><td>'+(fc>0?'₱'+fc.toFixed(2):'—')+'</td></tr>';
+  }).join('');
+  var commitR=PSITES.map(function(s){
+    var sd=get(s,activeWeek);var wc2=WCOM[s]||0;var out=sd?sd.output:0;var p=wc2>0?out/wc2*100:0;
+    return '<tr><td>'+dot2(s)+s+'</td><td>'+(out>0?fv(out,1):'—')+'</td><td>'+wc2.toLocaleString()+'</td>'+
+      '<td class="'+bsc(p,100,85)+'">'+(wc2>0?p.toFixed(1)+'%':'—')+'</td>'+
+      '<td class="'+(sd&&sd.oee>=85?'tg':sd&&sd.oee>=70?'ta':'tr')+'">'+(sd&&sd.oee>0?sd.oee.toFixed(1)+'%':'—')+'</td>'+
+      '<td class="'+(sd&&sd.unscheduledDT>10?'tr':'')+'">'+(sd&&sd.unscheduledDT>0?fv(sd.unscheduledDT,2):'—')+'</td></tr>';
+  }).join('');
+
+  ct.innerHTML=
+    (activeSite==='NATIONAL'?
+      '<div class="sec"><div class="sech"><div class="sect">National Scorecard — Week '+activeWeek+' · '+d.month+'</div><div class="secl"></div></div>'+
+      '<div class="sc-strip">'+sc+'</div></div>':'')+
+
+    '<div class="sec"><div class="sech"><div class="sect">'+SLBL[activeSite]+' · Week '+activeWeek+' · '+d.month+'</div><div class="secl"></div></div>'+
+    '<div class="g5">'+
+      '<div class="kc" style="--kcc:'+pC+'"><div class="kc-l">Weekly Output</div><div class="kc-v" style="color:'+pC+'">'+fv(d.output,1)+'<span style="font-size:12px;color:var(--text3)"> mt</span></div><div class="kc-s">Commit: '+wc.toLocaleString()+' mt</div><span class="bdg '+bsc(pp,100,85)+'">'+pp.toFixed(1)+'% of commit</span></div>'+
+      '<div class="kc" style="--kcc:'+oC+'"><div class="kc-l">OEE</div><div class="kc-v" style="color:'+oC+'">'+(d.oee>0?fv(d.oee,1):'N/A')+'<span style="font-size:12px;color:var(--text3)">%</span></div><div class="kc-s">P:'+fv(d.performance,1)+'% Q:'+fv(d.quality,1)+'% A:'+fv(d.availability,1)+'%</div><span class="bdg '+bsc(d.oee,85,70)+'">'+(d.oee>=85?'World class':d.oee>=70?'Acceptable':'Needs attn')+'</span></div>'+
+      '<div class="kc" style="--kcc:'+(udt>20?'var(--red)':udt>10?'var(--amber)':'var(--border2)')+'"><div class="kc-l">Downtime</div>'+
+        '<div style="display:flex;gap:6px;margin:4px 0">'+
+          '<div style="flex:1;text-align:center;background:var(--redd);border-radius:4px;padding:5px">'+
+            '<div style="font-size:9px;color:var(--red);font-weight:700">UDT</div>'+
+            '<div style="font-size:16px;font-weight:700;color:var(--red)">'+fv(udt,2)+'<span style="font-size:9px"> hr</span></div>'+
+            '<div style="font-size:9px;color:var(--text3)">'+(udtP>0?udtP.toFixed(1)+'%':'—')+'</div>'+
+          '</div>'+
+          '<div style="flex:1;text-align:center;background:var(--blued);border-radius:4px;padding:5px">'+
+            '<div style="font-size:9px;color:var(--blueb);font-weight:700">SDT</div>'+
+            '<div style="font-size:16px;font-weight:700;color:var(--blueb)">'+fv(sdt,2)+'<span style="font-size:9px"> hr</span></div>'+
+            '<div style="font-size:9px;color:var(--text3)">'+(sdtP>0?sdtP.toFixed(1)+'%':'—')+'</div>'+
+          '</div>'+
+        '</div>'+
+        '<div style="font-size:10px;color:var(--text3)">Total: '+fv(udt+sdt,2)+' hr</div></div>'+
+      '<div class="kc" style="--kcc:var(--teal)"><div class="kc-l">Run Rate</div><div class="kc-v">'+(d.runRate>0?fv(d.runRate,2):'—')+'<span style="font-size:12px;color:var(--text3)"> t/hr</span></div><div class="kc-s">Net operating rate</div></div>'+
+      '<div class="kc" style="--kcc:'+oC+'"><div class="kc-l">OEE Breakdown</div>'+
+        '<div style="display:flex;gap:4px;justify-content:space-around;margin:8px 0">'+
+          '<div style="text-align:center"><div style="font-size:9px;color:var(--text3)">Perf</div><div style="font-size:15px;font-weight:700;color:'+(d.performance>=90?'var(--blueb)':'var(--amber)')+'">'+fv(d.performance,1)+'%</div></div>'+
+          '<div style="text-align:center"><div style="font-size:9px;color:var(--text3)">Qual</div><div style="font-size:15px;font-weight:700;color:'+(d.quality>=98?'var(--greenb)':'var(--amber)')+'">'+fv(d.quality,1)+'%</div></div>'+
+          '<div style="text-align:center"><div style="font-size:9px;color:var(--text3)">Avail</div><div style="font-size:15px;font-weight:700;color:'+(d.availability>=90?'var(--greenb)':'var(--red)')+'">'+fv(d.availability,1)+'%</div></div>'+
+        '</div></div>'+
+    '</div></div>'+
+
+    '<div class="sec"><div class="sech"><div class="sect">Weekly Commitment</div><div class="secl"></div></div>'+
+    '<div class="cc"><div class="tw"><table><thead><tr><th>Site</th><th>Output (mt)</th><th>Commit (mt)</th><th>% Commit</th><th>OEE%</th><th>UDT hr</th></tr></thead><tbody>'+commitR+
+    '<tr class="tot"><td>NATIONAL</td><td>'+fv(natOut,1)+'</td><td>'+WCOM.NATIONAL.toLocaleString()+'</td><td class="'+bsc(pp,100,85)+'">'+pp.toFixed(1)+'%</td><td>—</td><td class="tr">'+fv(natUDT,2)+'</td></tr>'+
+    '</tbody></table></div></div></div>'+
+
+    '<div class="sec"><div class="sech"><div class="sect">Quality & Losses</div><div class="secl"></div></div>'+
+    '<div class="g3">'+
+      '<div class="cc"><div class="cct">Rejection — Outright ≤0.3% / Other ≤0.7%</div><div class="tw"><table><thead><tr><th>Site</th><th>Outright mt</th><th>%</th><th>Other mt</th><th>%</th><th>Total mt</th><th>Total%</th></tr></thead><tbody>'+rejR+'</tbody></table></div></div>'+
+      '<div class="cc"><div class="cct">Process Loss — Limit -0.5%</div><div class="tw"><table><thead><tr><th>Site</th><th>mt</th><th>%</th><th>Status</th></tr></thead><tbody>'+lossR+'</tbody></table></div></div>'+
+      '<div class="cc"><div class="cct">RM Variance</div><div class="tw"><table><thead><tr><th>Site</th><th>Var qty</th><th>%</th><th>W/o Sacks</th><th>%</th></tr></thead><tbody>'+varR+'</tbody></table></div></div>'+
+    '</div></div>'+
+
+    '<div class="sec"><div class="sech"><div class="sect">Energy</div><div class="secl"></div></div>'+
+    '<div class="cc"><div class="tw"><table><thead><tr><th>Site</th><th>Total kWh</th><th>kWh/ton</th><th>L/ton Diesel</th><th>Fuel Cost/ton</th></tr></thead><tbody>'+enR+'</tbody></table></div></div></div>'+
+
+    '<div class="sec"><div class="sech"><div class="sect">Trends</div><div class="secl"></div></div>'+
+    '<div class="g2">'+
+      '<div class="cc"><div class="cct">OEE % Weekly Trend</div><div style="position:relative;height:150px"><canvas id="c-oee-tr"></canvas></div></div>'+
+      '<div class="cc"><div class="cct">kWh/ton Weekly Trend</div><div style="position:relative;height:150px"><canvas id="c-kwh-tr"></canvas></div></div>'+
+    '</div></div>';
+
+  setTimeout(function(){
+    mkChart('c-oee-tr','line',wkL,[
+      {label:'OEE%',data:hd.map(function(r){return r.oee>0?+r.oee.toFixed(1):null;}),borderColor:'#00ff85',backgroundColor:'rgba(0,255,133,.08)',borderWidth:2,pointRadius:3,tension:.3,fill:true}
+    ],{scales:{y:{min:0,max:120,ticks:{color:'#3d6b8a',font:{size:9}},grid:{color:'rgba(255,255,255,0.05)'}},x:{ticks:{color:'#3d6b8a',font:{size:9}},grid:{color:'rgba(255,255,255,0.04)'}}}});
+    mkChart('c-kwh-tr','line',wkL,[
+      {label:'kWh/ton',data:hd.map(function(r){return r.kwhTon>0?+r.kwhTon.toFixed(2):null;}),borderColor:'#ffca28',backgroundColor:'rgba(255,202,40,.08)',borderWidth:2,pointRadius:3,tension:.3,fill:true}
+    ]);
+  },100);
+}
+</script>
+<script>
+// ============================================================
+// DOWNTIME PAGE
+// ============================================================
+function renderDowntime(){
+  var ct=document.getElementById('ct-downtime');
+  if(!ct)return;
+  if(!DTRAW.length){ct.innerHTML='<div class="nodata">No downtime data available. Check GAS sheet name is "Downtime".</div>';return;}
+
+  // Filter UDT rows for selected month
+  var mwks=PROD.filter(function(r){return r.plant==='NATIONAL'&&r.month===activeMonth;}).map(function(r){return r.week;});
+  var allUDT=DTRAW.filter(function(d){return mwks.indexOf(d.week)>=0&&d.udt>0;});
+
+  if(!allUDT.length){ct.innerHTML='<div class="nodata">No UDT data for '+activeMonth+'.</div>';return;}
+
+  // ── Aggregate by category for pareto ─────────────────────
+  var catMap={};
+  allUDT.forEach(function(d){catMap[d.cat]=(catMap[d.cat]||0)+d.udt;});
+  var cats=Object.keys(catMap).map(function(k){return {cat:k,hrs:catMap[k]};}).sort(function(a,b){return b.hrs-a.hrs;});
+  var grand=cats.reduce(function(a,c){return a+c.hrs;},0);
+  var cum=0;
+  cats.forEach(function(c){
+    c.pct=grand>0?c.hrs/grand*100:0;
+    cum+=c.pct;
+    c.cumPct=+cum.toFixed(1);
+    c.is80=(cum-c.pct)<80;
+  });
+  var cats80=cats.filter(function(c){return c.is80;}).map(function(c){return c.cat;});
+
+  // ── Summary table rows ───────────────────────────────────
+  var tblRows=cats.map(function(c,i){
+    var hl=c.is80;
+    var col=BCOLS[i%BCOLS.length];
+    return '<tr style="'+(hl?'background:rgba(255,71,87,0.07)':'opacity:0.4')+'">'+
+      '<td style="padding:5px 8px;border-bottom:1px solid var(--border)">'+
+        '<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:'+col+';margin-right:6px;vertical-align:middle"></span>'+
+        '<span style="font-size:11px;color:'+(hl?'var(--text)':'var(--text3)')+'">'+c.cat+'</span></td>'+
+      '<td style="padding:5px 8px;border-bottom:1px solid var(--border);text-align:right;font-size:10px;color:'+(hl?'var(--text)':'var(--text3)')+'">'+c.hrs.toFixed(2)+'</td>'+
+      '<td style="padding:5px 8px;border-bottom:1px solid var(--border);text-align:right">'+
+        '<div style="display:flex;align-items:center;gap:4px;justify-content:flex-end">'+
+        '<div style="width:36px;height:4px;background:var(--bg3);border-radius:2px;overflow:hidden"><div style="width:'+c.pct.toFixed(0)+'%;height:100%;background:'+col+'"></div></div>'+
+        '<span style="font-size:10px;'+(hl?'color:var(--red);font-weight:600':'color:var(--text3)')+'">'+c.pct.toFixed(1)+'%</span></div></td>'+
+      '<td style="padding:5px 8px;border-bottom:1px solid var(--border);text-align:right;font-size:10px;'+(hl?'color:var(--amber);font-weight:600':'color:var(--text3)')+'">'+c.cumPct+'%</td>'+
+      '<td style="padding:5px 8px;border-bottom:1px solid var(--border);text-align:center">'+
+        (hl?'<span style="padding:1px 6px;border-radius:8px;font-size:9px;font-weight:600;background:var(--redd);color:var(--red)">80%</span>':'')+
+      '</td></tr>';
+  }).join('');
+
+  // ── 80% Breakdown table ───────────────────────────────────
+  // Group by Plant + Category + SubCategory, sum UDT, collect PM/CCR
+  var brkMap={};
+  allUDT.filter(function(d){return cats80.indexOf(d.cat)>=0;}).forEach(function(d){
+    var key=d.plant+'__'+d.cat+'__'+(d.sub||'—');
+    if(!brkMap[key]){brkMap[key]={plant:d.plant,cat:d.cat,sub:d.sub||'—',hrs:0,pms:[],ccrs:[]};}
+    brkMap[key].hrs+=d.udt;
+    if(d.pmOp&&brkMap[key].pms.indexOf(d.pmOp)<0)brkMap[key].pms.push(d.pmOp);
+    if(d.ccr&&brkMap[key].ccrs.indexOf(d.ccr)<0)brkMap[key].ccrs.push(d.ccr);
+  });
+  var brkList=Object.values(brkMap).sort(function(a,b){return b.hrs-a.hrs;});
+  var brkRows=brkList.map(function(r,i){
+    var bg=i%2===0?'':'background:rgba(255,255,255,.015)';
+    return '<tr style="'+bg+'">'+
+      '<td style="padding:6px 10px;border-bottom:1px solid var(--border)">'+dot2(r.plant)+r.plant+'</td>'+
+      '<td style="padding:6px 10px;border-bottom:1px solid var(--border)"><span style="padding:2px 8px;border-radius:4px;font-size:9px;font-weight:600;background:var(--redd);color:var(--red)">'+r.cat+'</span></td>'+
+      '<td style="padding:6px 10px;border-bottom:1px solid var(--border);font-size:11px;color:var(--text2)">'+r.sub+'</td>'+
+      '<td style="padding:6px 10px;border-bottom:1px solid var(--border);text-align:right;font-size:11px;font-weight:600;color:var(--red)">'+r.hrs.toFixed(2)+'</td>'+
+      '<td style="padding:6px 10px;border-bottom:1px solid var(--border);font-size:11px;color:var(--text2)">'+(r.pms.join(', ')||'—')+'</td>'+
+      '<td style="padding:6px 10px;border-bottom:1px solid var(--border);font-size:11px;color:var(--text2)">'+(r.ccrs.join(', ')||'—')+'</td>'+
+    '</tr>';
+  }).join('');
+
+  var top80hrs=allUDT.filter(function(d){return cats80.indexOf(d.cat)>=0;}).reduce(function(a,d){return a+d.udt;},0);
+  var sites80=allUDT.filter(function(d){return cats80.indexOf(d.cat)>=0;});
+  var sitesAff=[];sites80.forEach(function(d){if(sitesAff.indexOf(d.plant)<0)sitesAff.push(d.plant);});
+
+  ct.innerHTML=
+    '<div class="sec">'+
+    '<div class="sech"><div class="sect">Downtime Analysis — '+activeMonth+'</div><div class="secl"></div></div>'+
+
+    // KPI CARDS
+    '<div class="g4" style="margin-bottom:14px">'+
+      '<div class="kc" style="--kcc:var(--red)"><div class="kc-l">Total UDT</div><div class="kc-v" style="color:var(--red)">'+grand.toFixed(1)+'<span style="font-size:12px;color:var(--text3)"> hr</span></div><div class="kc-s">'+allUDT.length+' incidents · '+activeMonth+'</div></div>'+
+      '<div class="kc" style="--kcc:var(--amber)"><div class="kc-l">Top Category</div><div class="kc-v" style="font-size:18px;color:var(--amber)">'+(cats.length?cats[0].cat:'—')+'</div><div class="kc-s">'+(cats.length?cats[0].hrs.toFixed(1)+' hr · '+cats[0].pct.toFixed(1)+'%':'—')+'</div></div>'+
+      '<div class="kc" style="--kcc:var(--blue)"><div class="kc-l">80% Causes</div><div class="kc-v" style="color:var(--blueb)">'+cats80.length+'<span style="font-size:12px;color:var(--text3)"> categories</span></div><div class="kc-s">'+top80hrs.toFixed(1)+' hr · driving 80% of loss</div></div>'+
+      '<div class="kc" style="--kcc:var(--purple)"><div class="kc-l">Sites Affected</div><div class="kc-v" style="color:var(--purple)">'+sitesAff.length+'<span style="font-size:12px;color:var(--text3)"> sites</span></div><div class="kc-s">'+activeMonth+' · UDT incidents</div></div>'+
+    '</div>'+
+
+    // PARETO + TABLE SIDE BY SIDE
+    '<div style="display:grid;grid-template-columns:1fr 360px;gap:12px;margin-bottom:14px">'+
+      '<div class="cc">'+
+        '<div class="cct">UDT Pareto Chart — by Category</div>'+
+        '<div style="position:relative;height:280px"><canvas id="c-pareto"></canvas></div>'+
+      '</div>'+
+      '<div class="cc" style="display:flex;flex-direction:column">'+
+        '<div class="cct">Category Summary — 🔴 = 80% of loss</div>'+
+        '<div style="overflow-y:auto;flex:1">'+
+        '<table style="width:100%;border-collapse:collapse">'+
+          '<thead><tr style="position:sticky;top:0;background:var(--bg3)">'+
+            '<th style="padding:5px 8px;text-align:left;font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--text3);border-bottom:1px solid var(--border2)">Category</th>'+
+            '<th style="padding:5px 8px;text-align:right;font-size:9px;color:var(--text3);border-bottom:1px solid var(--border2)">Hrs</th>'+
+            '<th style="padding:5px 8px;text-align:right;font-size:9px;color:var(--text3);border-bottom:1px solid var(--border2)">%</th>'+
+            '<th style="padding:5px 8px;text-align:right;font-size:9px;color:var(--text3);border-bottom:1px solid var(--border2)">Cum%</th>'+
+            '<th style="padding:5px 8px;border-bottom:1px solid var(--border2)"></th>'+
+          '</tr></thead>'+
+          '<tbody>'+tblRows+'</tbody>'+
+          '<tfoot><tr style="background:var(--bg3)">'+
+            '<td style="padding:5px 8px;font-size:11px;font-weight:600;color:var(--greenb);border-top:2px solid var(--border2)">TOTAL</td>'+
+            '<td style="padding:5px 8px;text-align:right;font-size:10px;font-weight:600;color:var(--greenb);border-top:2px solid var(--border2)">'+grand.toFixed(2)+'</td>'+
+            '<td style="padding:5px 8px;text-align:right;font-size:10px;font-weight:600;color:var(--greenb);border-top:2px solid var(--border2)">100%</td>'+
+            '<td colspan="2" style="border-top:2px solid var(--border2)"></td>'+
+          '</tr></tfoot>'+
+        '</table></div>'+
+      '</div>'+
+    '</div>'+
+
+    // 80% BREAKDOWN TABLE
+    '<div class="cc">'+
+      '<div class="cct">🔴 80% UDT Breakdown — Plant · Category · Sub-Category · PM Operator · CCR In Charge</div>'+
+      '<div class="tw">'+
+      '<table><thead><tr>'+
+        '<th>Plant</th><th>Category</th><th>Sub-Category</th>'+
+        '<th>UDT (hrs)</th><th>PM Operator</th><th>CCR In Charge</th>'+
+      '</tr></thead>'+
+      '<tbody>'+
+        (brkRows||'<tr><td colspan="6" style="text-align:center;padding:20px;color:var(--text3)">No 80% breakdown data</td></tr>')+
+      '</tbody></table></div>'+
+    '</div>'+
+
+    '</div>';
+
+  // Render pareto chart
+  setTimeout(function(){
+    var el=document.getElementById('c-pareto');
+    if(!el)return;
+    if(CHARTS['c-pareto'])CHARTS['c-pareto'].destroy();
+    CHARTS['c-pareto']=new Chart(el,{
+      data:{
+        labels:cats.map(function(c){return c.cat;}),
+        datasets:[
+          {type:'bar',label:'UDT Hours',
+            data:cats.map(function(c){return +c.hrs.toFixed(2);}),
+            backgroundColor:cats.map(function(c,i){return c.is80?BCOLS[i%BCOLS.length]+'cc':'rgba(139,148,158,0.2)';}),
+            borderColor:cats.map(function(c,i){return c.is80?BCOLS[i%BCOLS.length]:'rgba(139,148,158,0.35)';}),
+            borderWidth:1,yAxisID:'y',order:2},
+          {type:'line',label:'Cumulative %',
+            data:cats.map(function(c){return c.cumPct;}),
+            borderColor:'#ffca28',borderWidth:2.5,pointRadius:4,
+            pointBackgroundColor:'#ffca28',fill:false,tension:0,
+            yAxisID:'y1',order:1}
+        ]
+      },
+      options:{
+        responsive:true,maintainAspectRatio:false,
+        plugins:{legend:{labels:{color:'#7aadcc',font:{size:10}}}},
+        scales:{
+          x:{ticks:{color:'#3d6b8a',font:{size:9},maxRotation:25},grid:{color:'rgba(255,255,255,0.04)'}},
+          y:{beginAtZero:true,ticks:{color:'#3d6b8a',font:{size:9}},grid:{color:'rgba(255,255,255,0.05)'},title:{display:true,text:'Hours',color:'#3d6b8a',font:{size:9}}},
+          y1:{position:'right',min:0,max:100,ticks:{color:'#ffca28',font:{size:9},callback:function(v){return v+'%';}},grid:{drawOnChartArea:false},title:{display:true,text:'Cumulative %',color:'#ffca28',font:{size:9}}}
+        }
+      }
+    });
+  },150);
+}
+</script>
+<script>
+// ============================================================
+// MONTHLY PAGE
+// ============================================================
+function parseMonCSV(text){
+  var rows=parseCSV(text);var hi=-1;
+  for(var i=0;i<Math.min(rows.length,5);i++){var c=(rows[i][0]||'').trim().toUpperCase();if(c==='PLANT'||c==='SITE'){hi=i;break;}}
+  if(hi<0)return[];
+  var VS=new Set(SITES);var data=[];
+  for(var i=hi+1;i<rows.length;i++){
+    var r=rows[i];if(!r||r.length<5)continue;
+    var pl=(r[0]||'').trim().toUpperCase();var mon=(r[1]||'').trim().toUpperCase();
+    if(!VS.has(pl)||MORD.indexOf(mon)<0)continue;
+    var gn=function(idx){var v=parseFloat((r[idx]||'').toString().replace(/,/g,'').replace(/%/g,''));return isNaN(v)?0:v;};
+    data.push({plant:pl,month:mon,output:gn(2),plan:gn(3),avgDay:gn(4),oee:gn(5)*100,udt:gn(6),sdt:gn(7),kwhTon:gn(8),liTon:gn(9)});
+  }
+  return data;
+}
+
+function renderMonthly(){
+  var ct=document.getElementById('ct-monthly');if(!ct)return;
+  var mons=[];var um={};
+  PROD.filter(function(r){return r.plant==='NATIONAL';}).forEach(function(r){um[r.month]=1;});
+  Object.keys(um).forEach(function(m){mons.push(m);});
+  mons.sort(function(a,b){return MORD.indexOf(a)-MORD.indexOf(b);});
+  var SM=window.MM||activeMonth||mons[mons.length-1];window.MM=SM;
+  var today=new Date();var mi=MORD.indexOf(SM);
+  var lastDay=mi>=0?new Date(today.getFullYear(),mi+1,0):today;
+  var remDays=Math.max(0,Math.floor((lastDay-new Date(today.getFullYear(),today.getMonth(),today.getDate()))/(864e5)));
+  var mBtns=mons.map(function(m){return '<button onclick="window.MM=\''+m+'\';renderMonthly()" style="padding:3px 9px;font-size:10px;border:1px solid var(--border2);border-radius:4px;background:'+(m===SM?'var(--blue)':'none')+';color:'+(m===SM?'#fff':'var(--text2)')+';cursor:pointer;font-family:inherit">'+m.slice(0,3)+'</button>';}).join('');
+  function mSum(s,f){return PROD.filter(function(r){return r.plant===s&&r.month===SM;}).reduce(function(a,r){return a+(r[f]||0);},0);}
+  function mAvg(s,f){var rs=PROD.filter(function(r){return r.plant===s&&r.month===SM&&(r[f]||0)>0;});return rs.length?rs.reduce(function(a,r){return a+(r[f]||0);},0)/rs.length:0;}
+  function getOut(s){var md=MDATA.find(function(r){return r.plant===s&&r.month===SM;});return md&&md.output>0?md.output:mSum(s,'output');}
+  function getDay(s){var md=MDATA.find(function(r){return r.plant===s&&r.month===SM;});if(md&&md.avgDay>0)return md.avgDay;var wks=PROD.filter(function(r){return r.plant===s&&r.month===SM;}).length;var out=mSum(s,'output');return wks>0?out/(wks*7):0;}
+  var nOut=PSITES.reduce(function(a,s){return a+getOut(s);},0);
+  var nPlan=mSum('NATIONAL','plan');var ppM=nPlan>0?nOut/nPlan*100:0;
+  var nOEE=mAvg('NATIONAL','oee');
+  var nUDT=PSITES.reduce(function(a,s){return a+mSum(s,'unscheduledDT');},0);
+  var nSDT=PSITES.reduce(function(a,s){return a+mSum(s,'scheduledDT');},0);
+  var nAvgDay=getDay('NATIONAL');var nProj=nOut+nAvgDay*remDays;
+  var nCP=DEMO.NATIONAL>0?nProj/DEMO.NATIONAL*100:0;var nUP=DSGN.NATIONAL>0?nProj/DSGN.NATIONAL*100:0;
+  var scR=PSITES.map(function(s){
+    var out=getOut(s),oee=mAvg(s,'oee'),udt=mSum(s,'unscheduledDT'),sdt=mSum(s,'scheduledDT');
+    var mc=WCOM[s]*4.33,pp=mc>0?out/mc*100:0;
+    return '<tr><td>'+dot2(s)+s+'</td><td>'+(out>0?fv(out,1):'—')+'</td><td class="'+bsc(pp,100,85)+'">'+(mc>0?pp.toFixed(1)+'%':'—')+'</td><td class="'+bsc(oee,85,70)+'">'+(oee>0?oee.toFixed(1)+'%':'—')+'</td><td class="'+(udt>40?'tr':udt>20?'ta':'')+'">'+(udt>0?fv(udt,1):'—')+'</td><td>'+(sdt>0?fv(sdt,1):'—')+'</td></tr>';
+  }).join('');
+  var prR=PSITES.map(function(s){
+    var out=getOut(s),avgDay=getDay(s),proj=out+avgDay*remDays;
+    var cP=DEMO[s]>0?proj/DEMO[s]*100:0,uP=DSGN[s]>0?proj/DSGN[s]*100:0;
+    return '<tr><td>'+dot2(s)+s+'</td><td>'+(out>0?fv(out,1):'—')+'</td><td>'+(avgDay>0?fv(avgDay,2):'—')+'</td><td>'+remDays+'</td><td>'+(proj>0?fv(proj,1):'—')+'</td><td>'+DEMO[s].toLocaleString()+'</td><td class="'+bsc(cP,90,70)+'">'+(proj>0?cP.toFixed(1)+'%':'—')+'</td><td>'+DSGN[s].toLocaleString()+'</td><td class="'+bsc(uP,70,50)+'">'+(proj>0?uP.toFixed(1)+'%':'—')+'</td></tr>';
+  }).join('');
+  ct.innerHTML='<div class="sec"><div class="sech"><div class="sect">Monthly Report — '+SM+'</div><div class="secl"></div></div>'+
+    '<div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:12px">'+mBtns+'</div>'+
+    '<div class="g4" style="margin-bottom:12px">'+
+      '<div class="kc" style="--kcc:'+(ppM>=100?'var(--greenb)':'var(--amber)')+'"><div class="kc-l">Monthly Output</div><div class="kc-v" style="color:'+(ppM>=100?'var(--greenb)':'var(--amber)')+'">'+fv(nOut,1)+'<span style="font-size:12px;color:var(--text3)"> mt</span></div><div class="kc-s">Plan: '+fv(nPlan,1)+' mt</div><span class="bdg '+bsc(ppM,100,90)+'">'+ppM.toFixed(1)+'% of plan</span></div>'+
+      '<div class="kc" style="--kcc:'+(nOEE>=85?'var(--greenb)':nOEE>=70?'var(--amber)':'var(--red)')+'"><div class="kc-l">Avg OEE</div><div class="kc-v" style="color:'+(nOEE>=85?'var(--greenb)':nOEE>=70?'var(--amber)':'var(--red)')+'">'+fv(nOEE,1)+'<span style="font-size:12px;color:var(--text3)">%</span></div><div class="kc-s">'+SM+' national avg</div></div>'+
+      '<div class="kc" style="--kcc:var(--red)"><div class="kc-l">UDT / SDT</div><div style="display:flex;gap:6px;margin:4px 0"><div style="flex:1;text-align:center;background:var(--redd);border-radius:4px;padding:4px"><div style="font-size:9px;color:var(--red);font-weight:700">UDT</div><div style="font-size:15px;font-weight:700;color:var(--red)">'+fv(nUDT,1)+'<span style="font-size:9px"> hr</span></div></div><div style="flex:1;text-align:center;background:var(--blued);border-radius:4px;padding:4px"><div style="font-size:9px;color:var(--blueb);font-weight:700">SDT</div><div style="font-size:15px;font-weight:700;color:var(--blueb)">'+fv(nSDT,1)+'<span style="font-size:9px"> hr</span></div></div></div></div>'+
+      '<div class="kc" style="--kcc:var(--blueb)"><div class="kc-l">Projected Month-End</div><div class="kc-v" style="color:var(--blueb)">'+fv(nProj,1)+'<span style="font-size:12px;color:var(--text3)"> mt</span></div><div class="kc-s">'+remDays+' days left · '+nCP.toFixed(1)+'% demo cap</div></div>'+
+    '</div>'+
+    '<div class="cc" style="margin-bottom:10px"><div class="cct">Monthly Scorecard — '+SM+'</div><div class="tw"><table><thead><tr><th>Site</th><th>Output mt</th><th>vs Commit</th><th>OEE%</th><th>UDT hr</th><th>SDT hr</th></tr></thead><tbody>'+scR+
+    '<tr class="tot"><td>NATIONAL</td><td>'+fv(nOut,1)+'</td><td class="'+bsc(ppM,100,90)+'">'+ppM.toFixed(1)+'%</td><td class="'+bsc(nOEE,85,70)+'">'+fv(nOEE,1)+'%</td><td class="tr">'+fv(nUDT,1)+'</td><td>'+fv(nSDT,1)+'</td></tr>'+
+    '</tbody></table></div></div>'+
+    '<div class="cc"><div class="cct">Month-End Projection — '+remDays+' days left</div><div class="tw"><table><thead><tr><th>Site</th><th>Output MTD</th><th>Avg/day</th><th>Days Left</th><th>Projected</th><th>Demo Cap</th><th>Commit%</th><th>Design Cap</th><th>Util%</th></tr></thead><tbody>'+prR+
+    '<tr class="tot"><td>NATIONAL</td><td>'+fv(nOut,1)+'</td><td>'+fv(nAvgDay,2)+'</td><td>'+remDays+'</td><td>'+fv(nProj,1)+'</td><td>'+DEMO.NATIONAL.toLocaleString()+'</td><td class="'+bsc(nCP,90,70)+'">'+nCP.toFixed(1)+'%</td><td>'+DSGN.NATIONAL.toLocaleString()+'</td><td class="'+bsc(nUP,70,50)+'">'+nUP.toFixed(1)+'%</td></tr>'+
+    '</tbody></table></div></div></div>';
+}
+
+// ============================================================
+// COST PAGE
+// ============================================================
+function parseCostCSV(text){
+  var rows=parseCSV(text);var hi=-1;
+  for(var i=0;i<Math.min(rows.length,5);i++){if((rows[i][0]||'').trim().toUpperCase()==='PLANT'){hi=i;break;}}
+  if(hi<0)return[];
+  var data=[];
+  for(var i=hi+1;i<rows.length;i++){
+    var r=rows[i];if(!r[0]||!r[1]||!r[2])continue;
+    var pl=(r[0]||'').trim().toUpperCase();var mon=(r[1]||'').trim().toUpperCase();var yr=parseInt(r[2])||0;
+    if(!pl||!mon||!yr||pl.indexOf('ACCTG')>=0||pl.indexOf('NATIONAL')>=0)continue;
+    if(MORD.indexOf(mon)<0)continue;
+    var gn=function(idx){var v=parseFloat((r[idx]||'').toString().replace(/,/g,''));return isNaN(v)?0:v;};
+    data.push({plant:pl,month:mon,year:yr,volumeKg:gn(3),rental:gn(4),spareParts:gn(5),
+      manpowerDirect:gn(6),diesel:gn(7),electricity:gn(8),manpowerAgency:gn(9),
+      others:gn(10),thirdParty:gn(11),cessDepr:gn(12),spDepr:gn(13),
+      insurance:gn(14),water:gn(15),thread:gn(16),tollingFee:gn(17),
+      totalCost:gn(18),fixedCost:gn(20),variableCost:gn(21)});
+  }
+  return data;
+}
+
+function renderCost(){
+  var ct=document.getElementById('ct-cost');if(!ct)return;
+  if(!CDATA.length){ct.innerHTML='<div class="nodata">Cost data loading... click Cost tab again in a moment.</div>';setTimeout(function(){if(CDATA.length>0)renderCost();},2500);return;}
+  var years=[];var uy={};CDATA.forEach(function(r){uy[r.year]=1;});Object.keys(uy).forEach(function(y){years.push(parseInt(y));});years.sort();
+  var CY=window.CY||(years.length?years[years.length-1]:2026);window.CY=parseInt(CY);
+  var cmons=[];var um2={};CDATA.filter(function(r){return r.year===window.CY;}).forEach(function(r){um2[r.month]=1;});
+  Object.keys(um2).filter(function(m){return MORD.indexOf(m)>=0;}).forEach(function(m){cmons.push(m);});
+  cmons.sort(function(a,b){return MORD.indexOf(a)-MORD.indexOf(b);});
+  var CM=window.CM&&cmons.indexOf(window.CM)>=0?window.CM:cmons[cmons.length-1];window.CM=CM;
+  function getCR(pl){return CDATA.find(function(r){return r.plant.toUpperCase()===pl.toUpperCase()&&r.month===CM&&r.year===window.CY;})||null;}
+  var yrBtns=years.map(function(y){return '<button onclick="window.CY='+y+';window.CM=null;renderCost()" style="padding:3px 10px;font-size:10px;border:1px solid '+(y===window.CY?'var(--greenb)':'var(--border2)')+';border-radius:4px;background:'+(y===window.CY?'var(--greend)':'none')+';color:'+(y===window.CY?'var(--greenb)':'var(--text2)')+';cursor:pointer;font-family:inherit">'+y+'</button>';}).join('');
+  var moBtns=cmons.map(function(m){return '<button onclick="window.CM=\''+m+'\';renderCost()" style="padding:3px 9px;font-size:10px;border:1px solid var(--border2);border-radius:4px;background:'+(m===CM?'var(--blue)':'none')+';color:'+(m===CM?'#fff':'var(--text2)')+';cursor:pointer;font-family:inherit">'+m.slice(0,3)+'</button>';}).join('');
+  var OPS=['AC','PFMIS','HOREB','BUKID','ARGAO'],TOLL=['CCPC','SOUTH'],MG=['HOREB MG','AC MG'];
+  var COL={AC:'#00ff85',PFMIS:'#ffca28',HOREB:'#00e5cc',BUKID:'#ff5252',ARGAO:'#e040fb',CCPC:'#40c4ff',SOUTH:'#ff6d00'};
+  var TH='<thead><tr><th>Site</th><th>Vol (mt)</th><th>Rental</th><th>Spare Parts</th><th>Manpower Dir</th><th>Manpower Agn</th><th>Diesel</th><th>Electricity</th><th>3rd Party</th><th>Others</th><th>Tolling</th><th>Depreciation</th><th>Total Cost</th><th>Cost/mt</th></tr></thead>';
+  function bRow(pl,col){
+    var cr=getCR(pl);
+    var dd='<span style="display:inline-block;width:5px;height:5px;border-radius:50%;background:'+(col||'#8b949e')+';margin-right:5px;vertical-align:middle"></span>';
+    if(!cr||cr.volumeKg===0)return '<tr><td>'+dd+pl+'</td>'+'<td>—</td>'.repeat(13)+'</tr>';
+    var vol=cr.volumeKg/1000,cpt=vol>0?cr.totalCost/vol:0;
+    return '<tr><td>'+dd+pl+'</td><td>'+fMT(cr.volumeKg)+'</td><td>'+fPM(cr.rental)+'</td><td>'+fPM(cr.spareParts)+'</td><td>'+fPM(cr.manpowerDirect)+'</td><td>'+fPM(cr.manpowerAgency)+'</td><td>'+fPM(cr.diesel)+'</td><td>'+fPM(cr.electricity)+'</td><td>'+fPM(cr.thirdParty)+'</td><td>'+fPM(cr.others+cr.water+cr.thread+cr.insurance)+'</td><td>'+(cr.tollingFee>0?fPM(cr.tollingFee):'—')+'</td><td>'+fPM(cr.cessDepr+cr.spDepr)+'</td><td>'+fPM(cr.totalCost)+'</td><td class="'+(cpt>2000?'tr':cpt>1500?'ta':'tg')+'">₱'+cpt.toFixed(2)+'</td></tr>';
+  }
+  function totRow(pls,lbl){
+    var rs=pls.map(getCR).filter(Boolean);if(!rs.length)return '<tr class="tot"><td>'+lbl+'</td>'+'<td>—</td>'.repeat(13)+'</tr>';
+    var s=function(f){return rs.reduce(function(a,r){return a+(r[f]||0);},0);};
+    var vol=s('volumeKg'),cost=s('totalCost'),cpt=vol>0?cost/vol*1000:0;
+    return '<tr class="tot"><td>'+lbl+'</td><td>'+fMT(vol)+'</td><td>'+fPM(s('rental'))+'</td><td>'+fPM(s('spareParts'))+'</td><td>'+fPM(s('manpowerDirect'))+'</td><td>'+fPM(s('manpowerAgency'))+'</td><td>'+fPM(s('diesel'))+'</td><td>'+fPM(s('electricity'))+'</td><td>'+fPM(s('thirdParty'))+'</td><td>'+fPM(rs.reduce(function(a,r){return a+r.others+r.water+r.thread+r.insurance;},0))+'</td><td>'+fPM(s('tollingFee'))+'</td><td>'+fPM(rs.reduce(function(a,r){return a+r.cessDepr+r.spDepr;},0))+'</td><td>'+fPM(cost)+'</td><td class="'+(cpt>2000?'tr':cpt>1500?'ta':'tg')+'">₱'+cpt.toFixed(2)+'</td></tr>';
+  }
+  var allR=OPS.concat(TOLL).concat(MG).map(getCR).filter(Boolean);
+  var nCost=allR.reduce(function(a,r){return a+r.totalCost;},0);
+  var nVol=allR.reduce(function(a,r){return a+r.volumeKg;},0);
+  var nCPT=nVol>0?nCost/nVol*1000:0;
+  var nFixed=allR.reduce(function(a,r){return a+r.fixedCost;},0);
+  var nVar=allR.reduce(function(a,r){return a+r.variableCost;},0);
+  ct.innerHTML='<div class="sec"><div class="sech"><div class="sect">Production Cost — '+CM+' '+window.CY+'</div><div class="secl"></div></div>'+
+    '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:12px">'+
+    '<span style="font-size:9px;color:var(--text3);letter-spacing:1px">YEAR</span>'+yrBtns+
+    '<div style="width:1px;height:16px;background:var(--border2);margin:0 4px"></div>'+
+    '<span style="font-size:9px;color:var(--text3);letter-spacing:1px">MONTH</span>'+moBtns+'</div>'+
+    '<div class="g4" style="margin-bottom:12px">'+
+      '<div class="kc" style="--kcc:var(--blueb)"><div class="kc-l">National Total Cost</div><div class="kc-v" style="color:var(--blueb);font-size:22px">₱'+(nCost/1000000).toFixed(3)+'M</div><div class="kc-s">'+CM+' '+window.CY+'</div></div>'+
+      '<div class="kc" style="--kcc:var(--greenb)"><div class="kc-l">National Cost/mt</div><div class="kc-v" style="color:var(--greenb);font-size:22px">₱'+nCPT.toFixed(2)+'</div><div class="kc-s">per metric ton</div></div>'+
+      '<div class="kc" style="--kcc:var(--amber)"><div class="kc-l">Fixed Cost</div><div class="kc-v" style="color:var(--amber);font-size:22px">₱'+(nFixed/1000000).toFixed(3)+'M</div><div class="kc-s">₱'+(nVol>0?(nFixed/nVol*1000).toFixed(2):'—')+'/mt</div></div>'+
+      '<div class="kc" style="--kcc:var(--purple)"><div class="kc-l">Variable Cost</div><div class="kc-v" style="color:var(--purple);font-size:22px">₱'+(nVar/1000000).toFixed(3)+'M</div><div class="kc-s">₱'+(nVol>0?(nVar/nVol*1000).toFixed(2):'—')+'/mt</div></div>'+
+    '</div>'+
+    '<div class="cc" style="margin-bottom:10px"><div class="cct">Operating Plants — '+CM+' '+window.CY+'</div><div class="tw"><table style="min-width:900px">'+TH+'<tbody>'+OPS.map(function(s){return bRow(s,COL[s]);}).join('')+totRow(OPS,'OPERATING TOTAL')+'</tbody></table></div></div>'+
+    '<div class="cc" style="margin-bottom:10px"><div class="cct">Tolling Plants — '+CM+' '+window.CY+'</div><div class="tw"><table style="min-width:900px">'+TH+'<tbody>'+TOLL.map(function(s){return bRow(s,COL[s]);}).join('')+totRow(TOLL,'TOLLING TOTAL')+'</tbody></table></div></div>'+
+    '<div class="cc" style="margin-bottom:10px"><div class="cct">Mix Grain Plants — '+CM+' '+window.CY+'</div><div class="tw"><table style="min-width:900px">'+TH+'<tbody>'+MG.map(function(s){return bRow(s,'#00e5cc');}).join('')+totRow(MG,'MG TOTAL')+'</tbody></table></div></div>'+
+    '<div class="cc"><div class="cct">National Grand Total — '+CM+' '+window.CY+'</div><div class="tw"><table style="min-width:900px">'+TH+'<tbody>'+totRow(OPS.concat(TOLL).concat(MG),'NATIONAL TOTAL')+'</tbody></table></div></div></div>';
+}
+</script>
+</body>
+</html>
