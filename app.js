@@ -853,14 +853,20 @@ function renderMonthly(){
 function renderCost(){var ct=document.getElementById('content-cost');if(!DATA.cost){ct.innerHTML='<div class="no-data">⟳ Loading...</div>';gasGet('cost').then(function(d){DATA.cost=d;renderCost();}).catch(function(e){ct.innerHTML='<div class="no-data">Error: '+e.message+'</div>';});return;}ct.innerHTML='<div class="no-data">Cost data loaded — '+( DATA.cost.rows||[]).length+' rows</div>';}
 function renderDowntime(){
   var ct=document.getElementById('content-downtime');
+  var dtWrap=document.getElementById('dt-data-wrap');
+
+  // Need monthly data for scorecard
   if(!DATA.monthly){
     ct.innerHTML='<div class="no-data">⟳ Loading...</div>';
     gasGet('monthly').then(function(d){DATA.monthly=d;renderDowntime();}).catch(function(e){ct.innerHTML='<div class="no-data" style="color:var(--red)">Error: '+e.message+'</div>';});
     return;
   }
+
   var rows=DATA.monthly.rows||[];
   var months=DATA.monthly.months||[];
   if(!activeMonth||months.indexOf(activeMonth)<0) activeMonth=months[months.length-1]||'';
+
+  // Build month pill strip
   var dtPills=document.getElementById('dt-month-pills');
   if(dtPills){
     _monthsList=months;
@@ -869,254 +875,173 @@ function renderDowntime(){
     }).join('');
     setTimeout(function(){var a=dtPills.querySelector('.wk-pill.active');if(a)a.scrollIntoView({behavior:'smooth',block:'nearest',inline:'center'});},100);
   }
+
+  // Monthly scorecard rows
   var mRows=rows.filter(function(r){return String(r.MONTH||r.Month||'').trim()===activeMonth;});
   var dRows=activeSite==='NATIONAL'
     ? mRows.filter(function(r){return (r.Plant||'').toUpperCase()==='NATIONAL';})
     : mRows.filter(function(r){return (r.Plant||'').toUpperCase()===activeSite;});
-  function dtHr(r,f1,f2){return gf(r,f1,f2||f1);}
-  function dtPct(r,f1,f2){var v=gf(r,f1,f2||f1);return v>1?v:v*100;}
-  function sumHr(f1,f2){return dRows.reduce(function(a,r){return a+dtHr(r,f1,f2);},0);}
-  function avgPct(f1,f2){
-    var v=dRows.reduce(function(a,r){return a+gf(r,f1,f2||f1);},0)/Math.max(dRows.length,1);
-    return v>1?v:v*100;
-  }
-  var sdt  = sumHr('Scheduled Down Time, hr','Scheduled Downtime, hr');
-  var udt  = sumHr('Unscheduled Down Time, hr','Unscheduled Downtime, hr');
-  var udtP = avgPct('Unscheduled Down Time, %','Unscheduled Downtime, %');
-  var eqH  = sumHr('Equipment Downtime, hr','Equipment Down Time, hr');
-  var eqP  = avgPct('Equipment Downtime, %','Equipment Down Time, %');
-  var prH  = sumHr('Process, hr');
-  var prP  = avgPct('Process, %');
-  var whH  = sumHr('Warehouse, hr');
-  var whP  = avgPct('Warehouse, %');
-  var rmH  = sumHr('Raw Materials, hr','Raw Materials, h');
-  var rmP  = avgPct('Raw Materials, %');
-  var coH  = sumHr('Change Over Downtime, hr');
-  var coP  = avgPct('Change Over Downtime, %');
-  var pfH  = sumHr('Power Failure, hr','Power Failure, h');
-  var pfP  = avgPct('Power Failure, %');
-  function dtColor(hrs){return hrs>80?'var(--red)':hrs>40?'var(--amber)':'var(--text)';}
-  function pctColor(pct){return pct>5?'var(--red)':pct>3?'var(--amber)':'var(--green-b)';}
-  function dtCard(label,hrs,pct,color){
-    var hrsC=dtColor(hrs);
-    var pctC=pct!==null?pctColor(pct):'var(--text3)';
-    return '<div style="background:var(--bg2);border:1px solid var(--border);border-top:2px solid '+hrsC+';border-radius:var(--rl);padding:12px 10px;flex:1;min-width:0">'
-      +'<div style="font-size:8px;color:var(--text3);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;white-space:nowrap">'+label+'</div>'
-      +'<div style="font-family:Barlow Condensed,sans-serif;font-size:28px;font-weight:700;color:'+hrsC+';line-height:1">'+(hrs>0?hrs.toFixed(2):'—')+'<span style="font-size:12px;color:var(--text2);font-family:Barlow,sans-serif"> hr</span></div>'
-      +(pct!==null?'<div style="font-family:DM Mono,monospace;font-size:11px;font-weight:600;color:'+pctC+';margin-top:4px">'+(pct>0?pct.toFixed(2)+'%':'0.00%')+'</div>':'')
+
+  function sumHr(f1,f2){return dRows.reduce(function(a,r){return a+gf(r,f1,f2||f1);},0);}
+  function avgPct(f1){var v=dRows.reduce(function(a,r){return a+gf(r,f1);},0)/Math.max(dRows.length,1);return v>1?v:v*100;}
+
+  var sdt=sumHr('Scheduled Down Time, hr');
+  var udt=sumHr('Unscheduled Down Time, hr','Unscheduled Downtime, hr');
+  var udtP=avgPct('Unscheduled Down Time, %');
+  var eqH=sumHr('Equipment Downtime, hr','Equipment Down Time, hr');
+  var eqP=avgPct('Equipment Downtime, %');
+  var prH=sumHr('Process, hr');var prP=avgPct('Process, %');
+  var whH=sumHr('Warehouse, hr');var whP=avgPct('Warehouse, %');
+  var rmH=sumHr('Raw Materials, hr','Raw Materials, h');var rmP=avgPct('Raw Materials, %');
+  var coH=sumHr('Change Over Downtime, hr');var coP=avgPct('Change Over Downtime, %');
+  var pfH=sumHr('Power Failure, hr','Power Failure, h');var pfP=avgPct('Power Failure, %');
+  var elH=sumHr('Electrical, hr');var elP=avgPct('Electrical, %');
+  var meH=sumHr('Mechanical, hr');var meP=avgPct('Mechanical, %');
+  var plH=sumHr('PLC, hr');var plP=avgPct('PLC, %');
+  var cdH=sumHr('Change Die, hr');var cdP=avgPct('Change Die, %');
+  var csH=sumHr('Change Screen, hr');var csP=avgPct('Change Screen, %');
+  var coACH=sumHr('Change Over, hr');var coACP=avgPct('Change Over, %');
+
+  function dtColor(h){return h>80?'var(--red)':h>40?'var(--amber)':'var(--border2)';}
+  function pctColor(p){return p>5?'var(--red)':p>3?'var(--amber)':'var(--green-b)';}
+  function dtCard(label,hrs,pct){
+    var hC=dtColor(hrs);var pC=pct!==null?pctColor(pct):'var(--text3)';
+    return '<div style="background:var(--bg2);border:1px solid var(--border);border-top:2px solid '+hC+';border-radius:var(--rl);padding:10px 8px;flex:1;min-width:0">'
+      +'<div style="font-size:8px;color:var(--text3);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;white-space:nowrap">'+label+'</div>'
+      +'<div style="font-family:Barlow Condensed,sans-serif;font-size:26px;font-weight:700;color:'+hC+';line-height:1">'+(hrs>0?hrs.toFixed(2):'—')+'<span style="font-size:11px;color:var(--text2)"> hr</span></div>'
+      +(pct!==null?'<div style="font-family:DM Mono,monospace;font-size:10px;font-weight:600;color:'+pC+';margin-top:3px">'+(pct>0?pct.toFixed(2)+'%':'0.00%')+'</div>':'')
       +'</div>';
   }
-  var elH  = sumHr('Electrical, hr');
-  var elP  = avgPct('Electrical, %');
-  var meH  = sumHr('Mechanical, hr');
-  var meP  = avgPct('Mechanical, %');
-  var plH  = sumHr('PLC, hr');
-  var plP  = avgPct('PLC, %');
-  // Row 2: Change Over = col AC/AF, Change Die = col AD/AG
-  var coACH = sumHr('Change Over, hr');
-  var coACP = avgPct('Change Over, %');
-  var cdH  = sumHr('Change Die, hr');
-  var cdP  = avgPct('Change Die, %');
-  var csH  = sumHr('Change Screen, hr');
-  var csP  = avgPct('Change Screen, %');
+
   ct.innerHTML='<div class="sec"><div class="sec-hdr"><div class="sec-title">Downtime Scorecard — '+(activeSite==='NATIONAL'?'National':SL[activeSite])+' · '+activeMonth+'</div><div class="sec-line"></div></div>'
     +'<div style="font-size:8px;color:var(--text3);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;font-family:DM Mono,monospace">Overall Downtime</div>'
     +'<div style="display:flex;gap:6px;flex-wrap:nowrap;overflow-x:auto;margin-bottom:10px">'
-    +dtCard('Scheduled DT',sdt,null,'var(--text3)')
-    +dtCard('Unscheduled DT',udt,udtP,'var(--red)')
-    +dtCard('Equipment',eqH,eqP,'var(--red)')
-    +dtCard('Process',prH,prP,'var(--amber)')
-    +dtCard('Warehouse',whH,whP,'var(--blue)')
-    +dtCard('Raw Materials',rmH,rmP,'var(--purple)')
-    +dtCard('Change Over DT',coH,coP,'var(--teal)')
-    +dtCard('Power Failure',pfH,pfP,'var(--amber)')
+    +dtCard('Scheduled DT',sdt,null)
+    +dtCard('Unscheduled DT',udt,udtP)
+    +dtCard('Equipment',eqH,eqP)
+    +dtCard('Process',prH,prP)
+    +dtCard('Warehouse',whH,whP)
+    +dtCard('Raw Materials',rmH,rmP)
+    +dtCard('Change Over DT',coH,coP)
+    +dtCard('Power Failure',pfH,pfP)
     +'</div>'
     +'<div style="font-size:8px;color:var(--text3);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;font-family:DM Mono,monospace">Equipment &amp; Change Over Breakdown</div>'
     +'<div style="display:flex;gap:6px;flex-wrap:nowrap;overflow-x:auto">'
-    +dtCard('Electrical',elH,elP,'var(--red)')
-    +dtCard('Mechanical',meH,meP,'var(--red)')
-    +dtCard('PLC',plH,plP,'var(--amber)')
-    +dtCard('Change Over',coACH,coACP,'var(--teal)')
-    +dtCard('Change Die',cdH,cdP,'var(--teal)')
-    +dtCard('Change Screen',csH,csP,'var(--teal)')
+    +dtCard('Electrical',elH,elP)
+    +dtCard('Mechanical',meH,meP)
+    +dtCard('PLC',plH,plP)
+    +dtCard('Change Over',coACH,coACP)
+    +dtCard('Change Die',cdH,cdP)
+    +dtCard('Change Screen',csH,csP)
     +'</div></div>';
-  // ── LOAD DOWNTIME SHEET DATA ─────────────────────────────
-  var dtWrap=document.getElementById('dt-data-wrap');
+
+  // Load downtime detail from Downtime sheet
   if(dtWrap) dtWrap.innerHTML='<div class="no-data">⟳ Loading downtime records...</div>';
-  (function(){
-    var dtMonth = activeMonth || new Date().toLocaleString('en-US',{month:'long'}).toUpperCase();
-    return gasGet('downtime',{site:activeSite,week:dtMonth});
-  })().then(function(d){
-    DATA.downtime=d;
+  var dtMonth=activeMonth||new Date().toLocaleString('en-US',{month:'long'}).toUpperCase();
+  gasGet('downtime',{site:activeSite,week:dtMonth}).then(function(d){
     var dtWrap=document.getElementById('dt-data-wrap');
     if(!dtWrap) return;
     var allRows=d.rows||[];
-    var udtTotal=d.udtTotal||0;
-    var uniqueMonths=[...new Set(allRows.map(function(r){return r.Month||''}))].filter(Boolean);
-    var uniquePlants=[...new Set(allRows.map(function(r){return r.Plant||''}))].filter(Boolean);
-    console.log('DT months:',uniqueMonths,'plants:',uniqueMonths,'activeMonth:',activeMonth,'activeSite:',activeSite,'total rows:',allRows.length);
-    console.log('Available months:',d.uniqueMonths,'Total rows:',d.totalRows);
-        // GAS already filtered by month server-side - use all returned rows
-    if(!activeMonth && d.month) activeMonth = d.month;
-    var mFiltered = allRows;
-    if(!mFiltered.length){
-      var dtWrap2=document.getElementById('dt-data-wrap');
-      if(dtWrap2) dtWrap2.innerHTML='<div class="no-data">No records found. Select a different month.</div>';
+    if(!allRows.length){
+      dtWrap.innerHTML='<div class="no-data">No downtime records for '+dtMonth+'.</div>';
       return;
     }
 
-    var mPareto={};
-    mFiltered.forEach(function(r){
-      if(r['Unscheduled Downtime']>0){
-        mPareto[r.Category]=(mPareto[r.Category]||0)+r['Unscheduled Downtime'];
-      }
-    });
-    var paretoArr=Object.keys(mPareto).map(function(k){return {category:k,hrs:mPareto[k]};})
-      .sort(function(a,b){return b.hrs-a.hrs;});
+    // Pareto
+    var paretoMap={};
+    allRows.forEach(function(r){if(r['Unscheduled Downtime']>0) paretoMap[r.Category]=(paretoMap[r.Category]||0)+r['Unscheduled Downtime'];});
+    var paretoArr=Object.keys(paretoMap).map(function(k){return {category:k,hrs:paretoMap[k]};}).sort(function(a,b){return b.hrs-a.hrs;});
     var mUDTTotal=paretoArr.reduce(function(a,x){return a+x.hrs;},0);
-    var cumPct=0;
-    var pareto80=[];
-    paretoArr.forEach(function(p){
-      cumPct+=mUDTTotal>0?p.hrs/mUDTTotal*100:0;
-      pareto80.push({category:p.category,hrs:p.hrs,cumPct:cumPct});
-    });
-    var paretoSection='<div class="sec"><div class="sec-hdr"><div class="sec-title">UDT Pareto Analysis — '+activeMonth+'</div><div class="sec-line"></div></div>'
-      +'<div class="g2">'
-      +'<div class="cc"><div class="cc-title">Pareto Chart — UDT by Category</div>'
-      +'<div style="position:relative;height:220px"><canvas id="dt-pareto-chart"></canvas></div></div>'
-      +'<div class="cc"><div class="cc-title">80% Contribution Summary</div>'
-      +'<div class="tbl-wrap"><table><thead><tr>'
-      +'<th style="text-align:left">Category</th><th>UDT hrs</th><th>%</th><th>Cum%</th>'
-      +'</tr></thead><tbody>'
-      +pareto80.map(function(p,i){
-        var pct=mUDTTotal>0?(p.hrs/mUDTTotal*100):0;
-        var is80=p.cumPct<=80.01;
-        return '<tr style="'+(is80?'background:rgba(248,81,73,0.07)':'')+'">'
-          +'<td style="text-align:left">'+(is80?'<span style="color:var(--red);font-weight:700">':'')
-          +p.category+(is80?'</span>':'')+'</td>'
-          +'<td>'+p.hrs.toFixed(2)+'</td>'
-          +'<td>'+pct.toFixed(1)+'%</td>'
-          +'<td class="'+(p.cumPct<=80?'tr':'')+'">'+(p.cumPct>100?100:p.cumPct).toFixed(1)+'%</td>'
-          +'</tr>';
-      }).join('')
-      +'</tbody></table></div></div>'
-      +'</div></div>';
-    function dtTable(title,rows,dtField){
-      if(!rows.length) return '<div class="cc"><div class="cc-title">'+title+'</div><div class="no-data">No records</div></div>';
-      return '<div class="cc"><div class="cc-title">'+title+' ('+rows.length+' records)</div>'
-        +'<div class="tbl-wrap" style="max-height:320px;overflow-y:auto"><table>'
-        +'<thead><tr>'
-        +'<th>Plant</th><th>Month</th><th>Wk</th><th>Shift</th><th>Machine Line</th>'
-        +'<th style="text-align:left">Category</th><th style="text-align:left">Sub-Category</th>'
-        +'<th style="text-align:left">Reason of Delay</th><th>'+dtField+'</th>'
-        +'</tr></thead><tbody>'
-        +rows.slice(0,200).map(function(r){
-          var val=r[dtField]||0;
-          return '<tr>'
-            +'<td>'+dot((r.Plant||'').toUpperCase())+(r.Plant||'—')+'</td>'
-            +'<td>'+(r.Month||'—')+'</td>'
-            +'<td>'+(r.Week||'—')+'</td>'
-            +'<td>'+(r.Shift||'—')+'</td>'
-            +'<td>'+(r['Machine Line']||'—')+'</td>'
-            +'<td style="text-align:left"><span class="cat-pill '+(DT_CATS[r.Category||'']||'cat-other')+'">'+(r.Category||'—')+'</span></td>'
-            +'<td style="text-align:left;font-size:10px;color:var(--text2)">'+(r['Sub-Category']||'—')+'</td>'
-            +'<td style="text-align:left;font-size:10px;color:var(--text3);max-width:200px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+(r['Reason of Delay']||'—')+'</td>'
-            +'<td class="'+(val>0?'tr':'')+'">'+(val>0?val.toFixed(2):'—')+'</td>'
-            +'</tr>';
-        }).join('')
-        +'</tbody></table></div></div>';
-    }
-    var udtRows=mFiltered.filter(function(r){return r['Unscheduled Downtime']>0;})
-      .sort(function(a,b){return b['Unscheduled Downtime']-a['Unscheduled Downtime'];});
-    var sdtRows=mFiltered.filter(function(r){return r['Scheduled Downtime']>0;})
-      .sort(function(a,b){return b['Scheduled Downtime']-a['Scheduled Downtime'];});
-    var coRows=mFiltered.filter(function(r){return r['No. Of Change Over']>0;})
-      .sort(function(a,b){return b['No. Of Change Over']-a['No. Of Change Over'];});
-    var breakdown80={};
+    var cumPct=0,pareto80=[];
+    paretoArr.forEach(function(p){cumPct+=mUDTTotal>0?p.hrs/mUDTTotal*100:0;pareto80.push({category:p.category,hrs:p.hrs,cumPct:cumPct});});
+
+    // 80% breakdown grouped by Plant+Category+SubCat
+    var bd80={};
     pareto80.filter(function(p){return p.cumPct<=80.01;}).forEach(function(p){
-      mFiltered.filter(function(r){
-        return r.Category===p.category && r['Unscheduled Downtime']>0;
-      }).forEach(function(r){
-        var key=r.Plant+'||'+r.Category+'||'+(r['Sub-Category']||'');
-        if(!breakdown80[key]){
-          breakdown80[key]={
-            Plant:r.Plant, Category:r.Category,
-            'Sub-Category':r['Sub-Category']||'',
-            'Unscheduled Downtime':0
-          };
-        }
-        breakdown80[key]['Unscheduled Downtime']+=r['Unscheduled Downtime'];
+      allRows.filter(function(r){return r.Category===p.category&&r['Unscheduled Downtime']>0;}).forEach(function(r){
+        var k=r.Plant+'||'+r.Category+'||'+(r['Sub-Category']||'');
+        if(!bd80[k]) bd80[k]={Plant:r.Plant,Category:r.Category,'Sub-Category':r['Sub-Category']||'','Unscheduled Downtime':0};
+        bd80[k]['Unscheduled Downtime']+=r['Unscheduled Downtime'];
       });
     });
-    var bd80Rows=Object.keys(breakdown80).map(function(k){return breakdown80[k];})
-      .sort(function(a,b){return b['Unscheduled Downtime']-a['Unscheduled Downtime'];});
+    var bd80Rows=Object.keys(bd80).map(function(k){return bd80[k];}).sort(function(a,b){return b['Unscheduled Downtime']-a['Unscheduled Downtime'];});
     var bd80Total=bd80Rows.reduce(function(a,r){return a+r['Unscheduled Downtime'];},0);
-    var bd80Section='<div class="sec"><div class="sec-hdr"><div class="sec-title">80% UDT Breakdown — '+activeMonth+' (Grouped)</div><div class="sec-line"></div></div>'
-      +(bd80Rows.length?
-        '<div class="cc"><div class="tbl-wrap" style="max-height:360px;overflow-y:auto"><table>'
-        +'<thead><tr>'
-        +'<th>Plant</th>'
-        +'<th style="text-align:left">Category</th>'
-        +'<th style="text-align:left">Sub-Category</th>'
-        +'<th>UDT hrs</th><th>%</th>'
-        +'</tr></thead><tbody>'
-        +bd80Rows.map(function(r){
-          var pct=bd80Total>0?(r['Unscheduled Downtime']/bd80Total*100):0;
-          return '<tr>'
-            +'<td>'+dot((r.Plant||'').toUpperCase())+(r.Plant||'—')+'</td>'
+
+    // Table builder
+    function dtTable(title,tRows,field){
+      if(!tRows.length) return '<div class="cc"><div class="cc-title">'+title+'</div><div class="no-data">No records</div></div>';
+      return '<div class="cc"><div class="cc-title">'+title+' ('+tRows.length+')</div>'
+        +'<div class="tbl-wrap" style="max-height:300px;overflow-y:auto"><table>'
+        +'<thead><tr><th>Plant</th><th>Wk</th><th>Shift</th><th>Machine</th><th style="text-align:left">Category</th><th style="text-align:left">Sub-Category</th><th style="text-align:left">Reason</th><th>'+field+'</th></tr></thead><tbody>'
+        +tRows.slice(0,200).map(function(r){
+          var val=r[field]||0;
+          return '<tr><td>'+dot((r.Plant||'').toUpperCase())+(r.Plant||'—')+'</td><td>'+(r.Week||'—')+'</td><td>'+(r.Shift||'—')+'</td><td>'+(r['Machine Line']||'—')+'</td>'
             +'<td style="text-align:left"><span class="cat-pill '+(DT_CATS[r.Category||'']||'cat-other')+'">'+(r.Category||'—')+'</span></td>'
-            +'<td style="text-align:left;font-size:11px;color:var(--text2)">'+(r['Sub-Category']||'—')+'</td>'
-            +'<td style="font-family:DM Mono,monospace;font-weight:600;text-align:center;color:var(--red)">'+r['Unscheduled Downtime'].toFixed(2)+'</td>'
-            +'<td style="color:var(--text2);font-size:10px;text-align:center">'+pct.toFixed(1)+'%</td>'
-            +'</tr>';
-        }).join('')
-        +'<tr style="border-top:2px solid var(--border);background:var(--bg3)">'
-        +'<td colspan="3" style="text-align:right;font-weight:700;color:var(--text)">TOTAL</td>'
-        +'<td class="tr" style="font-family:DM Mono,monospace;font-weight:700;text-align:center">'+bd80Total.toFixed(2)+'</td>'
-        +'<td style="color:var(--text2);text-align:center">100%</td>'
-        +'</tr>'
-        +'</tbody></table></div></div>'
-        :'<div class="no-data">No breakdown data</div>')
-      +'</div>';
-    var tablesSection='<div class="sec"><div class="sec-hdr"><div class="sec-title">Downtime Detail Records — '+activeMonth+'</div><div class="sec-line"></div></div>'
-      +dtTable('Unscheduled Downtime Records',udtRows,'Unscheduled Downtime')
+            +'<td style="text-align:left;font-size:10px;color:var(--text2)">'+(r['Sub-Category']||'—')+'</td>'
+            +'<td style="text-align:left;font-size:10px;color:var(--text3);max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+(r['Reason of Delay']||'—')+'</td>'
+            +'<td class="'+(val>0?'tr':'')+'">'+(val>0?val.toFixed(2):'—')+'</td></tr>';
+        }).join('')+'</tbody></table></div></div>';
+    }
+
+    var udtRows=allRows.filter(function(r){return r['Unscheduled Downtime']>0;}).sort(function(a,b){return b['Unscheduled Downtime']-a['Unscheduled Downtime'];});
+    var sdtRows=allRows.filter(function(r){return r['Scheduled Downtime']>0;}).sort(function(a,b){return b['Scheduled Downtime']-a['Scheduled Downtime'];});
+    var coRows=allRows.filter(function(r){return r['No. Of Change Over']>0;}).sort(function(a,b){return b['No. Of Change Over']-a['No. Of Change Over'];});
+
+    var html='<div class="sec"><div class="sec-hdr"><div class="sec-title">UDT Pareto — '+dtMonth+'</div><div class="sec-line"></div></div>'
+      +'<div class="g2">'
+      +'<div class="cc"><div class="cc-title">Pareto Chart</div><div style="position:relative;height:220px"><canvas id="dt-pareto-chart"></canvas></div></div>'
+      +'<div class="cc"><div class="cc-title">80% Summary</div><div class="tbl-wrap"><table>'
+      +'<thead><tr><th style="text-align:left">Category</th><th>UDT hrs</th><th>%</th><th>Cum%</th></tr></thead><tbody>'
+      +pareto80.map(function(p){var pct=mUDTTotal>0?p.hrs/mUDTTotal*100:0;var is80=p.cumPct<=80.01;
+        return '<tr style="'+(is80?'background:rgba(248,81,73,0.07)':'')+'">'
+          +'<td style="text-align:left">'+(is80?'<b style="color:var(--red)">'+p.category+'</b>':p.category)+'</td>'
+          +'<td>'+p.hrs.toFixed(2)+'</td><td>'+pct.toFixed(1)+'%</td>'
+          +'<td class="'+(p.cumPct<=80?'tr':'')+'">'+Math.min(p.cumPct,100).toFixed(1)+'%</td></tr>';
+      }).join('')+'</tbody></table></div></div></div></div>'
+
+      +'<div class="sec"><div class="sec-hdr"><div class="sec-title">80% UDT Breakdown — Grouped</div><div class="sec-line"></div></div>'
+      +'<div class="cc"><div class="tbl-wrap" style="max-height:360px;overflow-y:auto"><table>'
+      +'<thead><tr><th>Plant</th><th style="text-align:left">Category</th><th style="text-align:left">Sub-Category</th><th>UDT hrs</th><th>%</th></tr></thead><tbody>'
+      +bd80Rows.map(function(r){var pct=bd80Total>0?r['Unscheduled Downtime']/bd80Total*100:0;
+        return '<tr><td>'+dot((r.Plant||'').toUpperCase())+(r.Plant||'—')+'</td>'
+          +'<td style="text-align:left"><span class="cat-pill '+(DT_CATS[r.Category||'']||'cat-other')+'">'+r.Category+'</span></td>'
+          +'<td style="text-align:left;font-size:11px;color:var(--text2)">'+(r['Sub-Category']||'—')+'</td>'
+          +'<td style="font-family:DM Mono,monospace;font-weight:600;color:var(--red);text-align:center">'+r['Unscheduled Downtime'].toFixed(2)+'</td>'
+          +'<td style="color:var(--text2);font-size:10px;text-align:center">'+pct.toFixed(1)+'%</td></tr>';
+      }).join('')
+      +'<tr style="background:var(--bg3);border-top:2px solid var(--border)"><td colspan="3" style="text-align:right;font-weight:700">TOTAL</td>'
+      +'<td style="font-family:DM Mono,monospace;font-weight:700;text-align:center;color:var(--red)">'+bd80Total.toFixed(2)+'</td><td style="text-align:center">100%</td></tr>'
+      +'</tbody></table></div></div></div>'
+
+      +'<div class="sec"><div class="sec-hdr"><div class="sec-title">Detail Records — '+dtMonth+'</div><div class="sec-line"></div></div>'
+      +dtTable('Unscheduled Downtime',udtRows,'Unscheduled Downtime')
       +'<div style="margin-top:8px"></div>'
-      +dtTable('Scheduled Downtime Records',sdtRows,'Scheduled Downtime')
+      +dtTable('Scheduled Downtime',sdtRows,'Scheduled Downtime')
       +'<div style="margin-top:8px"></div>'
-      +dtTable('Change Over Records',coRows,'No. Of Change Over')
+      +dtTable('Change Over',coRows,'No. Of Change Over')
       +'</div>';
-    dtWrap.innerHTML=paretoSection+bd80Section+tablesSection;
+
+    dtWrap.innerHTML=html;
+
     var ctx=document.getElementById('dt-pareto-chart');
     if(ctx){
       if(charts['dt-pareto']){try{charts['dt-pareto'].destroy();}catch(e){}}
-      charts['dt-pareto']=new Chart(ctx.getContext('2d'),{
-        data:{
-          labels:paretoArr.map(function(p){return p.category;}),
-          datasets:[
-            {type:'bar',label:'UDT hrs',data:paretoArr.map(function(p){return +p.hrs.toFixed(2);}),
-             backgroundColor:'rgba(248,81,73,0.6)',borderRadius:3,yAxisID:'y'},
-            {type:'line',label:'Cumulative %',
-             data:(function(){var c=0;return paretoArr.map(function(p){c+=mUDTTotal>0?p.hrs/mUDTTotal*100:0;return +c.toFixed(1);});}()),
-             borderColor:'#388bfd',backgroundColor:'transparent',tension:.3,pointRadius:4,spanGaps:true,yAxisID:'y1'},
-            {type:'line',label:'80% line',data:paretoArr.map(function(){return 80;}),
-             borderColor:'rgba(63,185,80,0.6)',borderDash:[4,4],borderWidth:1.5,pointRadius:0,yAxisID:'y1'}
-          ]
-        },
-        options:{responsive:true,maintainAspectRatio:false,animation:{duration:200},
-          plugins:{legend:{display:true,labels:{color:'#8b949e',font:{size:9},boxWidth:10}},
-            tooltip:{backgroundColor:'#1f2631',borderColor:'rgba(255,255,255,.1)',borderWidth:1,bodyFont:{family:"'DM Mono',monospace",size:10}}},
-          scales:{
-            x:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'#484f58',font:{size:9},maxRotation:30}},
-            y:{position:'left',grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'#484f58',font:{size:9}},title:{display:true,text:'Hours',color:'#484f58',font:{size:9}}},
-            y1:{position:'right',grid:{display:false},ticks:{color:'#484f58',font:{size:9},callback:function(v){return v+'%';}},min:0,max:100}
-          }}
-      });
+      charts['dt-pareto']=new Chart(ctx.getContext('2d'),{data:{labels:paretoArr.map(function(p){return p.category;}),datasets:[
+        {type:'bar',label:'UDT hrs',data:paretoArr.map(function(p){return +p.hrs.toFixed(2);}),backgroundColor:'rgba(248,81,73,0.6)',borderRadius:3,yAxisID:'y'},
+        {type:'line',label:'Cum%',data:(function(){var c=0;return paretoArr.map(function(p){c+=mUDTTotal>0?p.hrs/mUDTTotal*100:0;return +c.toFixed(1);});}()),borderColor:'#388bfd',backgroundColor:'transparent',tension:.3,pointRadius:3,spanGaps:true,yAxisID:'y1'},
+        {type:'line',label:'80%',data:paretoArr.map(function(){return 80;}),borderColor:'rgba(63,185,80,0.6)',borderDash:[4,4],borderWidth:1.5,pointRadius:0,yAxisID:'y1'}
+      ]},options:{responsive:true,maintainAspectRatio:false,animation:{duration:200},
+        plugins:{legend:{display:true,labels:{color:'#8b949e',font:{size:9},boxWidth:10}},tooltip:{backgroundColor:'#1f2631',borderWidth:1,bodyFont:{family:"'DM Mono',monospace",size:10}}},
+        scales:{x:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'#484f58',font:{size:9},maxRotation:30}},
+          y:{position:'left',grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'#484f58',font:{size:9}},title:{display:true,text:'Hours',color:'#484f58',font:{size:9}}},
+          y1:{position:'right',grid:{display:false},ticks:{color:'#484f58',font:{size:9},callback:function(v){return v+'%';}},min:0,max:100}}}});
     }
   }).catch(function(e){
     var dtWrap=document.getElementById('dt-data-wrap');
     if(dtWrap) dtWrap.innerHTML='<div class="no-data" style="color:var(--red)">Error: '+e.message+'</div>';
   });
 }
+
 function renderProduction(){var ct=document.getElementById('content-production');ct.innerHTML='<div class="no-data">Production tab</div>';}
 function renderOEE(){var ct=document.getElementById('content-oee');ct.innerHTML='<div class="no-data">OEE tab — coming soon</div>';}
 function renderCostAnalytics(){var ct=document.getElementById('content-cost_analytics');ct.innerHTML='<div class="no-data">Cost Analytics tab</div>';}
