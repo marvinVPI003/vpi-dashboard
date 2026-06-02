@@ -136,6 +136,9 @@ function buildNav(){
 }
 function setSite(s){
   activeSite=s;
+  // Clear cached data that is site-specific
+  DATA.dtLastResponse=null;
+  DATA.monthly=null;
   buildNav();
   var fns={dashboard:render,monthly:renderMonthly,cost:renderCost,downtime:renderDowntime,production:renderProduction,oee:renderOEE,cost_analytics:renderCostAnalytics,quality_energy:renderQualityEnergy};
   if(fns[activePage]) fns[activePage]();
