@@ -15,13 +15,12 @@ var _monthsList=[];
 function gasGet(tab, extra) {
   return new Promise(function(resolve, reject) {
     var cb = 'vpi' + Date.now() + Math.floor(Math.random()*1000);
-    var p = 'tab='+encodeURIComponent(tab)
-      +'&site='+encodeURIComponent(activeSite)
-      +'&week='+encodeURIComponent(activeWeek)
-      +'&callback='+cb;
-    if(extra) Object.keys(extra).forEach(function(k){
-      p += '&'+encodeURIComponent(k)+'='+encodeURIComponent(extra[k]);
-    });
+    // Build params as object so extras OVERRIDE defaults
+    var params = {tab:tab, site:activeSite, week:activeWeek, callback:cb};
+    if(extra) Object.keys(extra).forEach(function(k){ params[k]=extra[k]; });
+    var p = Object.keys(params).map(function(k){
+      return encodeURIComponent(k)+'='+encodeURIComponent(params[k]);
+    }).join('&');
     var s = document.createElement('script');
     var done = false;
     var timer = setTimeout(function(){
