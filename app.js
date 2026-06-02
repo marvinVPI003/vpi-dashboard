@@ -945,7 +945,10 @@ function renderDowntime(){
   // ── LOAD DOWNTIME SHEET DATA ─────────────────────────────
   var dtWrap=document.getElementById('dt-data-wrap');
   if(dtWrap) dtWrap.innerHTML='<div class="no-data">⟳ Loading downtime records...</div>';
-  gasGet('downtime',{site:activeSite,week:activeMonth}).then(function(d){
+  (function(){
+    var dtMonth = activeMonth || new Date().toLocaleString('en-US',{month:'long'}).toUpperCase();
+    return gasGet('downtime',{site:activeSite,week:dtMonth});
+  })().then(function(d){
     DATA.downtime=d;
     var dtWrap=document.getElementById('dt-data-wrap');
     if(!dtWrap) return;
@@ -955,17 +958,15 @@ function renderDowntime(){
     var uniquePlants=[...new Set(allRows.map(function(r){return r.Plant||''}))].filter(Boolean);
     console.log('DT months:',uniqueMonths,'plants:',uniqueMonths,'activeMonth:',activeMonth,'activeSite:',activeSite,'total rows:',allRows.length);
     console.log('Available months:',d.uniqueMonths,'Total rows:',d.totalRows);
-    // Filter by active month - use _monthUpper for reliability
-    var mFiltered=allRows.filter(function(r){
-      var rMonth=r._monthUpper||String(r.Month||'').trim().toUpperCase();
-      return rMonth===activeMonth.toUpperCase();
-    });
-    console.log('Filtered rows for',activeMonth,':',mFiltered.length);
-    if(!mFiltered.length&&allRows.length>0){
+        // GAS already filtered by month server-side - use all returned rows
+    if(!activeMonth && d.month) activeMonth = d.month;
+    var mFiltered = allRows;
+    if(!mFiltered.length){
       var dtWrap2=document.getElementById('dt-data-wrap');
-      if(dtWrap2) dtWrap2.innerHTML='<div class="no-data" style="color:var(--amber)">No records for '+activeMonth+'. Available months: '+(d.uniqueMonths||[]).join(', ')+'<br>Total records: '+allRows.length+'</div>';
+      if(dtWrap2) dtWrap2.innerHTML='<div class="no-data">No records found. Select a different month.</div>';
       return;
     }
+
     var mPareto={};
     mFiltered.forEach(function(r){
       if(r['Unscheduled Downtime']>0){
@@ -1033,9 +1034,7 @@ function renderDowntime(){
       .sort(function(a,b){return b['Scheduled Downtime']-a['Scheduled Downtime'];});
     var coRows=mFiltered.filter(function(r){return r['No. Of Change Over']>0;})
       .sort(function(a,b){return b['No. Of Change Over']-a['No. Of Change Over'];});
-    // Build 80% UDT breakdown table - grouped and totaled
     var breakdown80={};
-    // Group by Plant+Category+SubCategory only - sum UDT hrs
     pareto80.filter(function(p){return p.cumPct<=80.01;}).forEach(function(p){
       mFiltered.filter(function(r){
         return r.Category===p.category && r['Unscheduled Downtime']>0;
@@ -1051,10 +1050,10 @@ function renderDowntime(){
         breakdown80[key]['Unscheduled Downtime']+=r['Unscheduled Downtime'];
       });
     });
-    var bd80Rows=Object.values(breakdown80)
+    var bd80Rows=Object.keys(breakdown80).map(function(k){return breakdown80[k];})
       .sort(function(a,b){return b['Unscheduled Downtime']-a['Unscheduled Downtime'];});
     var bd80Total=bd80Rows.reduce(function(a,r){return a+r['Unscheduled Downtime'];},0);
-    var bd80Section='<div class="sec"><div class="sec-hdr"><div class="sec-title">80% UDT Breakdown — '+activeMonth+' (Grouped &amp; Totaled)</div><div class="sec-line"></div></div>'
+    var bd80Section='<div class="sec"><div class="sec-hdr"><div class="sec-title">80% UDT Breakdown — '+activeMonth+' (Grouped)</div><div class="sec-line"></div></div>'
       +(bd80Rows.length?
         '<div class="cc"><div class="tbl-wrap" style="max-height:360px;overflow-y:auto"><table>'
         +'<thead><tr>'
@@ -1075,11 +1074,11 @@ function renderDowntime(){
         }).join('')
         +'<tr style="border-top:2px solid var(--border);background:var(--bg3)">'
         +'<td colspan="3" style="text-align:right;font-weight:700;color:var(--text)">TOTAL</td>'
-        +'<td class="tr" style="font-family:DM Mono,monospace;font-weight:700">'+bd80Total.toFixed(2)+'</td>'
-        +'<td style="color:var(--text2)">100%</td>'
+        +'<td class="tr" style="font-family:DM Mono,monospace;font-weight:700;text-align:center">'+bd80Total.toFixed(2)+'</td>'
+        +'<td style="color:var(--text2);text-align:center">100%</td>'
         +'</tr>'
         +'</tbody></table></div></div>'
-        :'<div class="no-data">No 80% breakdown data</div>')
+        :'<div class="no-data">No breakdown data</div>')
       +'</div>';
     var tablesSection='<div class="sec"><div class="sec-hdr"><div class="sec-title">Downtime Detail Records — '+activeMonth+'</div><div class="sec-line"></div></div>'
       +dtTable('Unscheduled Downtime Records',udtRows,'Unscheduled Downtime')
@@ -1117,16 +1116,13 @@ function renderDowntime(){
     }
   }).catch(function(e){
     var dtWrap=document.getElementById('dt-data-wrap');
-    if(dtWrap) dtWrap.innerHTML='<div class="no-data" style="color:var(--red)">Error loading downtime data: '+e.message+'</div>';
+    if(dtWrap) dtWrap.innerHTML='<div class="no-data" style="color:var(--red)">Error: '+e.message+'</div>';
   });
 }
 function renderProduction(){var ct=document.getElementById('content-production');ct.innerHTML='<div class="no-data">Production tab</div>';}
-function renderOEE(){
-  var ct=document.getElementById('content-oee');
-  ct.innerHTML='<div class="no-data">OEE tab — coming soon</div>';
-}
-
+function renderOEE(){var ct=document.getElementById('content-oee');ct.innerHTML='<div class="no-data">OEE tab — coming soon</div>';}
 function renderCostAnalytics(){var ct=document.getElementById('content-cost_analytics');ct.innerHTML='<div class="no-data">Cost Analytics tab</div>';}
 function renderQualityEnergy(){var ct=document.getElementById('content-quality_energy');ct.innerHTML='<div class="no-data">Quality & Energy tab</div>';}
+
 // ── START ──────────────────────────────────────────────────
 loadData(false);
