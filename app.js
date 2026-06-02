@@ -851,6 +851,11 @@ function renderMonthly(){
   ]},options:{responsive:true,maintainAspectRatio:false,animation:{duration:200},plugins:{legend:{display:true,labels:{color:'#8b949e',font:{size:9},boxWidth:10}},tooltip:mTip},scales:{x:sc,y:{grid:{color:gc},ticks:{color:'#484f58',font:{size:9},callback:function(v){return v+'%';}},min:0,max:120}}}});
 }
 function renderCost(){var ct=document.getElementById('content-cost');if(!DATA.cost){ct.innerHTML='<div class="no-data">⟳ Loading...</div>';gasGet('cost').then(function(d){DATA.cost=d;renderCost();}).catch(function(e){ct.innerHTML='<div class="no-data">Error: '+e.message+'</div>';});return;}ct.innerHTML='<div class="no-data">Cost data loaded — '+( DATA.cost.rows||[]).length+' rows</div>';}
+function dtSetMonth(m){
+  activeMonth=m;
+  DATA.dtRows=null;
+  renderDowntime();
+}
 function renderDowntime(){
   var ct=document.getElementById('content-downtime');
   var dtWrap=document.getElementById('dt-data-wrap');
@@ -937,15 +942,22 @@ function renderDowntime(){
 
     var allRows=d.rows||[];
 
-    // Get unique months from data to build month selector
+    // Get unique months from ACTUAL downtime data
     var monthOrder=['JANUARY','FEBRUARY','MARCH','APRIL','MAY','JUNE','JULY','AUGUST','SEPTEMBER','OCTOBER','NOVEMBER','DECEMBER'];
     var dtMonthsSeen={};
     allRows.forEach(function(r){if(r.Month) dtMonthsSeen[r.Month.toUpperCase()]=r.Month;});
     var dtMonths=monthOrder.filter(function(m){return dtMonthsSeen[m];});
 
-    // Pick active month - use activeMonth or latest available
-    var dtActive=activeMonth?activeMonth.toUpperCase():'';
-    if(!dtActive||!dtMonthsSeen[dtActive]) dtActive=dtMonths[dtMonths.length-1]||'';
+    // Always use LATEST month from downtime data as default
+    var dtActive=dtMonths[dtMonths.length-1]||'';
+
+    // If activeMonth exists in downtime data, use it
+    if(activeMonth && dtMonthsSeen[activeMonth.toUpperCase()]) {
+      dtActive=activeMonth.toUpperCase();
+    }
+
+    // Update activeMonth to match downtime data
+    if(dtActive && !activeMonth) activeMonth=dtActive;
 
     // Filter rows by active month and site
     var filtered=allRows.filter(function(r){
@@ -954,8 +966,16 @@ function renderDowntime(){
       return mMatch&&sMatch;
     });
 
+    // Rebuild month pills based on downtime data months
+    var dtPills2=document.getElementById('dt-month-pills');
+    if(dtPills2 && dtMonths.length){
+      dtPills2.innerHTML=dtMonths.map(function(m){
+        return '<button class="wk-pill'+(m===dtActive?' active':'')+'" onclick="dtSetMonth(''+m+'')">'+m.slice(0,3)+'</button>';
+      }).join('');
+    }
+
     if(!filtered.length){
-      dtWrap.innerHTML='<div class="no-data">No downtime records for '+dtActive+'.<br><small style="color:var(--text3)">Available months: '+dtMonths.join(', ')+'<br>Total rows: '+allRows.length+'</small></div>';
+      dtWrap.innerHTML='<div class="no-data">No downtime records for '+dtActive+'</div>';
       return;
     }
 
