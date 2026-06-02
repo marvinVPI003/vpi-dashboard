@@ -117,7 +117,8 @@ async function loadData(isRefresh) {
       var el=document.getElementById('loading');
       if(el) el.innerHTML='<div style="font-size:28px;color:var(--red)">✕</div>'+
         '<div style="font-family:Barlow Condensed,sans-serif;font-size:20px;color:var(--red)">Connection Failed</div>'+
-        '<div style="font-size:11px;color:var(--text2);font-family:DM Mono,monospace;max-width:380px;text-align:center;line-he style="padding:8px 20px;font-size:11px;font-family:DM Mono,monospace;border:1px solid var(--red);border-radius:4px;background:none;color:var(--red);cursor:pointer;margin-top:8px">⟳ Retry</button>';
+        '<div style="font-size:11px;color:var(--text2);margin-top:8px">'+err.message+'</div>'+
+        '<button onclick="loadData(false)" style="padding:8px 20px;font-size:11px;border:1px solid var(--red);border-radius:4px;background:none;color:var(--red);cursor:pointer;margin-top:8px">⟳ Retry</button>';
     }
   }
 }
