@@ -855,10 +855,11 @@ function renderDowntime(){
   var ct=document.getElementById('content-downtime');
   var dtWrap=document.getElementById('dt-data-wrap');
 
-  // Need monthly data for scorecard
+  // Step 1: Need monthly data for scorecard
   if(!DATA.monthly){
     ct.innerHTML='<div class="no-data">⟳ Loading...</div>';
-    gasGet('monthly').then(function(d){DATA.monthly=d;renderDowntime();}).catch(function(e){ct.innerHTML='<div class="no-data" style="color:var(--red)">Error: '+e.message+'</div>';});
+    gasGet('monthly').then(function(d){DATA.monthly=d;renderDowntime();})
+      .catch(function(e){ct.innerHTML='<div class="no-data" style="color:var(--red)">Error: '+e.message+'</div>';});
     return;
   }
 
@@ -866,7 +867,7 @@ function renderDowntime(){
   var months=DATA.monthly.months||[];
   if(!activeMonth||months.indexOf(activeMonth)<0) activeMonth=months[months.length-1]||'';
 
-  // Build month pill strip
+  // Build month pill strip for downtime tab
   var dtPills=document.getElementById('dt-month-pills');
   if(dtPills){
     _monthsList=months;
@@ -876,11 +877,11 @@ function renderDowntime(){
     setTimeout(function(){var a=dtPills.querySelector('.wk-pill.active');if(a)a.scrollIntoView({behavior:'smooth',block:'nearest',inline:'center'});},100);
   }
 
-  // Monthly scorecard rows
+  // Step 2: Scorecard from MR Monthly
   var mRows=rows.filter(function(r){return String(r.MONTH||r.Month||'').trim()===activeMonth;});
   var dRows=activeSite==='NATIONAL'
-    ? mRows.filter(function(r){return (r.Plant||'').toUpperCase()==='NATIONAL';})
-    : mRows.filter(function(r){return (r.Plant||'').toUpperCase()===activeSite;});
+    ?mRows.filter(function(r){return (r.Plant||'').toUpperCase()==='NATIONAL';})
+    :mRows.filter(function(r){return (r.Plant||'').toUpperCase()===activeSite;});
 
   function sumHr(f1,f2){return dRows.reduce(function(a,r){return a+gf(r,f1,f2||f1);},0);}
   function avgPct(f1){var v=dRows.reduce(function(a,r){return a+gf(r,f1);},0)/Math.max(dRows.length,1);return v>1?v:v*100;}
@@ -888,8 +889,7 @@ function renderDowntime(){
   var sdt=sumHr('Scheduled Down Time, hr');
   var udt=sumHr('Unscheduled Down Time, hr','Unscheduled Downtime, hr');
   var udtP=avgPct('Unscheduled Down Time, %');
-  var eqH=sumHr('Equipment Downtime, hr','Equipment Down Time, hr');
-  var eqP=avgPct('Equipment Downtime, %');
+  var eqH=sumHr('Equipment Downtime, hr','Equipment Down Time, hr');var eqP=avgPct('Equipment Downtime, %');
   var prH=sumHr('Process, hr');var prP=avgPct('Process, %');
   var whH=sumHr('Warehouse, hr');var whP=avgPct('Warehouse, %');
   var rmH=sumHr('Raw Materials, hr','Raw Materials, h');var rmP=avgPct('Raw Materials, %');
@@ -916,58 +916,77 @@ function renderDowntime(){
   ct.innerHTML='<div class="sec"><div class="sec-hdr"><div class="sec-title">Downtime Scorecard — '+(activeSite==='NATIONAL'?'National':SL[activeSite])+' · '+activeMonth+'</div><div class="sec-line"></div></div>'
     +'<div style="font-size:8px;color:var(--text3);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;font-family:DM Mono,monospace">Overall Downtime</div>'
     +'<div style="display:flex;gap:6px;flex-wrap:nowrap;overflow-x:auto;margin-bottom:10px">'
-    +dtCard('Scheduled DT',sdt,null)
-    +dtCard('Unscheduled DT',udt,udtP)
-    +dtCard('Equipment',eqH,eqP)
-    +dtCard('Process',prH,prP)
-    +dtCard('Warehouse',whH,whP)
-    +dtCard('Raw Materials',rmH,rmP)
-    +dtCard('Change Over DT',coH,coP)
-    +dtCard('Power Failure',pfH,pfP)
+    +dtCard('Scheduled DT',sdt,null)+dtCard('Unscheduled DT',udt,udtP)
+    +dtCard('Equipment',eqH,eqP)+dtCard('Process',prH,prP)
+    +dtCard('Warehouse',whH,whP)+dtCard('Raw Materials',rmH,rmP)
+    +dtCard('Change Over DT',coH,coP)+dtCard('Power Failure',pfH,pfP)
     +'</div>'
     +'<div style="font-size:8px;color:var(--text3);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;font-family:DM Mono,monospace">Equipment &amp; Change Over Breakdown</div>'
     +'<div style="display:flex;gap:6px;flex-wrap:nowrap;overflow-x:auto">'
-    +dtCard('Electrical',elH,elP)
-    +dtCard('Mechanical',meH,meP)
-    +dtCard('PLC',plH,plP)
-    +dtCard('Change Over',coACH,coACP)
-    +dtCard('Change Die',cdH,cdP)
-    +dtCard('Change Screen',csH,csP)
+    +dtCard('Electrical',elH,elP)+dtCard('Mechanical',meH,meP)
+    +dtCard('PLC',plH,plP)+dtCard('Change Over',coACH,coACP)
+    +dtCard('Change Die',cdH,cdP)+dtCard('Change Screen',csH,csP)
     +'</div></div>';
 
-  // Load downtime detail from Downtime sheet
-  if(dtWrap) dtWrap.innerHTML='<div class="no-data">⟳ Loading downtime records for '+dtMonth+'...</div>';
-  var dtMonth=activeMonth||(function(){
-    var months=['JANUARY','FEBRUARY','MARCH','APRIL','MAY','JUNE','JULY','AUGUST','SEPTEMBER','OCTOBER','NOVEMBER','DECEMBER'];
-    return months[new Date().getMonth()];
-  })();
-  gasGet('downtime',{site:activeSite,week:dtMonth}).then(function(d){
+  // Step 3: Load Downtime sheet data - NO month filter, filter client-side
+  if(dtWrap) dtWrap.innerHTML='<div class="no-data">⟳ Loading downtime records...</div>';
+
+  gasGet('downtime',{site:activeSite,week:''}).then(function(d){
     var dtWrap=document.getElementById('dt-data-wrap');
     if(!dtWrap) return;
+
     var allRows=d.rows||[];
-    if(!allRows.length){
-      dtWrap.innerHTML='<div class="no-data">No downtime records found for '+dtMonth+'.<br><small style="color:var(--text3)">Total rows returned: '+(allRows.length)+'</small></div>';
+
+    // Get unique months from data to build month selector
+    var monthOrder=['JANUARY','FEBRUARY','MARCH','APRIL','MAY','JUNE','JULY','AUGUST','SEPTEMBER','OCTOBER','NOVEMBER','DECEMBER'];
+    var dtMonthsSeen={};
+    allRows.forEach(function(r){if(r.Month) dtMonthsSeen[r.Month.toUpperCase()]=r.Month;});
+    var dtMonths=monthOrder.filter(function(m){return dtMonthsSeen[m];});
+
+    // Pick active month - use activeMonth or latest available
+    var dtActive=activeMonth?activeMonth.toUpperCase():'';
+    if(!dtActive||!dtMonthsSeen[dtActive]) dtActive=dtMonths[dtMonths.length-1]||'';
+
+    // Filter rows by active month and site
+    var filtered=allRows.filter(function(r){
+      var mMatch=r.Month&&r.Month.toUpperCase()===dtActive;
+      var sMatch=activeSite==='NATIONAL'?true:(r.Plant&&r.Plant.toUpperCase()===activeSite);
+      return mMatch&&sMatch;
+    });
+
+    if(!filtered.length){
+      dtWrap.innerHTML='<div class="no-data">No downtime records for '+dtActive+'.<br><small style="color:var(--text3)">Available months: '+dtMonths.join(', ')+'<br>Total rows: '+allRows.length+'</small></div>';
       return;
     }
 
-    // Pareto
+    // Build pareto from filtered rows
     var paretoMap={};
-    allRows.forEach(function(r){if(r['Unscheduled Downtime']>0) paretoMap[r.Category]=(paretoMap[r.Category]||0)+r['Unscheduled Downtime'];});
-    var paretoArr=Object.keys(paretoMap).map(function(k){return {category:k,hrs:paretoMap[k]};}).sort(function(a,b){return b.hrs-a.hrs;});
+    filtered.forEach(function(r){
+      if(r['Unscheduled Downtime']>0)
+        paretoMap[r.Category]=(paretoMap[r.Category]||0)+r['Unscheduled Downtime'];
+    });
+    var paretoArr=Object.keys(paretoMap).map(function(k){return {category:k,hrs:paretoMap[k]};})
+      .sort(function(a,b){return b.hrs-a.hrs;});
     var mUDTTotal=paretoArr.reduce(function(a,x){return a+x.hrs;},0);
-    var cumPct=0,pareto80=[];
-    paretoArr.forEach(function(p){cumPct+=mUDTTotal>0?p.hrs/mUDTTotal*100:0;pareto80.push({category:p.category,hrs:p.hrs,cumPct:cumPct});});
+
+    var cumPct=0, pareto80=[];
+    paretoArr.forEach(function(p){
+      cumPct+=mUDTTotal>0?p.hrs/mUDTTotal*100:0;
+      pareto80.push({category:p.category,hrs:p.hrs,cumPct:cumPct});
+    });
 
     // 80% breakdown grouped by Plant+Category+SubCat
     var bd80={};
     pareto80.filter(function(p){return p.cumPct<=80.01;}).forEach(function(p){
-      allRows.filter(function(r){return r.Category===p.category&&r['Unscheduled Downtime']>0;}).forEach(function(r){
-        var k=r.Plant+'||'+r.Category+'||'+(r['Sub-Category']||'');
-        if(!bd80[k]) bd80[k]={Plant:r.Plant,Category:r.Category,'Sub-Category':r['Sub-Category']||'','Unscheduled Downtime':0};
-        bd80[k]['Unscheduled Downtime']+=r['Unscheduled Downtime'];
-      });
+      filtered.filter(function(r){return r.Category===p.category&&r['Unscheduled Downtime']>0;})
+        .forEach(function(r){
+          var k=r.Plant+'||'+r.Category+'||'+(r['Sub-Category']||'');
+          if(!bd80[k]) bd80[k]={Plant:r.Plant,Category:r.Category,'Sub-Category':r['Sub-Category']||'','Unscheduled Downtime':0};
+          bd80[k]['Unscheduled Downtime']+=r['Unscheduled Downtime'];
+        });
     });
-    var bd80Rows=Object.keys(bd80).map(function(k){return bd80[k];}).sort(function(a,b){return b['Unscheduled Downtime']-a['Unscheduled Downtime'];});
+    var bd80Rows=Object.keys(bd80).map(function(k){return bd80[k];})
+      .sort(function(a,b){return b['Unscheduled Downtime']-a['Unscheduled Downtime'];});
     var bd80Total=bd80Rows.reduce(function(a,r){return a+r['Unscheduled Downtime'];},0);
 
     // Table builder
@@ -975,48 +994,75 @@ function renderDowntime(){
       if(!tRows.length) return '<div class="cc"><div class="cc-title">'+title+'</div><div class="no-data">No records</div></div>';
       return '<div class="cc"><div class="cc-title">'+title+' ('+tRows.length+')</div>'
         +'<div class="tbl-wrap" style="max-height:300px;overflow-y:auto"><table>'
-        +'<thead><tr><th>Plant</th><th>Wk</th><th>Shift</th><th>Machine</th><th style="text-align:left">Category</th><th style="text-align:left">Sub-Category</th><th style="text-align:left">Reason</th><th>'+field+'</th></tr></thead><tbody>'
+        +'<thead><tr><th>Plant</th><th>Wk</th><th>Shift</th><th>Machine</th>'
+        +'<th style="text-align:left">Category</th>'
+        +'<th style="text-align:left">Sub-Category</th>'
+        +'<th style="text-align:left">Reason</th>'
+        +'<th>'+field+'</th></tr></thead><tbody>'
         +tRows.slice(0,200).map(function(r){
           var val=r[field]||0;
-          return '<tr><td>'+dot((r.Plant||'').toUpperCase())+(r.Plant||'—')+'</td><td>'+(r.Week||'—')+'</td><td>'+(r.Shift||'—')+'</td><td>'+(r['Machine Line']||'—')+'</td>'
+          return '<tr>'
+            +'<td>'+dot((r.Plant||'').toUpperCase())+(r.Plant||'—')+'</td>'
+            +'<td>'+(r.Week||'—')+'</td>'
+            +'<td style="font-size:10px">'+(r.Shift||'—')+'</td>'
+            +'<td style="font-size:10px">'+(r['Machine Line']||'—')+'</td>'
             +'<td style="text-align:left"><span class="cat-pill '+(DT_CATS[r.Category||'']||'cat-other')+'">'+(r.Category||'—')+'</span></td>'
             +'<td style="text-align:left;font-size:10px;color:var(--text2)">'+(r['Sub-Category']||'—')+'</td>'
             +'<td style="text-align:left;font-size:10px;color:var(--text3);max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+(r['Reason of Delay']||'—')+'</td>'
-            +'<td class="'+(val>0?'tr':'')+'">'+(val>0?val.toFixed(2):'—')+'</td></tr>';
-        }).join('')+'</tbody></table></div></div>';
+            +'<td class="'+(val>0?'tr':'')+'">'+(val>0?val.toFixed(2):'—')+'</td>'
+            +'</tr>';
+        }).join('')
+        +'</tbody></table></div></div>';
     }
 
-    var udtRows=allRows.filter(function(r){return r['Unscheduled Downtime']>0;}).sort(function(a,b){return b['Unscheduled Downtime']-a['Unscheduled Downtime'];});
-    var sdtRows=allRows.filter(function(r){return r['Scheduled Downtime']>0;}).sort(function(a,b){return b['Scheduled Downtime']-a['Scheduled Downtime'];});
-    var coRows=allRows.filter(function(r){return r['No. Of Change Over']>0;}).sort(function(a,b){return b['No. Of Change Over']-a['No. Of Change Over'];});
+    var udtRows=filtered.filter(function(r){return r['Unscheduled Downtime']>0;})
+      .sort(function(a,b){return b['Unscheduled Downtime']-a['Unscheduled Downtime'];});
+    var sdtRows=filtered.filter(function(r){return r['Scheduled Downtime']>0;})
+      .sort(function(a,b){return b['Scheduled Downtime']-a['Scheduled Downtime'];});
+    var coRows=filtered.filter(function(r){return r['No. Of Change Over']>0;})
+      .sort(function(a,b){return b['No. Of Change Over']-a['No. Of Change Over'];});
 
-    var html='<div class="sec"><div class="sec-hdr"><div class="sec-title">UDT Pareto — '+dtMonth+'</div><div class="sec-line"></div></div>'
+    var html='';
+
+    // Pareto section
+    html+='<div class="sec"><div class="sec-hdr"><div class="sec-title">UDT Pareto — '+dtActive+'</div><div class="sec-line"></div></div>'
       +'<div class="g2">'
       +'<div class="cc"><div class="cc-title">Pareto Chart</div><div style="position:relative;height:220px"><canvas id="dt-pareto-chart"></canvas></div></div>'
       +'<div class="cc"><div class="cc-title">80% Summary</div><div class="tbl-wrap"><table>'
       +'<thead><tr><th style="text-align:left">Category</th><th>UDT hrs</th><th>%</th><th>Cum%</th></tr></thead><tbody>'
-      +pareto80.map(function(p){var pct=mUDTTotal>0?p.hrs/mUDTTotal*100:0;var is80=p.cumPct<=80.01;
+      +pareto80.map(function(p){
+        var pct=mUDTTotal>0?p.hrs/mUDTTotal*100:0;
+        var is80=p.cumPct<=80.01;
         return '<tr style="'+(is80?'background:rgba(248,81,73,0.07)':'')+'">'
           +'<td style="text-align:left">'+(is80?'<b style="color:var(--red)">'+p.category+'</b>':p.category)+'</td>'
-          +'<td>'+p.hrs.toFixed(2)+'</td><td>'+pct.toFixed(1)+'%</td>'
-          +'<td class="'+(p.cumPct<=80?'tr':'')+'">'+Math.min(p.cumPct,100).toFixed(1)+'%</td></tr>';
-      }).join('')+'</tbody></table></div></div></div></div>'
+          +'<td>'+p.hrs.toFixed(2)+'</td>'
+          +'<td>'+pct.toFixed(1)+'%</td>'
+          +'<td class="'+(p.cumPct<=80?'tr':'')+'">'+Math.min(p.cumPct,100).toFixed(1)+'%</td>'
+          +'</tr>';
+      }).join('')
+      +'</tbody></table></div></div>'
+      +'</div></div>';
 
-      +'<div class="sec"><div class="sec-hdr"><div class="sec-title">80% UDT Breakdown — Grouped</div><div class="sec-line"></div></div>'
+    // 80% Breakdown
+    html+='<div class="sec"><div class="sec-hdr"><div class="sec-title">80% UDT Breakdown — Grouped</div><div class="sec-line"></div></div>'
       +'<div class="cc"><div class="tbl-wrap" style="max-height:360px;overflow-y:auto"><table>'
       +'<thead><tr><th>Plant</th><th style="text-align:left">Category</th><th style="text-align:left">Sub-Category</th><th>UDT hrs</th><th>%</th></tr></thead><tbody>'
-      +bd80Rows.map(function(r){var pct=bd80Total>0?r['Unscheduled Downtime']/bd80Total*100:0;
+      +bd80Rows.map(function(r){
+        var pct=bd80Total>0?r['Unscheduled Downtime']/bd80Total*100:0;
         return '<tr><td>'+dot((r.Plant||'').toUpperCase())+(r.Plant||'—')+'</td>'
           +'<td style="text-align:left"><span class="cat-pill '+(DT_CATS[r.Category||'']||'cat-other')+'">'+r.Category+'</span></td>'
           +'<td style="text-align:left;font-size:11px;color:var(--text2)">'+(r['Sub-Category']||'—')+'</td>'
           +'<td style="font-family:DM Mono,monospace;font-weight:600;color:var(--red);text-align:center">'+r['Unscheduled Downtime'].toFixed(2)+'</td>'
           +'<td style="color:var(--text2);font-size:10px;text-align:center">'+pct.toFixed(1)+'%</td></tr>';
       }).join('')
-      +'<tr style="background:var(--bg3);border-top:2px solid var(--border)"><td colspan="3" style="text-align:right;font-weight:700">TOTAL</td>'
-      +'<td style="font-family:DM Mono,monospace;font-weight:700;text-align:center;color:var(--red)">'+bd80Total.toFixed(2)+'</td><td style="text-align:center">100%</td></tr>'
-      +'</tbody></table></div></div></div>'
+      +'<tr style="background:var(--bg3);border-top:2px solid var(--border)">'
+      +'<td colspan="3" style="text-align:right;font-weight:700">TOTAL</td>'
+      +'<td style="font-family:DM Mono,monospace;font-weight:700;text-align:center;color:var(--red)">'+bd80Total.toFixed(2)+'</td>'
+      +'<td style="text-align:center">100%</td></tr>'
+      +'</tbody></table></div></div></div>';
 
-      +'<div class="sec"><div class="sec-hdr"><div class="sec-title">Detail Records — '+dtMonth+'</div><div class="sec-line"></div></div>'
+    // Detail tables
+    html+='<div class="sec"><div class="sec-hdr"><div class="sec-title">Detail Records — '+dtActive+'</div><div class="sec-line"></div></div>'
       +dtTable('Unscheduled Downtime',udtRows,'Unscheduled Downtime')
       +'<div style="margin-top:8px"></div>'
       +dtTable('Scheduled Downtime',sdtRows,'Scheduled Downtime')
@@ -1026,22 +1072,30 @@ function renderDowntime(){
 
     dtWrap.innerHTML=html;
 
+    // Render pareto chart
     var ctx=document.getElementById('dt-pareto-chart');
     if(ctx){
       if(charts['dt-pareto']){try{charts['dt-pareto'].destroy();}catch(e){}}
-      charts['dt-pareto']=new Chart(ctx.getContext('2d'),{data:{labels:paretoArr.map(function(p){return p.category;}),datasets:[
-        {type:'bar',label:'UDT hrs',data:paretoArr.map(function(p){return +p.hrs.toFixed(2);}),backgroundColor:'rgba(248,81,73,0.6)',borderRadius:3,yAxisID:'y'},
-        {type:'line',label:'Cum%',data:(function(){var c=0;return paretoArr.map(function(p){c+=mUDTTotal>0?p.hrs/mUDTTotal*100:0;return +c.toFixed(1);});}()),borderColor:'#388bfd',backgroundColor:'transparent',tension:.3,pointRadius:3,spanGaps:true,yAxisID:'y1'},
-        {type:'line',label:'80%',data:paretoArr.map(function(){return 80;}),borderColor:'rgba(63,185,80,0.6)',borderDash:[4,4],borderWidth:1.5,pointRadius:0,yAxisID:'y1'}
-      ]},options:{responsive:true,maintainAspectRatio:false,animation:{duration:200},
-        plugins:{legend:{display:true,labels:{color:'#8b949e',font:{size:9},boxWidth:10}},tooltip:{backgroundColor:'#1f2631',borderWidth:1,bodyFont:{family:"'DM Mono',monospace",size:10}}},
-        scales:{x:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'#484f58',font:{size:9},maxRotation:30}},
-          y:{position:'left',grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'#484f58',font:{size:9}},title:{display:true,text:'Hours',color:'#484f58',font:{size:9}}},
-          y1:{position:'right',grid:{display:false},ticks:{color:'#484f58',font:{size:9},callback:function(v){return v+'%';}},min:0,max:100}}}});
+      charts['dt-pareto']=new Chart(ctx.getContext('2d'),{
+        data:{labels:paretoArr.map(function(p){return p.category;}),
+          datasets:[
+            {type:'bar',label:'UDT hrs',data:paretoArr.map(function(p){return +p.hrs.toFixed(2);}),backgroundColor:'rgba(248,81,73,0.6)',borderRadius:3,yAxisID:'y'},
+            {type:'line',label:'Cum%',data:(function(){var c=0;return paretoArr.map(function(p){c+=mUDTTotal>0?p.hrs/mUDTTotal*100:0;return +c.toFixed(1);});}()),borderColor:'#388bfd',backgroundColor:'transparent',tension:.3,pointRadius:3,spanGaps:true,yAxisID:'y1'},
+            {type:'line',label:'80%',data:paretoArr.map(function(){return 80;}),borderColor:'rgba(63,185,80,0.6)',borderDash:[4,4],borderWidth:1.5,pointRadius:0,yAxisID:'y1'}
+          ]},
+        options:{responsive:true,maintainAspectRatio:false,animation:{duration:200},
+          plugins:{legend:{display:true,labels:{color:'#8b949e',font:{size:9},boxWidth:10}},
+            tooltip:{backgroundColor:'#1f2631',borderWidth:1,bodyFont:{family:"'DM Mono',monospace",size:10}}},
+          scales:{
+            x:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'#484f58',font:{size:9},maxRotation:30}},
+            y:{position:'left',grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'#484f58',font:{size:9}},title:{display:true,text:'Hours',color:'#484f58',font:{size:9}}},
+            y1:{position:'right',grid:{display:false},ticks:{color:'#484f58',font:{size:9},callback:function(v){return v+'%';}},min:0,max:100}
+          }}
+      });
     }
   }).catch(function(e){
     var dtWrap=document.getElementById('dt-data-wrap');
-    if(dtWrap) dtWrap.innerHTML='<div class="no-data" style="color:var(--red)">Error: '+e.message+'</div>';
+    if(dtWrap) dtWrap.innerHTML='<div class="no-data" style="color:var(--red)">Error loading: '+e.message+'</div>';
   });
 }
 
