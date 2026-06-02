@@ -855,10 +855,19 @@ function renderMonthly(){
 }
 function renderCost(){var ct=document.getElementById('content-cost');if(!DATA.cost){ct.innerHTML='<div class="no-data">⟳ Loading...</div>';gasGet('cost').then(function(d){DATA.cost=d;renderCost();}).catch(function(e){ct.innerHTML='<div class="no-data">Error: '+e.message+'</div>';});return;}ct.innerHTML='<div class="no-data">Cost data loaded — '+( DATA.cost.rows||[]).length+' rows</div>';}
 function renderDowntimeMonth(m){
-  // Re-render downtime tables for selected month
+  activeMonth=m;
   var dtW=document.getElementById('dt-data-wrap');
-  if(!dtW||!DATA.dtLastResponse) return;
-  renderDowntimeTables(DATA.dtLastResponse, dtW, m, activeSite);
+  if(!dtW) return;
+  if(DATA.dtLastResponse){
+    renderDowntimeTables(DATA.dtLastResponse, dtW, m, activeSite);
+    // Also update scorecard month pills
+    var pills=document.getElementById('dt-month-pills');
+    if(pills) pills.querySelectorAll('.wk-pill').forEach(function(b){
+      b.classList.toggle('active', b.textContent===m.slice(0,3));
+    });
+  } else {
+    renderDowntime();
+  }
 }
 function dtSetMonth(m){
   activeMonth=m;
@@ -970,9 +979,13 @@ function renderDowntimeTables(d, dtW, filterMonth, filterSite){
   // Do NOT rely on filterMonth/activeMonth - use actual data
   var showMonth = availMonths[availMonths.length-1]||'';
 
-  // Filter by month - case insensitive
+  // Filter by site AND month
   var rows=allRows.filter(function(r){
-    return r.Month && r.Month.toUpperCase()===showMonth;
+    var mMatch = r.Month && r.Month.toUpperCase()===showMonth;
+    var sMatch = (!filterSite || filterSite==='NATIONAL')
+      ? true
+      : (r.Plant||'').toUpperCase()===filterSite.toUpperCase();
+    return mMatch && sMatch;
   });
 
   if(!rows.length && allRows.length){
@@ -1049,15 +1062,6 @@ function renderDowntimeTables(d, dtW, filterMonth, filterSite){
   }
 
   var html='';
-
-  // Month pills from downtime data
-  html+='<div style="background:var(--bg2);border-bottom:1px solid var(--border);padding:6px 12px;display:flex;align-items:center;gap:4px;flex-wrap:wrap;margin-bottom:8px">'
-    +'<span style="font-size:9px;color:var(--text3);font-family:DM Mono,monospace;letter-spacing:1px;margin-right:4px">MONTH</span>'
-    +availMonths.map(function(m){
-      var active=m===showMonth?' active':'';
-      return '<button class="wk-pill'+active+'" data-dtm="'+m+'" onclick="renderDowntimeMonth(this.dataset.dtm)">'+m.slice(0,3)+'</button>';
-    }).join('')
-    +'</div>';
 
   // 1. Pareto chart + table side by side
   html+='<div class="sec"><div class="sec-hdr"><div class="sec-title">UDT Pareto — '+showMonth+'</div><div class="sec-line"></div></div>'
