@@ -1058,26 +1058,23 @@ function renderDowntime(){
       +(bd80Rows.length?
         '<div class="cc"><div class="tbl-wrap" style="max-height:360px;overflow-y:auto"><table>'
         +'<thead><tr>'
-        +'<th>Plant</th><th>Month</th>'
+        +'<th>Plant</th>'
         +'<th style="text-align:left">Category</th>'
         +'<th style="text-align:left">Sub-Category</th>'
-        +'<th style="text-align:left">Reason of Delay</th>'
         +'<th>UDT hrs</th><th>%</th>'
         +'</tr></thead><tbody>'
         +bd80Rows.map(function(r){
           var pct=bd80Total>0?(r['Unscheduled Downtime']/bd80Total*100):0;
           return '<tr>'
             +'<td>'+dot((r.Plant||'').toUpperCase())+(r.Plant||'—')+'</td>'
-            +'<td>'+(r.Month||activeMonth)+'</td>'
             +'<td style="text-align:left"><span class="cat-pill '+(DT_CATS[r.Category||'']||'cat-other')+'">'+(r.Category||'—')+'</span></td>'
-            +'<td style="text-align:left;font-size:10px;color:var(--text2)">'+(r['Sub-Category']||'—')+'</td>'
-            +'<td style="text-align:left;font-size:10px;color:var(--text3);max-width:220px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+(r['Reason of Delay']||'—')+'</td>'
+            +'<td style="text-align:left;font-size:11px;color:var(--text2)">'+(r['Sub-Category']||'—')+'</td>'
             +'<td class="tr" style="font-family:DM Mono,monospace;font-weight:600">'+r['Unscheduled Downtime'].toFixed(2)+'</td>'
             +'<td style="color:var(--text2);font-size:10px">'+pct.toFixed(1)+'%</td>'
             +'</tr>';
         }).join('')
         +'<tr style="border-top:2px solid var(--border);background:var(--bg3)">'
-        +'<td colspan="5" style="text-align:right;font-weight:700;color:var(--text)">TOTAL</td>'
+        +'<td colspan="3" style="text-align:right;font-weight:700;color:var(--text)">TOTAL</td>'
         +'<td class="tr" style="font-family:DM Mono,monospace;font-weight:700">'+bd80Total.toFixed(2)+'</td>'
         +'<td style="color:var(--text2)">100%</td>'
         +'</tr>'
