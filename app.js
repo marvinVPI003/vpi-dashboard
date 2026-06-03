@@ -945,8 +945,19 @@ function renderDowntime(){
   // ── STEP 2: Load Downtime sheet data ─────────────────────
   // Use cached data if same site - instant month switching without re-fetch
   if(DATA.dtLastResponse && DATA.dtLastSite===activeSite){
-    if(dtWrap) renderDowntimeTables(DATA.dtLastResponse, dtWrap, activeMonth, activeSite);
-    return;
+    // Verify cache has data for requested month
+    var reqM=(activeMonth||'').toUpperCase();
+    var hasM=false;
+    if(!reqM) hasM=true;
+    else (DATA.dtLastResponse.rows||[]).some(function(r){
+      if((r.Month||'').toUpperCase()===reqM){hasM=true;return true;}
+    });
+    if(hasM){
+      if(dtWrap) renderDowntimeTables(DATA.dtLastResponse, dtWrap, activeMonth, activeSite);
+      return;
+    }
+    // Month not in cache - clear and re-fetch
+    DATA.dtLastResponse=null; DATA.dtLastSite=null;
   }
 
   if(dtWrap) dtWrap.innerHTML='<div class="no-data">⟳ Loading downtime records...</div>';
