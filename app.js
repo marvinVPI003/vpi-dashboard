@@ -136,8 +136,9 @@ function buildNav(){
 }
 function setSite(s){
   activeSite=s;
-  // Clear only downtime cache (site-specific), keep monthly (all sites)
+  // Clear downtime cache so new site re-fetches
   DATA.dtLastResponse=null;
+  DATA.dtLastSite=null;
   buildNav();
   var fns={dashboard:render,monthly:renderMonthly,cost:renderCost,downtime:renderDowntime,production:renderProduction,oee:renderOEE,cost_analytics:renderCostAnalytics,quality_energy:renderQualityEnergy};
   if(fns[activePage]) fns[activePage]();
@@ -942,12 +943,19 @@ function renderDowntime(){
     +'</div></div>';
 
   // ── STEP 2: Load Downtime sheet data ─────────────────────
+  // Use cached data if same site - instant month switching without re-fetch
+  if(DATA.dtLastResponse && DATA.dtLastSite===activeSite){
+    if(dtWrap) renderDowntimeTables(DATA.dtLastResponse, dtWrap, activeMonth, activeSite);
+    return;
+  }
+
   if(dtWrap) dtWrap.innerHTML='<div class="no-data">⟳ Loading downtime records...</div>';
 
   gasGet('downtime',{site:activeSite,week:''}).then(function(d){
     var dtW=document.getElementById('dt-data-wrap');
     if(!dtW) return;
-    DATA.dtLastResponse=d; // cache for month switching
+    DATA.dtLastResponse=d;
+    DATA.dtLastSite=activeSite;
     renderDowntimeTables(d, dtW, activeMonth, activeSite);
   }).catch(function(e){
     var dtW=document.getElementById('dt-data-wrap');
