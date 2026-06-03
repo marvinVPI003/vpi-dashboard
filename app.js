@@ -988,11 +988,10 @@ function renderDowntimeTables(d, dtW, filterMonth, filterSite){
   if(filterMonth && seenMonths[filterMonth.toUpperCase()]) showMonth=filterMonth.toUpperCase();
 
   // Filter by site AND month
+  var siteFilt = (!filterSite || filterSite==='NATIONAL') ? '' : filterSite.toUpperCase();
   var rows=allRows.filter(function(r){
     var mMatch = r.Month && r.Month.toUpperCase()===showMonth;
-    var sMatch = (!filterSite || filterSite==='NATIONAL')
-      ? true
-      : (r.Plant||'').toUpperCase()===filterSite.toUpperCase();
+    var sMatch = !siteFilt || (r.Plant||'').toUpperCase()===siteFilt;
     return mMatch && sMatch;
   });
 
