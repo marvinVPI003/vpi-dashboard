@@ -107,6 +107,7 @@ async function loadData(isRefresh) {
     scheduleRefresh();
     // Prefetch monthly data eagerly (needed by Monthly tab and Downtime scorecard)
     gasGet('monthly').then(function(d){DATA.monthly=d;}).catch(function(){});
+    gasGet('forecast').then(function(d){DATA.forecast=d;}).catch(function(){});
     ['cost','production','oee','cost_analytics','quality_energy'].forEach(function(tab){
       gasGet(tab).then(function(d){DATA[tab]=d;}).catch(function(){});
     });
@@ -1210,7 +1211,157 @@ function renderDowntimeTables(d, dtW, filterMonth, filterSite){
   }
 }
 
-function renderProduction(){var ct=document.getElementById('content-production');ct.innerHTML='<div class="no-data">Production tab</div>';}
+function renderProduction(){
+  renderForecast();
+}
+
+function renderForecast(){
+  var ct=document.getElementById('content-production');
+  if(!ct) return;
+
+  if(!DATA.forecast){
+    ct.innerHTML='<div class="no-data">⟳ Loading forecast data...</div>';
+    gasGet('forecast').then(function(d){
+      DATA.forecast=d;
+      renderForecast();
+    }).catch(function(e){
+      ct.innerHTML='<div class="no-data" style="color:var(--red)">Error: '+e.message+'</div>';
+    });
+    return;
+  }
+
+  var rows = DATA.forecast.rows||[];
+  var nat  = DATA.forecast.national||{};
+  if(!rows.length){
+    ct.innerHTML='<div class="no-data">No forecast data available</div>';
+    return;
+  }
+
+  // ── Helpers ─────────────────────────────────────────────
+  var TH='padding:7px 10px;background:var(--bg3);color:var(--text2);font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;border-bottom:1px solid var(--border);white-space:nowrap;';
+  var TD='padding:6px 10px;font-size:11px;border-bottom:1px solid var(--border);white-space:nowrap;';
+
+  function fmt(n,d){
+    if(!n&&n!==0) return '—';
+    d=d===undefined?0:d;
+    var abs=Math.abs(n);
+    var sign=n<0?'-':'+';
+    if(abs>=1000000) return (n<0?'-':'')+(abs/1000000).toFixed(2)+'M';
+    if(abs>=1000)    return (n<0?'-':'')+(abs/1000).toFixed(1)+'k';
+    return n.toFixed(d);
+  }
+  function fmtN(n){
+    if(!n&&n!==0) return '—';
+    var abs=Math.abs(n);
+    if(abs>=1000000) return (n<0?'-':'')+(abs/1000000).toFixed(2)+'M';
+    if(abs>=1000)    return (n<0?'-':'')+(abs/1000).toFixed(1)+'k';
+    return String(n);
+  }
+  function clrVar(v){return v>=0?'var(--green-b)':'var(--red)';}
+  function clrDays(v){return v>=0?'var(--green-b)':'var(--amber)';}
+
+  var AREA_COLOR = {LUZON:'#388bfd',VISAYAS:'#3fb950',MINDANAO:'#f78166',NATIONAL:'#d2a8ff'};
+
+  // ── National Scorecard ───────────────────────────────────
+  function scCard(label, val, sub, valColor){
+    return '<div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:14px 12px;flex:1;min-width:0">'+
+      '<div style="font-size:8px;color:var(--text3);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;font-family:DM Mono,monospace">'+label+'</div>'+
+      '<div style="font-family:Barlow Condensed,sans-serif;font-size:28px;font-weight:700;color:'+(valColor||'var(--text1)')+';line-height:1">'+val+'</div>'+
+      (sub?'<div style="font-size:10px;color:var(--text3);margin-top:4px">'+sub+'</div>':'')+
+      '</div>';
+  }
+
+  var dueDate = nat.DueDate||rows[0].DueDate||'—';
+  var mtdPct  = nat.MTDPct||(nat.Forecast>0?(nat.MTDPullout/nat.Forecast*100).toFixed(2)+'%':'—');
+
+  var html='';
+
+  // Top scorecard
+  html+='<div class="sec"><div class="sec-hdr"><div class="sec-title">CSD Forecast — National Overview</div><div class="sec-line"></div></div>'+
+    '<div style="font-size:9px;color:var(--text3);font-family:DM Mono,monospace;margin-bottom:8px">Due Date: <b style="color:var(--amber)">'+dueDate+'</b></div>'+
+    '<div style="display:flex;gap:8px;flex-wrap:nowrap;overflow-x:auto">'+
+    scCard('Forecast',fmtN(nat.Forecast),'Target volume','var(--text1)')+
+    scCard('MTD Pull-out',fmtN(nat.MTDPullout),mtdPct+' of forecast',nat.MTDPullout>0?'var(--green-b)':'var(--text2)')+
+    scCard('Inventory',fmtN(nat.Inventory),'Current stock','var(--text1)')+
+    scCard('Days Needed',nat.DaysNeeded!==undefined?nat.DaysNeeded.toFixed(1):'—','To meet forecast',clrDays(nat.DaysNeeded))+
+    scCard('Remaining Days',nat.RemDays!==undefined?nat.RemDays.toFixed(1):'—','Days left',clrDays(nat.RemDays))+
+    '</div></div>';
+
+  // Area cards row
+  html+='<div class="sec"><div class="sec-hdr"><div class="sec-title">By Area</div><div class="sec-line"></div></div>'+
+    '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">';
+
+  var areas3 = rows.filter(function(r){return r.Area!=='NATIONAL';});
+  areas3.forEach(function(r){
+    var col = AREA_COLOR[r.Area]||'#8b949e';
+    var pct = r.Forecast>0?(r.MTDPullout/r.Forecast*100).toFixed(1):'0';
+    var barW = Math.min(parseFloat(pct),100);
+    html+='<div style="background:var(--bg2);border:1px solid var(--border);border-top:3px solid '+col+';border-radius:var(--rl);padding:14px">'+
+      '<div style="font-family:Barlow Condensed,sans-serif;font-size:16px;font-weight:700;color:'+col+';margin-bottom:10px">'+r.Area+'</div>'+
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:10px">'+
+      '<div><div style="font-size:8px;color:var(--text3);text-transform:uppercase">Forecast</div><div style="font-size:15px;font-weight:600">'+fmtN(r.Forecast)+'</div></div>'+
+      '<div><div style="font-size:8px;color:var(--text3);text-transform:uppercase">MTD Pull-out</div><div style="font-size:15px;font-weight:600;color:var(--green-b)">'+fmtN(r.MTDPullout)+'</div></div>'+
+      '<div><div style="font-size:8px;color:var(--text3);text-transform:uppercase">Inventory</div><div style="font-size:15px;font-weight:600">'+fmtN(r.Inventory)+'</div></div>'+
+      '<div><div style="font-size:8px;color:var(--text3);text-transform:uppercase">Open SO</div><div style="font-size:15px;font-weight:600">'+fmtN(r.OpenSO)+'</div></div>'+
+      '</div>'+
+      '<div style="margin-bottom:4px">'+
+        '<div style="display:flex;justify-content:space-between;font-size:9px;color:var(--text3);margin-bottom:3px">'+
+          '<span>MTD Progress</span><span>'+pct+'%</span>'+
+        '</div>'+
+        '<div style="height:4px;background:var(--border);border-radius:2px">'+
+          '<div style="height:4px;width:'+barW+'%;background:'+col+';border-radius:2px;transition:width .5s"></div>'+
+        '</div>'+
+      '</div>'+
+      '<div style="display:flex;justify-content:space-between;margin-top:8px">'+
+        '<div><div style="font-size:8px;color:var(--text3)">Days Needed</div><div style="font-size:13px;font-weight:600;color:'+clrDays(r.DaysNeeded)+'">'+(r.DaysNeeded!==undefined?r.DaysNeeded.toFixed(1):'—')+'</div></div>'+
+        '<div><div style="font-size:8px;color:var(--text3)">Rem. Days</div><div style="font-size:13px;font-weight:600;color:'+clrDays(r.RemDays)+'">'+(r.RemDays!==undefined?r.RemDays.toFixed(1):'—')+'</div></div>'+
+        '<div><div style="font-size:8px;color:var(--text3)">Vs Forecast</div><div style="font-size:13px;font-weight:600;color:'+clrVar(r.VsForecast)+'">'+fmtN(r.VsForecast)+'</div></div>'+
+      '</div>'+
+      '</div>';
+  });
+
+  html+='</div></div>';
+
+  // Detail table
+  html+='<div class="sec"><div class="sec-hdr"><div class="sec-title">Full Detail Table</div><div class="sec-line"></div></div>'+
+    '<div class="cc"><div class="tbl-wrap" style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;min-width:900px">'+
+    '<thead><tr>'+
+    ['Area','Forecast','Open SO','MTD Pull-out','MTD %','Inventory','Prod Line-up','Total Output','Complete Feeds','In Transit','Vs Forecast','Days Needed','Rem. Days','Vs Pull-out','Due Date'].map(function(h,i){
+      var r = (i>=1&&i<=3)||(i>=5&&i<=13);
+      return '<th style="'+TH+'text-align:'+(r?'right':'left')+'">'+h+'</th>';
+    }).join('')+
+    '</tr></thead><tbody>'+
+    rows.map(function(r,idx){
+      var col = AREA_COLOR[r.Area]||'#8b949e';
+      var isNat = r.Area==='NATIONAL';
+      var bg = isNat?'background:var(--bg3);border-top:2px solid var(--border2);font-weight:700;':
+               (idx%2===0?'background:var(--bg1)':'background:var(--bg2)');
+      function td(v,right,color){
+        return '<td style="'+TD+'text-align:'+(right?'right':'left')+';'+(color?'color:'+color+';':'')+bg+'">'+v+'</td>';
+      }
+      return '<tr>'+
+        td('<span style="display:inline-flex;align-items:center;gap:6px"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:'+col+'"></span><b>'+r.Area+'</b></span>',false)+
+        td(fmtN(r.Forecast),true)+
+        td(fmtN(r.OpenSO),true)+
+        td(fmtN(r.MTDPullout),true,'var(--green-b)')+
+        td(r.MTDPct||'—',true)+
+        td(fmtN(r.Inventory),true)+
+        td(fmtN(r.ProdLineup),true)+
+        td(fmtN(r.TotalOutput),true)+
+        td(fmtN(r.CompFeeds),true)+
+        td(fmtN(r.InTransit),true)+
+        td(fmtN(r.VsForecast),true,clrVar(r.VsForecast))+
+        td(r.DaysNeeded!==undefined?r.DaysNeeded.toFixed(1):'—',true,clrDays(r.DaysNeeded))+
+        td(r.RemDays!==undefined?r.RemDays.toFixed(1):'—',true,clrDays(r.RemDays))+
+        td(fmtN(r.VsPullout),true,clrVar(r.VsPullout))+
+        td(r.DueDate||'—',false,'var(--amber)')+
+        '</tr>';
+    }).join('')+
+    '</tbody></table></div></div></div>';
+
+  ct.innerHTML = html;
+}
+
 function renderOEE(){var ct=document.getElementById('content-oee');ct.innerHTML='<div class="no-data">OEE tab — coming soon</div>';}
 function renderCostAnalytics(){var ct=document.getElementById('content-cost_analytics');ct.innerHTML='<div class="no-data">Cost Analytics tab</div>';}
 function renderQualityEnergy(){var ct=document.getElementById('content-quality_energy');ct.innerHTML='<div class="no-data">Quality & Energy tab</div>';}
