@@ -1354,7 +1354,6 @@ function renderForecast(){
         td(r.DaysNeeded!==undefined?r.DaysNeeded.toFixed(1):'—',true,clrDays(r.DaysNeeded))+
         td(r.RemDays!==undefined?r.RemDays.toFixed(1):'—',true,clrDays(r.RemDays))+
         td(fmtN(r.VsPullout),true,clrVar(r.VsPullout))+
-        td(r.DueDate||'—',false,'var(--amber)')+
         '</tr>';
     }).join('')+
     '</tbody></table></div></div></div>';
