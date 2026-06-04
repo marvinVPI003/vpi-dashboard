@@ -986,8 +986,9 @@ function renderDowntimeTables(d, dtW, filterMonth, filterSite){
   var availMonths=monthOrder.filter(function(m){ return seenMonths[m]; });
 
   // Use filterMonth if available, else latest
-  var showMonth = availMonths[availMonths.length-1]||'';
-  if(filterMonth && seenMonths[filterMonth.toUpperCase()]) showMonth=filterMonth.toUpperCase();
+  // Use filterMonth directly - if no data exists for it, rows will be empty -> "No records"
+  // NEVER fall back to another month as that shows wrong data
+  var showMonth = filterMonth ? filterMonth.toUpperCase() : (availMonths[availMonths.length-1]||'');
 
   // Filter by month only - site already filtered server-side by GAS
   var rows=allRows.filter(function(r){
