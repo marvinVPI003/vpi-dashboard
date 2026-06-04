@@ -1326,7 +1326,7 @@ function renderForecast(){
   html+='<div class="sec"><div class="sec-hdr"><div class="sec-title">Full Detail Table</div><div class="sec-line"></div></div>'+
     '<div class="cc"><div class="tbl-wrap" style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;min-width:900px">'+
     '<thead><tr>'+
-    ['Area','Forecast','Open SO','MTD Pull-out','MTD %','Inventory','Prod Line-up','Total Output','Complete Feeds','In Transit','Vs Forecast','Days Needed','Rem. Days','Vs Pull-out','Due Date'].map(function(h,i){
+    ['Area','Forecast','Open SO','MTD Pull-out','MTD %','Inventory','Prod Line-up','Total Output','Complete Feeds','In Transit','Vs Forecast','Days Needed','Rem. Days','Vs Pull-out'].map(function(h,i){
       var r = (i>=1&&i<=3)||(i>=5&&i<=13);
       return '<th style="'+TH+'text-align:'+(r?'right':'left')+'">'+h+'</th>';
     }).join('')+
@@ -1341,15 +1341,15 @@ function renderForecast(){
       }
       return '<tr>'+
         td('<span style="display:inline-flex;align-items:center;gap:6px"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:'+col+'"></span><b>'+r.Area+'</b></span>',false)+
-        td(fmtN(r.Forecast),true)+
-        td(fmtN(r.OpenSO),true)+
-        td(fmtN(r.MTDPullout),true,'var(--green-b)')+
-        td(r.MTDPct||'—',true)+
-        td(fmtN(r.Inventory),true)+
-        td(fmtN(r.ProdLineup),true)+
-        td(fmtN(r.TotalOutput),true)+
-        td(fmtN(r.CompFeeds),true)+
-        td(fmtN(r.InTransit),true)+
+        td(fmtN(Math.round(r.Forecast)),true)+
+        td(fmtN(Math.round(r.OpenSO)),true)+
+        td(fmtN(Math.round(r.MTDPullout)),true,'var(--green-b)')+
+        td(r.MTDPct?(isNaN(parseFloat(r.MTDPct))?r.MTDPct:(parseFloat(r.MTDPct)<1?(parseFloat(r.MTDPct)*100).toFixed(2)+'%':r.MTDPct)):'—',true)+
+        td(fmtN(Math.round(r.Inventory)),true)+
+        td(fmtN(Math.round(r.ProdLineup)),true)+
+        td(fmtN(Math.round(r.TotalOutput)),true)+
+        td(fmtN(Math.round(r.CompFeeds)),true)+
+        td(fmtN(Math.round(r.InTransit)),true)+
         td(fmtN(r.VsForecast),true,clrVar(r.VsForecast))+
         td(r.DaysNeeded!==undefined?r.DaysNeeded.toFixed(1):'—',true,clrDays(r.DaysNeeded))+
         td(r.RemDays!==undefined?r.RemDays.toFixed(1):'—',true,clrDays(r.RemDays))+
