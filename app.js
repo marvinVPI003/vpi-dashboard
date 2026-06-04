@@ -1358,6 +1358,162 @@ function renderForecast(){
     }).join('')+
     '</tbody></table></div></div></div>';
 
+
+  // ── SECTION 2: Site Scorecards ──────────────────────────
+  var siteRows = DATA.forecast.siteRows||[];
+  var totalRow = DATA.forecast.totalRow||{};
+  var speedVal = DATA.forecast.speedVal||0;
+  var speedPct = DATA.forecast.speedPct||'—';
+
+  // Region grouping
+  var regions = {
+    LUZON:    {color:'#388bfd', sites:['BULACAN','ISABELA']},
+    VISAYAS:  {color:'#3fb950', sites:['HOREB','ARGAO','BACOLOD']},
+    MINDANAO: {color:'#f78166', sites:['BUKID','DAVAO']}
+  };
+
+  function fmtSC(n){
+    if(!n&&n!==0) return '—';
+    var abs=Math.abs(n);
+    if(abs>=1000000) return (n<0?'-':'')+(abs/1000000).toFixed(2)+'M';
+    if(abs>=1000)    return (n<0?'-':'')+(abs/1000).toFixed(1)+'k';
+    return Math.round(n).toLocaleString();
+  }
+
+  html+='<div class="sec"><div class="sec-hdr"><div class="sec-title">Weekly Pull-out by Region & Site</div><div class="sec-line"></div></div>';
+  html+='<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:10px">';
+
+  Object.keys(regions).forEach(function(reg){
+    var rc = regions[reg];
+    html+='<div style="background:var(--bg2);border:1px solid var(--border);border-top:3px solid '+rc.color+';border-radius:var(--rl);padding:12px">';
+    html+='<div style="font-family:Barlow Condensed,sans-serif;font-size:14px;font-weight:700;color:'+rc.color+';margin-bottom:10px;letter-spacing:1px">'+reg+'</div>';
+
+    rc.sites.forEach(function(site){
+      var sr = siteRows.filter(function(r){return r.Area.toUpperCase()===site;})[0]||null;
+      var pull = sr?sr.TotalPull:0;
+      var tgt  = sr?sr.Target:0;
+      var pct  = sr?sr.PctComp:'—';
+      // Convert pct if decimal
+      if(pct && !isNaN(parseFloat(pct)) && parseFloat(pct)<=1 && parseFloat(pct)>0){
+        pct = (parseFloat(pct)*100).toFixed(0)+'%';
+      }
+      var pctNum = parseFloat(String(pct).replace('%',''))||0;
+      var barW = Math.min(pctNum,100);
+      var barColor = pctNum>=80?'var(--green-b)':pctNum>=50?'var(--amber)':'var(--red)';
+
+      html+='<div style="margin-bottom:10px;padding-bottom:10px;border-bottom:1px solid var(--border)">';
+      html+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">';
+      html+='<span style="font-size:10px;font-weight:600;color:var(--text1)">'+site+'</span>';
+      html+='<span style="font-size:9px;color:var(--text3)">Tgt: '+fmtSC(tgt)+'</span>';
+      html+='</div>';
+      html+='<div style="font-family:Barlow Condensed,sans-serif;font-size:22px;font-weight:700;color:var(--text1);line-height:1">'+fmtSC(pull)+'</div>';
+      html+='<div style="font-size:9px;color:'+barColor+';font-family:DM Mono,monospace;margin:2px 0">'+pct+' completion</div>';
+      html+='<div style="height:3px;background:var(--border);border-radius:2px;margin-top:4px">';
+      html+='<div style="height:3px;width:'+barW+'%;background:'+barColor+';border-radius:2px"></div>';
+      html+='</div></div>';
+    });
+    html+='</div>';
+  });
+
+  // Speed of the Week card
+  var spPctNum = parseFloat(String(speedPct).replace('%',''))||0;
+  var spColor = spPctNum>=80?'var(--green-b)':spPctNum>=50?'var(--amber)':'var(--red)';
+  html+='<div style="background:var(--bg2);border:1px solid var(--border);border-top:3px solid var(--amber);border-radius:var(--rl);padding:12px;grid-column:1/-1">';
+  html+='<div style="display:flex;align-items:center;justify-content:space-between">';
+  html+='<div>';
+  html+='<div style="font-size:8px;color:var(--text3);text-transform:uppercase;letter-spacing:1px;font-family:DM Mono,monospace;margin-bottom:4px">⚡ Speed of the Week</div>';
+  html+='<div style="font-family:Barlow Condensed,sans-serif;font-size:36px;font-weight:700;color:var(--amber);line-height:1">'+fmtSC(speedVal)+'<span style="font-size:13px;color:var(--text3);font-family:DM Mono,monospace"> bags/day</span></div>';
+  html+='<div style="font-size:11px;color:'+spColor+';font-family:DM Mono,monospace;margin-top:4px">'+speedPct+' completion</div>';
+  html+='</div>';
+  html+='<div style="text-align:right">';
+  html+='<div style="font-size:9px;color:var(--text3);margin-bottom:4px">vs Target</div>';
+  html+='<div style="font-size:13px;font-family:DM Mono,monospace;color:'+spColor+'">'+speedPct+'</div>';
+  html+='</div></div></div>';
+  html+='</div></div>';
+
+  // ── SECTION 3: Daily Pull-out Table ─────────────────────
+  var TH2='padding:7px 8px;background:var(--bg3);color:var(--text2);font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;border-bottom:1px solid var(--border);white-space:nowrap;text-align:right;';
+  var TD2='padding:5px 8px;font-size:10px;border-bottom:1px solid var(--border);text-align:right;white-space:nowrap;';
+
+  function fmtN2(n){
+    if(!n) return '—';
+    return Math.round(n).toLocaleString();
+  }
+  function pctFmt(v){
+    if(!v) return '—';
+    var s=String(v).trim();
+    var n=parseFloat(s.replace('%',''));
+    if(isNaN(n)) return s;
+    if(n>1) return n.toFixed(0)+'%';
+    return (n*100).toFixed(0)+'%';
+  }
+
+  var weekLabel = 'Wk '+activeWeek;
+
+  html+='<div class="sec"><div class="sec-hdr"><div class="sec-title">Daily Pull-out Detail — '+weekLabel+'</div><div class="sec-line"></div></div>';
+  html+='<div class="cc"><div class="tbl-wrap" style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;min-width:800px">';
+  html+='<thead><tr>';
+  html+='<th style="'+TH2+'text-align:left">Area</th>';
+  ['Mon','Tue','Wed','Thu','Fri','Sat','Sun','Total Pull-out','Target','%'].forEach(function(h){
+    html+='<th style="'+TH2+'">'+h+'</th>';
+  });
+  html+='<th style="'+TH2+'text-align:left">Concerns / Remarks</th>';
+  html+='</tr></thead><tbody>';
+
+  // Region groups
+  var regionOrder = [
+    {name:'LUZON',    color:'#388bfd', sites:['BULACAN','ISABELA']},
+    {name:'VISAYAS',  color:'#3fb950', sites:['HOREB','ARGAO','BACOLOD']},
+    {name:'MINDANAO', color:'#f78166', sites:['BUKID','DAVAO']}
+  ];
+
+  regionOrder.forEach(function(reg){
+    // Region header row
+    html+='<tr><td colspan="12" style="padding:4px 8px;background:'+reg.color+'22;color:'+reg.color+';font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;border-bottom:1px solid var(--border)">'+reg.name+'</td></tr>';
+
+    reg.sites.forEach(function(site, si){
+      var sr = siteRows.filter(function(r){return r.Area.toUpperCase()===site;})[0]||null;
+      if(!sr) return;
+      var bg = si%2===0?'background:var(--bg1)':'background:var(--bg2)';
+      var pctV = pctFmt(sr.PctComp);
+      var pctN = parseFloat(String(pctV).replace('%',''))||0;
+      var pctColor = pctN>=80?'var(--green-b)':pctN>=50?'var(--amber)':'var(--red)';
+      html+='<tr style="'+bg+'">';
+      html+='<td style="'+TD2+'text-align:left;font-weight:600;padding-left:16px">'+sr.Area+'</td>';
+      html+='<td style="'+TD2+'">'+fmtN2(sr.Mon)+'</td>';
+      html+='<td style="'+TD2+'">'+fmtN2(sr.Tue)+'</td>';
+      html+='<td style="'+TD2+'">'+fmtN2(sr.Wed)+'</td>';
+      html+='<td style="'+TD2+'">'+fmtN2(sr.Thu)+'</td>';
+      html+='<td style="'+TD2+'">'+fmtN2(sr.Fri)+'</td>';
+      html+='<td style="'+TD2+'">'+fmtN2(sr.Sat)+'</td>';
+      html+='<td style="'+TD2+'">'+fmtN2(sr.Sun)+'</td>';
+      html+='<td style="'+TD2+'font-weight:600;color:var(--green-b)">'+fmtN2(sr.TotalPull)+'</td>';
+      html+='<td style="'+TD2+'">'+fmtN2(sr.Target)+'</td>';
+      html+='<td style="'+TD2+'color:'+pctColor+';font-weight:600;font-family:DM Mono,monospace">'+pctV+'</td>';
+      html+='<td style="'+TD2+'text-align:left;color:var(--text3);font-size:9px;max-width:200px;white-space:normal">'+(sr.Concerns||'—')+'</td>';
+      html+='</tr>';
+    });
+  });
+
+  // Total row
+  if(totalRow){
+    var tPct = pctFmt(totalRow.PctComp);
+    var tPctN = parseFloat(String(tPct).replace('%',''))||0;
+    var tColor = tPctN>=80?'var(--green-b)':tPctN>=50?'var(--amber)':'var(--red)';
+    html+='<tr style="background:var(--bg3);border-top:2px solid var(--border2)">';
+    html+='<td style="'+TD2+'text-align:left;font-weight:700">TOTAL</td>';
+    ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].forEach(function(d){
+      html+='<td style="'+TD2+'font-weight:700">'+fmtN2(totalRow[d])+'</td>';
+    });
+    html+='<td style="'+TD2+'font-weight:700;color:var(--green-b)">'+fmtN2(totalRow.TotalPull)+'</td>';
+    html+='<td style="'+TD2+'font-weight:700">'+fmtN2(totalRow.Target)+'</td>';
+    html+='<td style="'+TD2+'font-weight:700;color:'+tColor+';font-family:DM Mono,monospace">'+tPct+'</td>';
+    html+='<td style="'+TD2+'"></td>';
+    html+='</tr>';
+  }
+
+  html+='</tbody></table></div></div></div>';
+
   ct.innerHTML = html;
 }
 
