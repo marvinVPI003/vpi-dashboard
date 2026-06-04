@@ -102,7 +102,9 @@ async function loadData(isRefresh) {
     buildNav();
     try{render();}catch(re){console.error('Render error:',re);}
     scheduleRefresh();
-    ['downtime','cost','production','oee','cost_analytics','quality_energy'].forEach(function(tab){
+    // Prefetch monthly data eagerly (needed by Monthly tab and Downtime scorecard)
+    gasGet('monthly').then(function(d){DATA.monthly=d;}).catch(function(){});
+    ['cost','production','oee','cost_analytics','quality_energy'].forEach(function(tab){
       gasGet(tab).then(function(d){DATA[tab]=d;}).catch(function(){});
     });
     gasGet('daily_detail',{site:'National',week:activeWeek}).then(function(d){
@@ -962,7 +964,7 @@ function renderDowntime(){
 
   if(dtWrap) dtWrap.innerHTML='<div class="no-data">⟳ Loading downtime records...</div>';
 
-  gasGet('downtime',{site:activeSite,week:''}).then(function(d){
+  gasGet('downtime',{site:activeSite,week:'',month:''}).then(function(d){
     var dtW=document.getElementById('dt-data-wrap');
     if(!dtW) return;
     DATA.dtLastResponse=d;
@@ -987,23 +989,15 @@ function renderDowntimeTables(d, dtW, filterMonth, filterSite){
   var showMonth = availMonths[availMonths.length-1]||'';
   if(filterMonth && seenMonths[filterMonth.toUpperCase()]) showMonth=filterMonth.toUpperCase();
 
-  // Filter by site AND month
-  var siteFilt = (!filterSite || filterSite==='NATIONAL') ? '' : filterSite.toUpperCase();
+  // Filter by month only - site already filtered server-side by GAS
   var rows=allRows.filter(function(r){
-    var mMatch = r.Month && r.Month.toUpperCase()===showMonth;
-    var sMatch = !siteFilt || (r.Plant||'').toUpperCase()===siteFilt;
-    return mMatch && sMatch;
+    return r.Month && r.Month.toUpperCase()===showMonth;
   });
-
-  if(!rows.length && allRows.length){
-    // Try first available month
-    showMonth = Object.keys(seenMonths)[0]||'';
-    rows=allRows.filter(function(r){return r.Month&&r.Month.toUpperCase()===showMonth;});
-  }
 
   if(!rows.length){
     dtW.innerHTML='<div class="no-data" style="padding:20px">'
-      +'No records found.<br><small style="color:var(--text3)">Total rows: '+allRows.length+'<br>Months in data: '+availMonths.join(', ')+'</small></div>';
+      +'No downtime records for <b>'+showMonth+'</b>.'
+      +'<br><small style="color:var(--text3)">Available months: '+availMonths.join(', ')+'</small></div>';
     return;
   }
 
