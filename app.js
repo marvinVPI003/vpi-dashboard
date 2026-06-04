@@ -1388,12 +1388,13 @@ function renderForecast(){
     html+='<div style="background:var(--bg2);border:1px solid var(--border);border-top:3px solid '+rc.color+';border-radius:var(--rl);padding:12px">';
     html+='<div style="font-family:Barlow Condensed,sans-serif;font-size:14px;font-weight:700;color:'+rc.color+';margin-bottom:10px;letter-spacing:1px">'+reg+'</div>';
 
+    var regTotal = 0;
     rc.sites.forEach(function(site){
       var sr = siteRows.filter(function(r){return r.Area.toUpperCase()===site;})[0]||null;
       var pull = sr?sr.TotalPull:0;
       var tgt  = sr?sr.Target:0;
+      regTotal += pull;
       var pct  = sr?sr.PctComp:'—';
-      // Convert pct if decimal
       if(pct && !isNaN(parseFloat(pct)) && parseFloat(pct)<=1 && parseFloat(pct)>0){
         pct = (parseFloat(pct)*100).toFixed(0)+'%';
       }
@@ -1412,11 +1413,21 @@ function renderForecast(){
       html+='<div style="height:3px;width:'+barW+'%;background:'+barColor+';border-radius:2px"></div>';
       html+='</div></div>';
     });
+    // Region total
+    html+='<div style="border-top:2px solid '+rc.color+';padding-top:8px;margin-top:2px">';
+    html+='<div style="font-size:8px;color:'+rc.color+';text-transform:uppercase;letter-spacing:1px;margin-bottom:2px">'+reg+' Total</div>';
+    html+='<div style="font-family:Barlow Condensed,sans-serif;font-size:26px;font-weight:700;color:'+rc.color+';line-height:1">'+fmtSC(regTotal)+'</div>';
+    html+='</div>';
     html+='</div>';
   });
 
   // Speed of the Week card
-  var spPctNum = parseFloat(String(speedPct).replace('%',''))||0;
+  // Convert speedPct from decimal if needed
+  var spPctStr = speedPct;
+  if(spPctStr && !isNaN(parseFloat(spPctStr)) && parseFloat(spPctStr)<=1 && parseFloat(spPctStr)>0){
+    spPctStr = (parseFloat(spPctStr)*100).toFixed(2)+'%';
+  }
+  var spPctNum = parseFloat(String(spPctStr).replace('%',''))||0;
   var spColor = spPctNum>=80?'var(--green-b)':spPctNum>=50?'var(--amber)':'var(--red)';
   html+='<div style="background:var(--bg2);border:1px solid var(--border);border-top:3px solid var(--amber);border-radius:var(--rl);padding:12px;grid-column:1/-1">';
   html+='<div style="display:flex;align-items:center;justify-content:space-between">';
@@ -1471,6 +1482,17 @@ function renderForecast(){
     // Region header row
     html+='<tr><td colspan="12" style="padding:4px 8px;background:'+reg.color+'22;color:'+reg.color+';font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;border-bottom:1px solid var(--border)">'+reg.name+'</td></tr>';
 
+    // Compute region daily totals
+    var regDayTotals={Mon:0,Tue:0,Wed:0,Thu:0,Fri:0,Sat:0,Sun:0,TotalPull:0,Target:0};
+    reg.sites.forEach(function(site){
+      var sr=siteRows.filter(function(r){return r.Area.toUpperCase()===site;})[0]||null;
+      if(!sr) return;
+      ['Mon','Tue','Wed','Thu','Fri','Sat','Sun','TotalPull','Target'].forEach(function(d){regDayTotals[d]+=(sr[d]||0);});
+    });
+    var regPct = regDayTotals.Target>0?(regDayTotals.TotalPull/regDayTotals.Target*100).toFixed(0)+'%':'—';
+    var regPctN = parseFloat(regPct)||0;
+    var regPctColor = regPctN>=80?'var(--green-b)':regPctN>=50?'var(--amber)':'var(--red)';
+
     reg.sites.forEach(function(site, si){
       var sr = siteRows.filter(function(r){return r.Area.toUpperCase()===site;})[0]||null;
       if(!sr) return;
@@ -1493,6 +1515,18 @@ function renderForecast(){
       html+='<td style="'+TD2+'text-align:left;color:var(--text3);font-size:9px;max-width:200px;white-space:normal">'+(sr.Concerns||'—')+'</td>';
       html+='</tr>';
     });
+
+    // Region subtotal row
+    html+='<tr style="background:'+reg.color+'11;border-top:1px solid '+reg.color+'44">';
+    html+='<td style="'+TD2+'text-align:left;font-weight:700;color:'+reg.color+'">'+reg.name+' TOTAL</td>';
+    ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].forEach(function(d){
+      html+='<td style="'+TD2+'font-weight:700;color:'+reg.color+'">'+fmtN2(regDayTotals[d])+'</td>';
+    });
+    html+='<td style="'+TD2+'font-weight:700;color:var(--green-b)">'+fmtN2(regDayTotals.TotalPull)+'</td>';
+    html+='<td style="'+TD2+'font-weight:700">'+fmtN2(regDayTotals.Target)+'</td>';
+    html+='<td style="'+TD2+'font-weight:700;color:'+regPctColor+';font-family:DM Mono,monospace">'+regPct+'</td>';
+    html+='<td style="'+TD2+'"></td>';
+    html+='</tr>';
   });
 
   // Total row
