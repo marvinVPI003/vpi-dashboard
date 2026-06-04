@@ -1,3 +1,5 @@
+const APP_VERSION = '2.0.'+Date.now();
+console.log('[VPI Dashboard] Version loaded at',new Date().toISOString());
 const GAS = 'https://script.google.com/macros/s/AKfycbznHnsf5gs6NT5Ps4s7PDj1HlbXRjcCF8F0713Q752pGBlBZwPvDVY0Y2zeX2w_5qgrEQ/exec';
 const SITES = ['NATIONAL','AC','PFMIS','HOREB','BUKID','ARGAO','CCPC','SOUTH'];
 const PROD_SITES = ['AC','PFMIS','HOREB','BUKID','ARGAO','CCPC','SOUTH'];
@@ -64,6 +66,7 @@ function fKK(n){return(!n||n===0)?'—':n>=1000000?(n/1000000).toFixed(2)+'M':n>
 function clamp(v,a,b){return Math.max(a,Math.min(b,v));}
 function dot(s){return '<span style="display:inline-block;width:5px;height:5px;border-radius:50%;background:'+(SC[s]||'#8b949e')+';margin-right:5px;vertical-align:middle"></span>';}
 function catCls(c){return DT_CATS[c]||'cat-other';}
+function getVersion(){return '2.0-'+(new Date().toLocaleDateString('en-PH'));}
 function setStatus(s){
   var dot=document.getElementById('status-dot'),txt=document.getElementById('status-txt'),btn=document.getElementById('refresh-btn');
   if(s==='fetching'){dot.className='pulse fetching';txt.textContent='Syncing...';if(btn)btn.disabled=true;}
@@ -97,7 +100,7 @@ async function loadData(isRefresh) {
     var weeks = (weekly.weeks||[]).map(function(w){return +w;}).filter(function(w){return w>0;}).sort(function(a,b){return a-b;});
     if(!isRefresh) activeWeek = weeks[weeks.length-1]||1;
     setStatus('live');
-    document.getElementById('last-updated').textContent = new Date().toLocaleTimeString('en-PH',{hour:'2-digit',minute:'2-digit'});
+    document.getElementById('last-updated').textContent = new Date().toLocaleTimeString('en-PH',{hour:'2-digit',minute:'2-digit'})+' v2.0';
     hideLoading();
     buildNav();
     try{render();}catch(re){console.error('Render error:',re);}
