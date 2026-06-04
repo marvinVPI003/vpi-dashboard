@@ -1422,24 +1422,24 @@ function renderForecast(){
   });
 
   // Speed of the Week card
-  // Convert speedPct from decimal if needed
-  var spPctStr = speedPct;
-  if(spPctStr && !isNaN(parseFloat(spPctStr)) && parseFloat(spPctStr)<=1 && parseFloat(spPctStr)>0){
-    spPctStr = (parseFloat(spPctStr)*100).toFixed(2)+'%';
+  // Convert speedPct from decimal to % if needed
+  var spPctStr = String(speedPct||'');
+  var spPctRaw = parseFloat(spPctStr.replace('%','').trim());
+  if(!isNaN(spPctRaw) && spPctRaw > 0 && spPctRaw <= 1){
+    spPctStr = (spPctRaw*100).toFixed(2)+'%';
+  } else if(!isNaN(spPctRaw)){
+    spPctStr = spPctRaw.toFixed(2)+'%';
   }
-  var spPctNum = parseFloat(String(spPctStr).replace('%',''))||0;
+  var spPctNum = parseFloat(spPctStr)||0;
   var spColor = spPctNum>=80?'var(--green-b)':spPctNum>=50?'var(--amber)':'var(--red)';
-  html+='<div style="background:var(--bg2);border:1px solid var(--border);border-top:3px solid var(--amber);border-radius:var(--rl);padding:12px;grid-column:1/-1">';
-  html+='<div style="display:flex;align-items:center;justify-content:space-between">';
+  html+='<div style="background:var(--bg2);border:1px solid var(--border);border-top:3px solid var(--amber);border-radius:var(--rl);padding:14px;grid-column:1/-1">';
+  html+='<div style="display:flex;align-items:center;gap:24px">';
   html+='<div>';
   html+='<div style="font-size:8px;color:var(--text3);text-transform:uppercase;letter-spacing:1px;font-family:DM Mono,monospace;margin-bottom:4px">⚡ Speed of the Week</div>';
-  html+='<div style="font-family:Barlow Condensed,sans-serif;font-size:36px;font-weight:700;color:var(--amber);line-height:1">'+fmtSC(speedVal)+'<span style="font-size:13px;color:var(--text3);font-family:DM Mono,monospace"> bags/day</span></div>';
-  html+='<div style="font-size:11px;color:'+spColor+';font-family:DM Mono,monospace;margin-top:4px">'+speedPct+' completion</div>';
+  html+='<div style="font-family:Barlow Condensed,sans-serif;font-size:40px;font-weight:700;color:var(--amber);line-height:1">'+fmtSC(speedVal)+'<span style="font-size:14px;color:var(--text3);font-family:DM Mono,monospace;margin-left:4px">tons/day</span></div>';
+  html+='<div style="font-size:12px;color:'+spColor+';font-family:DM Mono,monospace;margin-top:6px;font-weight:600">'+spPctStr+' completion</div>';
   html+='</div>';
-  html+='<div style="text-align:right">';
-  html+='<div style="font-size:9px;color:var(--text3);margin-bottom:4px">vs Target</div>';
-  html+='<div style="font-size:13px;font-family:DM Mono,monospace;color:'+spColor+'">'+speedPct+'</div>';
-  html+='</div></div></div>';
+  html+='</div></div>';
   html+='</div></div>';
 
   // ── SECTION 3: Daily Pull-out Table ─────────────────────
