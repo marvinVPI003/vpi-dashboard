@@ -900,9 +900,9 @@ function renderCost(){
   var vol = totalVol();
   function perTon(v){ return vol>0 ? v/vol : 0; }
 
-  var TH='padding:6px 8px;background:var(--bg3);color:var(--text2);font-size:8px;font-weight:600;text-transform:uppercase;letter-spacing:0.3px;border-bottom:1px solid var(--border);white-space:nowrap;text-align:right;';
-  var TD='padding:5px 8px;font-size:10px;border-bottom:1px solid var(--border);text-align:right;white-space:nowrap;';
-  var TDL='padding:5px 8px;font-size:10px;border-bottom:1px solid var(--border);text-align:left;white-space:nowrap;';
+  var TH='padding:4px 5px;background:var(--bg3);color:var(--text2);font-size:7px;font-weight:600;text-transform:uppercase;letter-spacing:0.2px;border-bottom:1px solid var(--border);white-space:nowrap;text-align:right;line-height:1.2;';
+  var TD='padding:3px 5px;font-size:9px;border-bottom:1px solid var(--border);text-align:right;white-space:nowrap;';
+  var TDL='padding:3px 5px;font-size:9px;border-bottom:1px solid var(--border);text-align:left;white-space:nowrap;';
 
   var html='';
 
@@ -935,21 +935,21 @@ function renderCost(){
     +'</div></div>';
 
   // ── Daily Detail Table ───────────────────────────────────
-  html+='<div class="sec"><div class="sec-hdr"><div class="sec-title">Daily Production Cost Detail</div><div class="sec-line"></div></div>';
-  html+='<div class="cc"><div class="tbl-wrap" style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;min-width:1400px">';
+  html+='<div class="sec"><div class="sec-hdr"><div class="sec-title">Daily Production Cost Detail <span style="font-size:10px;color:var(--text3);font-weight:400">(all values in ₱/ton)</span></div><div class="sec-line"></div></div>';
+  html+='<div class="cc"><div class="tbl-wrap"><table style="width:100%;border-collapse:collapse;table-layout:auto;font-size:9px">';
   html+='<thead><tr>';
   html+='<th style="'+TH+'text-align:left">Date</th>';
   if(activeSite==='NATIONAL') html+='<th style="'+TH+'text-align:left">Plant</th>';
   html+='<th style="'+TH+'">Volume</th>';
-  [['Rental','RentalTon'],['Spareparts','SPTon'],['Manpower Direct','MPTon'],
+  [['Rental','RentalTon'],['Spareparts','SPTon'],['Manpower','MPTon'],
    ['Power','PowerTon'],['Fuel','FuelTon'],['Coal','CoalTon'],
-   ['Agency Manpower','AgencyTon'],['Others','OthersTon']
+   ['Agency MP','AgencyTon'],['Others','OthersTon']
   ].forEach(function(pair){
-    html+='<th style="'+TH+'">'+pair[0]+'<br><span style="font-size:7px;opacity:.7">cost/ton</span></th>';
+    html+='<th style="'+TH+'">'+pair[0]+'</th>';
   });
-  html+='<th style="'+TH+'">Fixed/ton</th>';
-  html+='<th style="'+TH+'">Variable/ton</th>';
-  html+='<th style="'+TH+'">Cost/ton</th>';
+  html+='<th style="'+TH+'">Fixed</th>';
+  html+='<th style="'+TH+'">Variable</th>';
+  html+='<th style="'+TH+'background:var(--bg2);color:var(--amber)">Total</th>';
   html+='</tr></thead><tbody>';
 
   rows.forEach(function(r,i){
