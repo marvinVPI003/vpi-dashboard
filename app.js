@@ -859,7 +859,147 @@ function renderMonthly(){
     {label:'Target 85%',data:months.map(function(){return 85;}),borderColor:'rgba(63,185,80,0.5)',borderDash:[4,4],borderWidth:1.5,pointRadius:0,fill:false}
   ]},options:{responsive:true,maintainAspectRatio:false,animation:{duration:200},plugins:{legend:{display:true,labels:{color:'#8b949e',font:{size:9},boxWidth:10}},tooltip:mTip},scales:{x:sc,y:{grid:{color:gc},ticks:{color:'#484f58',font:{size:9},callback:function(v){return v+'%';}},min:0,max:120}}}});
 }
-function renderCost(){var ct=document.getElementById('content-cost');if(!DATA.cost){ct.innerHTML='<div class="no-data">⟳ Loading...</div>';gasGet('cost').then(function(d){DATA.cost=d;renderCost();}).catch(function(e){ct.innerHTML='<div class="no-data">Error: '+e.message+'</div>';});return;}ct.innerHTML='<div class="no-data">Cost data loaded — '+( DATA.cost.rows||[]).length+' rows</div>';}
+function renderCost(){
+  var ct=document.getElementById('content-cost');
+  if(!ct) return;
+
+  if(!DATA.pcdaily || DATA.pcdailyWeek!==activeWeek || DATA.pcdailySite!==activeSite){
+    ct.innerHTML='<div class="no-data">⟳ Loading cost data...</div>';
+    gasGet('pcdaily',{site:activeSite,week:activeWeek}).then(function(d){
+      DATA.pcdaily=d;
+      DATA.pcdailyWeek=activeWeek;
+      DATA.pcdailySite=activeSite;
+      renderCost();
+    }).catch(function(e){
+      ct.innerHTML='<div class="no-data" style="color:var(--red)">Error: '+e.message+'</div>';
+    });
+    return;
+  }
+
+  var rows = DATA.pcdaily.rows||[];
+  if(!rows.length){
+    ct.innerHTML='<div class="no-data">No cost data for '+(activeSite==='NATIONAL'?'National':SL[activeSite])+' · Week '+activeWeek+'</div>';
+    return;
+  }
+
+  // ── Helpers ──────────────────────────────────────────────
+  function fmt0(n){ if(!n&&n!==0) return '—'; return Math.round(n).toLocaleString(); }
+  function fmt2(n){ if(!n&&n!==0) return '—'; return n.toFixed(2); }
+  function fmtPeso(n){ if(!n&&n!==0) return '—'; return '₱'+Math.round(n).toLocaleString(); }
+
+  // ── Aggregate for weekly summary (sum cost/day fields, avg cost/ton) ─
+  function sumF(f){ return rows.reduce(function(a,r){return a+(r[f]||0);},0); }
+  function totalVol(){ return sumF('TotalVolume'); }
+
+  var sums = {
+    RentalDay: sumF('RentalDay'), SPDay: sumF('SPDay'), MPDay: sumF('MPDay'),
+    PowerCost: sumF('PowerCost'), FuelCost: sumF('FuelCost'), CoalCost: sumF('CoalCost'),
+    AgencyTotal: sumF('AgencyTotal'), OthersDay: sumF('OthersDay'),
+    FixedTotal: sumF('FixedTotal'), VarTotal: sumF('VarTotal'), CostTotal: sumF('CostTotal')
+  };
+  var vol = totalVol();
+  function perTon(v){ return vol>0 ? v/vol : 0; }
+
+  var TH='padding:6px 8px;background:var(--bg3);color:var(--text2);font-size:8px;font-weight:600;text-transform:uppercase;letter-spacing:0.3px;border-bottom:1px solid var(--border);white-space:nowrap;text-align:right;';
+  var TD='padding:5px 8px;font-size:10px;border-bottom:1px solid var(--border);text-align:right;white-space:nowrap;';
+  var TDL='padding:5px 8px;font-size:10px;border-bottom:1px solid var(--border);text-align:left;white-space:nowrap;';
+
+  var html='';
+
+  // ── Weekly Summary Scorecard ─────────────────────────────
+  function scCard(label,dayVal,tonVal,color){
+    return '<div style="background:var(--bg2);border:1px solid var(--border);border-top:2px solid '+(color||'var(--border2)')+';border-radius:var(--rl);padding:10px;flex:1;min-width:0">'
+      +'<div style="font-size:8px;color:var(--text3);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px;white-space:nowrap">'+label+'</div>'
+      +'<div style="font-family:Barlow Condensed,sans-serif;font-size:18px;font-weight:700;color:var(--text1);line-height:1">'+fmtPeso(dayVal)+'</div>'
+      +'<div style="font-size:9px;color:var(--text3);font-family:DM Mono,monospace;margin-top:2px">₱'+fmt2(tonVal)+'/ton</div>'
+      +'</div>';
+  }
+
+  html+='<div class="sec"><div class="sec-hdr"><div class="sec-title">Production Cost — Weekly Summary · '+(activeSite==='NATIONAL'?'National':SL[activeSite])+' · Week '+activeWeek+'</div><div class="sec-line"></div></div>';
+
+  html+='<div style="display:flex;gap:6px;flex-wrap:nowrap;overflow-x:auto;margin-bottom:8px">'
+    +scCard('Rental',sums.RentalDay,perTon(sums.RentalDay))
+    +scCard('Spareparts',sums.SPDay,perTon(sums.SPDay))
+    +scCard('Manpower Direct',sums.MPDay,perTon(sums.MPDay))
+    +scCard('Power',sums.PowerCost,perTon(sums.PowerCost))
+    +scCard('Fuel',sums.FuelCost,perTon(sums.FuelCost))
+    +scCard('Coal',sums.CoalCost,perTon(sums.CoalCost))
+    +scCard('Agency Manpower',sums.AgencyTotal,perTon(sums.AgencyTotal))
+    +scCard('Others',sums.OthersDay,perTon(sums.OthersDay))
+    +'</div>';
+
+  html+='<div style="display:flex;gap:6px;flex-wrap:nowrap;overflow-x:auto">'
+    +scCard('Total Fixed Cost',sums.FixedTotal,perTon(sums.FixedTotal),'var(--amber)')
+    +scCard('Total Variable Cost',sums.VarTotal,perTon(sums.VarTotal),'var(--amber)')
+    +scCard('Total Cost',sums.CostTotal,perTon(sums.CostTotal),'var(--red)')
+    +'</div></div>';
+
+  // ── Daily Detail Table ───────────────────────────────────
+  html+='<div class="sec"><div class="sec-hdr"><div class="sec-title">Daily Production Cost Detail</div><div class="sec-line"></div></div>';
+  html+='<div class="cc"><div class="tbl-wrap" style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;min-width:1400px">';
+  html+='<thead><tr>';
+  html+='<th style="'+TH+'text-align:left">Date</th>';
+  if(activeSite==='NATIONAL') html+='<th style="'+TH+'text-align:left">Plant</th>';
+  html+='<th style="'+TH+'">Volume</th>';
+  [['Rental','RentalDay','RentalTon'],['Spareparts','SPDay','SPTon'],['Manpower Direct','MPDay','MPTon'],
+   ['Power','PowerCost','PowerTon'],['Fuel','FuelCost','FuelTon'],['Coal','CoalCost','CoalTon'],
+   ['Agency Manpower','AgencyTotal','AgencyTon'],['Others','OthersDay','OthersTon']
+  ].forEach(function(pair){
+    html+='<th style="'+TH+'">'+pair[0]+'<br><span style="font-size:7px;opacity:.7">cost/day</span></th>';
+    html+='<th style="'+TH+'">'+pair[0]+'<br><span style="font-size:7px;opacity:.7">cost/ton</span></th>';
+  });
+  html+='<th style="'+TH+'">Total Fixed</th><th style="'+TH+'">Fixed/ton</th>';
+  html+='<th style="'+TH+'">Total Variable</th><th style="'+TH+'">Variable/ton</th>';
+  html+='<th style="'+TH+'">Total Cost</th><th style="'+TH+'">Cost/ton</th>';
+  html+='</tr></thead><tbody>';
+
+  rows.forEach(function(r,i){
+    var bg = i%2===0?'background:var(--bg1)':'background:var(--bg2)';
+    html+='<tr style="'+bg+'">';
+    html+='<td style="'+TDL+bg+'">'+(r.Date||'—')+'</td>';
+    if(activeSite==='NATIONAL') html+='<td style="'+TDL+bg+'">'+dot(r.Plant)+r.Plant+'</td>';
+    html+='<td style="'+TD+bg+'">'+fmt0(r.TotalVolume)+'</td>';
+    [['RentalDay','RentalTon'],['SPDay','SPTon'],['MPDay','MPTon'],
+     ['PowerCost','PowerTon'],['FuelCost','FuelTon'],['CoalCost','CoalTon'],
+     ['AgencyTotal','AgencyTon'],['OthersDay','OthersTon']
+    ].forEach(function(pair){
+      html+='<td style="'+TD+bg+'">'+fmt0(r[pair[0]])+'</td>';
+      html+='<td style="'+TD+bg+'color:var(--text3)">'+fmt2(r[pair[1]])+'</td>';
+    });
+    html+='<td style="'+TD+bg+'font-weight:600">'+fmt0(r.FixedTotal)+'</td>';
+    html+='<td style="'+TD+bg+'color:var(--text3)">'+fmt2(r.FixedTon)+'</td>';
+    html+='<td style="'+TD+bg+'font-weight:600">'+fmt0(r.VarTotal)+'</td>';
+    html+='<td style="'+TD+bg+'color:var(--text3)">'+fmt2(r.VarTon)+'</td>';
+    html+='<td style="'+TD+bg+'font-weight:700;color:var(--red)">'+fmt0(r.CostTotal)+'</td>';
+    html+='<td style="'+TD+bg+'color:var(--amber);font-weight:600">'+fmt2(r.CostTon)+'</td>';
+    html+='</tr>';
+  });
+
+  // Weekly total row
+  html+='<tr style="background:var(--bg3);border-top:2px solid var(--border2)">';
+  html+='<td style="'+TDL+'font-weight:700">WEEKLY TOTAL</td>';
+  if(activeSite==='NATIONAL') html+='<td style="'+TDL+'"></td>';
+  html+='<td style="'+TD+'font-weight:700">'+fmt0(vol)+'</td>';
+  [['RentalDay','RentalTon'],['SPDay','SPTon'],['MPDay','MPTon'],
+   ['PowerCost','PowerTon'],['FuelCost','FuelTon'],['CoalCost','CoalTon'],
+   ['AgencyTotal','AgencyTon'],['OthersDay','OthersTon']
+  ].forEach(function(pair){
+    var dsum = sums[pair[0]]!==undefined?sums[pair[0]]:sumF(pair[0]);
+    html+='<td style="'+TD+'font-weight:700">'+fmt0(dsum)+'</td>';
+    html+='<td style="'+TD+'color:var(--text3);font-weight:700">'+fmt2(perTon(dsum))+'</td>';
+  });
+  html+='<td style="'+TD+'font-weight:700">'+fmt0(sums.FixedTotal)+'</td>';
+  html+='<td style="'+TD+'color:var(--text3);font-weight:700">'+fmt2(perTon(sums.FixedTotal))+'</td>';
+  html+='<td style="'+TD+'font-weight:700">'+fmt0(sums.VarTotal)+'</td>';
+  html+='<td style="'+TD+'color:var(--text3);font-weight:700">'+fmt2(perTon(sums.VarTotal))+'</td>';
+  html+='<td style="'+TD+'font-weight:700;color:var(--red)">'+fmt0(sums.CostTotal)+'</td>';
+  html+='<td style="'+TD+'color:var(--amber);font-weight:700">'+fmt2(perTon(sums.CostTotal))+'</td>';
+  html+='</tr>';
+
+  html+='</tbody></table></div></div></div>';
+
+  ct.innerHTML = html;
+}
 function renderDowntimeMonth(m){
   // Always re-render everything with new month
   activeMonth=m;
