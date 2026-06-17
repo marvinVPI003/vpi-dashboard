@@ -941,16 +941,15 @@ function renderCost(){
   html+='<th style="'+TH+'text-align:left">Date</th>';
   if(activeSite==='NATIONAL') html+='<th style="'+TH+'text-align:left">Plant</th>';
   html+='<th style="'+TH+'">Volume</th>';
-  [['Rental','RentalDay','RentalTon'],['Spareparts','SPDay','SPTon'],['Manpower Direct','MPDay','MPTon'],
-   ['Power','PowerCost','PowerTon'],['Fuel','FuelCost','FuelTon'],['Coal','CoalCost','CoalTon'],
-   ['Agency Manpower','AgencyTotal','AgencyTon'],['Others','OthersDay','OthersTon']
+  [['Rental','RentalTon'],['Spareparts','SPTon'],['Manpower Direct','MPTon'],
+   ['Power','PowerTon'],['Fuel','FuelTon'],['Coal','CoalTon'],
+   ['Agency Manpower','AgencyTon'],['Others','OthersTon']
   ].forEach(function(pair){
-    html+='<th style="'+TH+'">'+pair[0]+'<br><span style="font-size:7px;opacity:.7">cost/day</span></th>';
     html+='<th style="'+TH+'">'+pair[0]+'<br><span style="font-size:7px;opacity:.7">cost/ton</span></th>';
   });
-  html+='<th style="'+TH+'">Total Fixed</th><th style="'+TH+'">Fixed/ton</th>';
-  html+='<th style="'+TH+'">Total Variable</th><th style="'+TH+'">Variable/ton</th>';
-  html+='<th style="'+TH+'">Total Cost</th><th style="'+TH+'">Cost/ton</th>';
+  html+='<th style="'+TH+'">Fixed/ton</th>';
+  html+='<th style="'+TH+'">Variable/ton</th>';
+  html+='<th style="'+TH+'">Cost/ton</th>';
   html+='</tr></thead><tbody>';
 
   rows.forEach(function(r,i){
@@ -959,18 +958,14 @@ function renderCost(){
     html+='<td style="'+TDL+bg+'">'+(r.Date||'—')+'</td>';
     if(activeSite==='NATIONAL') html+='<td style="'+TDL+bg+'">'+dot(r.Plant)+r.Plant+'</td>';
     html+='<td style="'+TD+bg+'">'+fmt0(r.TotalVolume)+'</td>';
-    [['RentalDay','RentalTon'],['SPDay','SPTon'],['MPDay','MPTon'],
-     ['PowerCost','PowerTon'],['FuelCost','FuelTon'],['CoalCost','CoalTon'],
-     ['AgencyTotal','AgencyTon'],['OthersDay','OthersTon']
+    [['RentalTon'],['SPTon'],['MPTon'],
+     ['PowerTon'],['FuelTon'],['CoalTon'],
+     ['AgencyTon'],['OthersTon']
     ].forEach(function(pair){
-      html+='<td style="'+TD+bg+'">'+fmt0(r[pair[0]])+'</td>';
-      html+='<td style="'+TD+bg+'color:var(--text3)">'+fmt2(r[pair[1]])+'</td>';
+      html+='<td style="'+TD+bg+'">'+fmt2(r[pair[0]])+'</td>';
     });
-    html+='<td style="'+TD+bg+'font-weight:600">'+fmt0(r.FixedTotal)+'</td>';
     html+='<td style="'+TD+bg+'color:var(--text3)">'+fmt2(r.FixedTon)+'</td>';
-    html+='<td style="'+TD+bg+'font-weight:600">'+fmt0(r.VarTotal)+'</td>';
     html+='<td style="'+TD+bg+'color:var(--text3)">'+fmt2(r.VarTon)+'</td>';
-    html+='<td style="'+TD+bg+'font-weight:700;color:var(--red)">'+fmt0(r.CostTotal)+'</td>';
     html+='<td style="'+TD+bg+'color:var(--amber);font-weight:600">'+fmt2(r.CostTon)+'</td>';
     html+='</tr>';
   });
@@ -980,19 +975,15 @@ function renderCost(){
   html+='<td style="'+TDL+'font-weight:700">WEEKLY TOTAL</td>';
   if(activeSite==='NATIONAL') html+='<td style="'+TDL+'"></td>';
   html+='<td style="'+TD+'font-weight:700">'+fmt0(vol)+'</td>';
-  [['RentalDay','RentalTon'],['SPDay','SPTon'],['MPDay','MPTon'],
-   ['PowerCost','PowerTon'],['FuelCost','FuelTon'],['CoalCost','CoalTon'],
-   ['AgencyTotal','AgencyTon'],['OthersDay','OthersTon']
+  [['RentalDay'],['SPDay'],['MPDay'],
+   ['PowerCost'],['FuelCost'],['CoalCost'],
+   ['AgencyTotal'],['OthersDay']
   ].forEach(function(pair){
     var dsum = sums[pair[0]]!==undefined?sums[pair[0]]:sumF(pair[0]);
-    html+='<td style="'+TD+'font-weight:700">'+fmt0(dsum)+'</td>';
     html+='<td style="'+TD+'color:var(--text3);font-weight:700">'+fmt2(perTon(dsum))+'</td>';
   });
-  html+='<td style="'+TD+'font-weight:700">'+fmt0(sums.FixedTotal)+'</td>';
   html+='<td style="'+TD+'color:var(--text3);font-weight:700">'+fmt2(perTon(sums.FixedTotal))+'</td>';
-  html+='<td style="'+TD+'font-weight:700">'+fmt0(sums.VarTotal)+'</td>';
   html+='<td style="'+TD+'color:var(--text3);font-weight:700">'+fmt2(perTon(sums.VarTotal))+'</td>';
-  html+='<td style="'+TD+'font-weight:700;color:var(--red)">'+fmt0(sums.CostTotal)+'</td>';
   html+='<td style="'+TD+'color:var(--amber);font-weight:700">'+fmt2(perTon(sums.CostTotal))+'</td>';
   html+='</tr>';
 
