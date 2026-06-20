@@ -185,6 +185,7 @@ function buildWeeklyReportDoc(d){
   }
   function subHeading(text){ return new D.Paragraph({heading: D.HeadingLevel.HEADING_2, children:[new D.TextRun(text)]}); }
   function bodyText(text, opts){ opts=opts||{}; return new D.Paragraph({spacing:{after:120}, children:[new D.TextRun({text:text, italics:opts.italics||false, bold:opts.bold||false, size:20})]}); }
+  function bullet(text){ return new D.Paragraph({numbering:{reference:"bullets", level:0}, spacing:{after:60}, children:[new D.TextRun({text:text, size:20})]}); }
 
   var siteRows = (d.siteRows||[]).map(function(r){
     var output = r['Total Plant Output,mt']||0;
@@ -251,6 +252,106 @@ function buildWeeklyReportDoc(d){
   if(prevUdt) summaryText += (natUdt<=prevUdt?", an improvement of ":", an increase of ")+fmtN(Math.abs(natUdt-prevUdt),1)+" hours vs. the prior week";
   summaryText += ". Production cost averaged \u20b1"+fmtN(avgCostTon,0)+"/ton for the week.";
 
+  // ── COMMENT GENERATION ──────────────────────────────────
+  var rawSiteRows = d.siteRows||[];
+
+  // 1. Production Performance comments
+  var prodComments = [];
+  if(prevOutput && natOutput!==undefined){
+    var outChange = parseFloat(pctChange(natOutput, prevOutput));
+    prodComments.push("National attainment was "+(attainPct>=0.98?'strong':attainPct>=0.9?'solid':'soft')+" at "+pct(attainPct)+" of plan, "+(outChange>=0?'up':'down')+" "+Math.abs(outChange).toFixed(1)+"% vs. the prior week.");
+  }
+  var sortedByOee = rawSiteRows.filter(function(r){return r.OEE!==undefined && r.OEE!==null && r.OEE!=='';}).sort(function(a,b){return a.OEE-b.OEE;});
+  if(sortedByOee.length){
+    var worstOee = sortedByOee[0];
+    var bestOee = sortedByOee[sortedByOee.length-1];
+    if(worstOee.OEE < 0.85){
+      prodComments.push(worstOee.Plant+" posted the lowest OEE this week at "+pct(worstOee.OEE)+(((worstOee['Unscheduled Down Time, hr']||0)>15)?", consistent with its elevated downtime hours.":".") );
+    }
+    if(bestOee.OEE >= 0.9 && bestOee.Plant!==worstOee.Plant){
+      prodComments.push(bestOee.Plant+" led the network on OEE at "+pct(bestOee.OEE)+".");
+    }
+  }
+  var sortedByUdt = rawSiteRows.slice().sort(function(a,b){return (b['Unscheduled Down Time, hr']||0)-(a['Unscheduled Down Time, hr']||0);});
+  if(sortedByUdt.length && (sortedByUdt[0]['Unscheduled Down Time, hr']||0) > 15){
+    prodComments.push(sortedByUdt[0].Plant+" carried the heaviest unscheduled downtime load at "+fmtN(sortedByUdt[0]['Unscheduled Down Time, hr'],1)+" hrs \u2014 worth a closer look at root causes.");
+  }
+  var noOeeSites = rawSiteRows.filter(function(r){return r.OEE===undefined||r.OEE===null||r.OEE==='';});
+  if(noOeeSites.length){
+    prodComments.push(noOeeSites.map(function(r){return r.Plant;}).join(', ')+" "+(noOeeSites.length>1?'have':'has')+" no OEE figure logged for the week \u2014 recommend confirming data entry is current.");
+  }
+  if(!prodComments.length) prodComments.push("Production performance was broadly in line with plan across all sites this week.");
+
+  // 2. Downtime comments
+  var dtComments = [];
+  if((d.topCats||[]).length){
+    var top3Cats = d.topCats.slice(0,3).map(function(c){return c.cat;}).join(', ');
+    dtComments.push("The leading downtime categories this week were "+top3Cats+".");
+  }
+  if((d.topPlants||[]).length){
+    var worstPlant = d.topPlants[0];
+    var totalUdtAll = d.topPlants.reduce(function(a,p){return a+p.hrs;},0);
+    var sharePct = totalUdtAll>0 ? (worstPlant.hrs/totalUdtAll*100).toFixed(0) : 0;
+    dtComments.push(worstPlant.plant+" accounted for the largest share of logged unscheduled downtime ("+fmtN(worstPlant.hrs,1)+" hrs, ~"+sharePct+"% of the network total).");
+  }
+  var mechCat = (d.topCats||[]).filter(function(c){return /mechanical/i.test(c.cat);})[0];
+  var whCat = (d.topCats||[]).filter(function(c){return /warehouse/i.test(c.cat);})[0];
+  if(mechCat) dtComments.push("Mechanical issues ("+fmtN(mechCat.hrs,1)+" hrs) point to equipment reliability as a recurring theme rather than isolated incidents \u2014 a focused maintenance review may help.");
+  if(whCat) dtComments.push("Warehouse-related delays ("+fmtN(whCat.hrs,1)+" hrs) suggest logistics/FG handling capacity, not production itself, is constraining throughput at the affected sites.");
+  if(!dtComments.length) dtComments.push("No significant downtime patterns were logged for the week.");
+
+  // 3. Forecast comments
+  var fcComments = [];
+  var natRemDays = d.fNat.RemDays;
+  if(natRemDays!==undefined){
+    fcComments.push("National remaining-days against forecast is "+natRemDays.toFixed(1)+" \u2014 "+(natRemDays<0?'the current pace is behind what\u2019s needed to hit the month-end target.':'the network is tracking ahead of pace to hit the month-end target.'));
+  }
+  var areasOnly = (d.fAreas||[]).filter(function(a){return a.Area!=='NATIONAL';});
+  if(areasOnly.length){
+    var worstArea = areasOnly.slice().sort(function(a,b){return (a.RemDays||0)-(b.RemDays||0);})[0];
+    var bestArea = areasOnly.slice().sort(function(a,b){return (b.RemDays||0)-(a.RemDays||0);})[0];
+    if(worstArea) fcComments.push(worstArea.Area+" is furthest behind forecast at "+(worstArea.RemDays!==undefined?worstArea.RemDays.toFixed(1):'\u2014')+" remaining days \u2014 the area needing the most attention this week.");
+    if(bestArea && bestArea.Area!==worstArea.Area) fcComments.push(bestArea.Area+" is closest to (or ahead of) pace at "+(bestArea.RemDays!==undefined?bestArea.RemDays.toFixed(1):'\u2014')+" remaining days.");
+  }
+  if(!fcComments.length) fcComments.push("Forecast data was not available to generate area-level commentary this week.");
+
+  // 4. Cost comments
+  var costComments = [];
+  var sortedCostCats = costCats.map(function(c){
+    var vals = (d.cRows||[]).map(function(r){return r[c.field]||0;}).filter(function(v){return v>0;});
+    var avg = vals.length ? vals.reduce(function(a,b){return a+b;},0)/vals.length : 0;
+    return {name:c.name, avg:avg};
+  }).sort(function(a,b){return b.avg-a.avg;});
+  if(sortedCostCats.length && avgCostTon>0){
+    var topDriver = sortedCostCats[0];
+    var topShare = (topDriver.avg/avgCostTon*100).toFixed(0);
+    costComments.push(topDriver.name+" is the largest cost driver at \u20b1"+fmtN(topDriver.avg,0)+"/ton (~"+topShare+"% of total cost/ton).");
+  }
+  if(d.cRows && d.cRows.length>1){
+    var byVol = d.cRows.slice().sort(function(a,b){return (b.TotalVolume||0)-(a.TotalVolume||0);});
+    var hiVolDay = byVol[0], loVolDay = byVol[byVol.length-1];
+    if(hiVolDay && loVolDay && hiVolDay.Date!==loVolDay.Date){
+      costComments.push("Cost/ton ranged from \u20b1"+fmtN(loVolDay.CostTon||0,0)+" on the highest-volume day ("+fmtN(hiVolDay.TotalVolume,0)+" mt) to \u20b1"+fmtN(hiVolDay.CostTon||0,0)+" \u2014 reinforcing that volume, not input cost inflation, is the main driver of daily cost/ton variance.");
+    }
+  }
+  var fixedShare = (d.totalFixed+d.totalVar)>0 ? d.totalFixed/(d.totalFixed+d.totalVar)*100 : 0;
+  costComments.push("Fixed costs made up "+fixedShare.toFixed(0)+"% of total cost this week \u2014 "+(fixedShare>55?'higher fixed-cost leverage means cost/ton is especially sensitive to volume swings.':'a relatively balanced fixed/variable cost split.'));
+  if(!costComments.length) costComments.push("Cost data was not available to generate commentary this week.");
+
+  // 5. Priorities for the week ahead
+  var priorities = [];
+  if(sortedByUdt.length && (sortedByUdt[0]['Unscheduled Down Time, hr']||0) > 15){
+    priorities.push(sortedByUdt[0].Plant+": schedule a focused downtime review \u2014 this was the heaviest UDT site this week and is dragging both OEE and output attainment.");
+  }
+  if(areasOnly.length){
+    var worstAreaP = areasOnly.slice().sort(function(a,b){return (a.RemDays||0)-(b.RemDays||0);})[0];
+    if(worstAreaP && worstAreaP.RemDays<0) priorities.push("Close the pull-out gap in "+worstAreaP.Area+" \u2014 currently "+worstAreaP.RemDays.toFixed(1)+" remaining days behind forecast pace.");
+  }
+  if(whCat) priorities.push("Address warehouse/FG handling bottlenecks at the affected sites so plant output isn't capped by downstream logistics.");
+  if(noOeeSites.length) priorities.push("Confirm "+noOeeSites.map(function(r){return r.Plant;}).join(', ')+" downtime/OEE data entry is current so performance can be tracked alongside the rest of the network.");
+  if(!priorities.length) priorities.push("Maintain current performance levels \u2014 no major red flags identified this week.");
+
+
   var children = [
     new D.Paragraph({ alignment: D.AlignmentType.CENTER, spacing:{after:60}, children:[new D.TextRun({text:"VPI OPERATIONS WEEKLY REPORT", bold:true, size:36, color:navy})]}),
     new D.Paragraph({ alignment: D.AlignmentType.CENTER, spacing:{after:60}, children:[new D.TextRun({text: weekLabel, size:24, color:"555555"})]}),
@@ -265,6 +366,8 @@ function buildWeeklyReportDoc(d){
     ].concat(siteRows).concat([
       dataRow(["NATIONAL", fmtN(natOutput,1), fmtN(natPlanned,1), pct(attainPct), natOee?pct(natOee):'N/A', fmtN(natUdt,1)], [1800,1300,1300,1180,1300,1300], {fill:lightBlue, bold:true})
     ])}),
+    subHeading("Comments"),
+  ].concat(prodComments.map(bullet)).concat([
 
     subHeading("Downtime by Category (Top Contributors)"),
     new D.Table({ width:{size:9180,type:D.WidthType.DXA}, columnWidths:[6885,2295], rows: [
@@ -275,21 +378,30 @@ function buildWeeklyReportDoc(d){
     new D.Table({ width:{size:9180,type:D.WidthType.DXA}, columnWidths:[6885,2295], rows: [
       headerRow(["Plant","Total UDT"], [6885,2295])
     ].concat(plantUdtRows.length?plantUdtRows:[dataRow(["No data logged",""],[6885,2295])])}),
+    subHeading("Comments"),
+  ]).concat(dtComments.map(bullet)).concat([
 
     sectionHeading("2. Forecast & CSD Pull-Out"),
     bodyText("National MTD pull-out stands at "+pesoM(d.fNat.MTDPullout)+" against a "+pesoM(d.fNat.Forecast)+" forecast ("+pct(parseFloat(d.fNat.MTDPct)||0)+" complete), due "+(d.fNat.DueDate||'\u2014')+"."),
     new D.Table({ width:{size:9180,type:D.WidthType.DXA}, columnWidths:[1800,1800,1800,1890,1890], rows: [
       headerRow(["Area","Forecast","MTD Pull-out","MTD %","Rem. Days"], [1800,1800,1800,1890,1890])
     ].concat(areaRows)}),
+    subHeading("Comments"),
+  ]).concat(fcComments.map(bullet)).concat([
 
     sectionHeading("3. Production Cost"),
     bodyText("National production cost for the week averaged \u20b1"+fmtN(avgCostTon,0)+"/ton across "+fmtN(d.totalVol,1)+" mt produced. Total fixed cost: \u20b1"+fmtN(d.totalFixed,0)+" ("+fmtN(d.totalVol>0?d.totalFixed/d.totalVol:0,2)+"/ton). Total variable cost: \u20b1"+fmtN(d.totalVar,0)+" ("+fmtN(d.totalVol>0?d.totalVar/d.totalVol:0,2)+"/ton)."),
     new D.Table({ width:{size:9180,type:D.WidthType.DXA}, columnWidths:[3060,3060,3060], rows: [
       headerRow(["Cost Component","Avg \u20b1/ton","Share of Total"], [3060,3060,3060])
     ].concat(costRows)}),
+    subHeading("Comments"),
+  ]).concat(costComments.map(bullet)).concat([
+
+    sectionHeading("4. Priorities for the Week Ahead"),
+  ]).concat(priorities.map(bullet)).concat([
 
     new D.Paragraph({ spacing:{before:300}, alignment:D.AlignmentType.CENTER, children:[new D.TextRun({text:"\u2014 End of Report \u2014", italics:true, size:18, color:"808080"})]})
-  ];
+  ]);
 
   return new D.Document({
     styles: {
