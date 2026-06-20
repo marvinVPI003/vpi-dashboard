@@ -1603,7 +1603,50 @@ function renderDowntimeTables(d, dtW, filterMonth, filterSite){
     +'</tr>'
     +'</tbody></table></div></div></div>';
 
-  // 3. All UDT table
+  // 2b. Top 10 UDT Reasons — vertical bar chart + table
+  var top10 = rows.filter(function(r){return r['Unscheduled Downtime']>0;})
+    .map(function(r){
+      return {
+        Plant: r.Plant||'',
+        Category: r.Category||'',
+        SubCategory: r['Sub-Category']||'',
+        Reason: r['Reason of Delay']||r['Sub-Category']||r.Category||'—',
+        UDT: r['Unscheduled Downtime']
+      };
+    })
+    .sort(function(a,b){return b.UDT-a.UDT;})
+    .slice(0,10);
+  var top10Total = top10.reduce(function(a,r){return a+r.UDT;},0);
+
+  html+='<div class="sec"><div class="sec-hdr"><div class="sec-title">Top 10 UDT Reasons (hrs) — '+showMonth+'</div><div class="sec-line"></div></div>'
+    +'<div class="g2">'
+    // Left: vertical bar chart
+    +'<div class="cc"><div class="cc-title">Top 10 by Hours</div>'
+    +'<div style="position:relative;height:320px"><canvas id="dt-top10-chart"></canvas></div></div>'
+    // Right: ranked table
+    +'<div class="cc"><div class="cc-title">Top 10 Detail</div>'
+    +'<div class="tbl-wrap" style="max-height:320px;overflow-y:auto"><table style="width:100%;border-collapse:collapse">'
+    +'<thead><tr>'
+    +'<th style="'+TH+'text-align:left">#</th>'
+    +'<th style="'+TH+'text-align:left">Plant</th>'
+    +'<th style="'+TH+'text-align:left">Reason</th>'
+    +'<th style="'+TH+'text-align:right">UDT hr</th>'
+    +'</tr></thead><tbody>'
+    +(top10.length?top10.map(function(r,i){
+      return '<tr style="background:'+(i%2===0?'var(--bg1)':'var(--bg2)')+'">'
+        +'<td style="'+TD+'color:var(--text3)">'+(i+1)+'</td>'
+        +'<td style="'+TD+'font-weight:600">'+dot(r.Plant)+r.Plant+'</td>'
+        +'<td style="'+TD+'"><span style="max-width:180px;display:inline-block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+r.Reason.replace(/"/g,'&quot;')+'">'+r.Reason+'</span></td>'
+        +'<td style="'+TD+'text-align:right;font-family:DM Mono,monospace;font-weight:600;color:var(--red)">'+r.UDT.toFixed(2)+'</td>'
+        +'</tr>';
+    }).join(''):'<tr><td colspan="4" style="'+TD+'text-align:center;color:var(--text3)">No records</td></tr>')
+    +'</tbody>'
+    +(top10.length?'<tfoot><tr style="background:var(--bg3);border-top:2px solid var(--border)">'
+      +'<td colspan="3" style="'+TD+'text-align:right;font-weight:700">TOP 10 TOTAL</td>'
+      +'<td style="'+TD+'text-align:right;font-family:DM Mono,monospace;font-weight:700;color:var(--red)">'+top10Total.toFixed(2)+'</td>'
+      +'</tr></tfoot>':'')
+    +'</table></div></div>'
+    +'</div></div>';
   html+='<div class="sec"><div class="sec-hdr"><div class="sec-title">All Unscheduled Downtime Records</div><div class="sec-line"></div></div>'
     +tbl('UDT Records',[
       {h:'Plant',fn:function(r){return dot(r.Plant||'')+' '+(r.Plant||'—');}},
@@ -1679,6 +1722,42 @@ function renderDowntimeTables(d, dtW, filterMonth, filterSite){
           y1:{position:'right',grid:{display:false},
               ticks:{color:'#484f58',font:{size:9},callback:function(v){return v+'%';}},
               min:0,max:100}
+        }
+      }
+    });
+  }
+
+  // ── Render Top 10 UDT Reasons Chart (vertical bars) ──────
+  var ctx10=document.getElementById('dt-top10-chart');
+  if(ctx10){
+    if(charts['dt-top10']){try{charts['dt-top10'].destroy();}catch(e){}}
+    charts['dt-top10']=new Chart(ctx10.getContext('2d'),{
+      type:'bar',
+      data:{
+        labels: top10.map(function(r){
+          var lbl = r.Plant+': '+r.Reason;
+          return lbl.length>28 ? lbl.slice(0,28)+'…' : lbl;
+        }),
+        datasets:[{
+          label:'UDT hrs',
+          data: top10.map(function(r){return +r.UDT.toFixed(2);}),
+          backgroundColor:'rgba(248,81,73,0.65)',
+          borderRadius:3
+        }]
+      },
+      options:{
+        indexAxis:'y',
+        responsive:true,maintainAspectRatio:false,animation:{duration:200},
+        plugins:{
+          legend:{display:false},
+          tooltip:{backgroundColor:'#1f2631',borderColor:'rgba(255,255,255,.1)',borderWidth:1,
+            bodyFont:{family:"'DM Mono',monospace",size:10},
+            callbacks:{label:function(ctx){return ctx.parsed.x.toFixed(2)+' hrs';}}}
+        },
+        scales:{
+          x:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'#484f58',font:{size:9}},
+             title:{display:true,text:'Hours',color:'#484f58',font:{size:9}}},
+          y:{grid:{display:false},ticks:{color:'#8b949e',font:{size:9}}}
         }
       }
     });
