@@ -1603,24 +1603,26 @@ function renderDowntimeTables(d, dtW, filterMonth, filterSite){
     +'</tr>'
     +'</tbody></table></div></div></div>';
 
-  // 2b. Top 10 UDT Reasons — vertical bar chart + table
-  var top10 = rows.filter(function(r){return r['Unscheduled Downtime']>0;})
-    .map(function(r){
-      return {
-        Plant: r.Plant||'',
-        Category: r.Category||'',
-        SubCategory: r['Sub-Category']||'',
-        Reason: r['Reason of Delay']||r['Sub-Category']||r.Category||'—',
-        UDT: r['Unscheduled Downtime']
-      };
-    })
+  // 2b. Top 10 UDT Sub-Categories — summed across month
+  var top10Map = {};
+  rows.filter(function(r){return r['Unscheduled Downtime']>0;}).forEach(function(r){
+    var k = (r.Plant||'')+'||'+(r['Sub-Category']||r.Category||'—');
+    if(!top10Map[k]) top10Map[k] = {
+      Plant: r.Plant||'',
+      Category: r.Category||'',
+      SubCategory: r['Sub-Category']||r.Category||'—',
+      UDT: 0
+    };
+    top10Map[k].UDT += r['Unscheduled Downtime'];
+  });
+  var top10 = Object.keys(top10Map).map(function(k){return top10Map[k];})
     .sort(function(a,b){return b.UDT-a.UDT;})
     .slice(0,10);
   var top10Total = top10.reduce(function(a,r){return a+r.UDT;},0);
 
-  html+='<div class="sec"><div class="sec-hdr"><div class="sec-title">Top 10 UDT Reasons (hrs) — '+showMonth+'</div><div class="sec-line"></div></div>'
+  html+='<div class="sec"><div class="sec-hdr"><div class="sec-title">Top 10 UDT Sub-Categories (hrs) — '+showMonth+'</div><div class="sec-line"></div></div>'
     +'<div class="g2">'
-    // Left: vertical bar chart
+    // Left: horizontal bar chart
     +'<div class="cc"><div class="cc-title">Top 10 by Hours</div>'
     +'<div style="position:relative;height:320px"><canvas id="dt-top10-chart"></canvas></div></div>'
     // Right: ranked table
@@ -1629,14 +1631,14 @@ function renderDowntimeTables(d, dtW, filterMonth, filterSite){
     +'<thead><tr>'
     +'<th style="'+TH+'text-align:left">#</th>'
     +'<th style="'+TH+'text-align:left">Plant</th>'
-    +'<th style="'+TH+'text-align:left">Reason</th>'
+    +'<th style="'+TH+'text-align:left">Sub-Category</th>'
     +'<th style="'+TH+'text-align:right">UDT hr</th>'
     +'</tr></thead><tbody>'
     +(top10.length?top10.map(function(r,i){
       return '<tr style="background:'+(i%2===0?'var(--bg1)':'var(--bg2)')+'">'
         +'<td style="'+TD+'color:var(--text3)">'+(i+1)+'</td>'
         +'<td style="'+TD+'font-weight:600">'+dot(r.Plant)+r.Plant+'</td>'
-        +'<td style="'+TD+'"><span style="max-width:180px;display:inline-block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+r.Reason.replace(/"/g,'&quot;')+'">'+r.Reason+'</span></td>'
+        +'<td style="'+TD+'"><span style="max-width:180px;display:inline-block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+r.SubCategory.replace(/"/g,'&quot;')+'">'+r.SubCategory+'</span></td>'
         +'<td style="'+TD+'text-align:right;font-family:DM Mono,monospace;font-weight:600;color:var(--red)">'+r.UDT.toFixed(2)+'</td>'
         +'</tr>';
     }).join(''):'<tr><td colspan="4" style="'+TD+'text-align:center;color:var(--text3)">No records</td></tr>')
@@ -1727,7 +1729,7 @@ function renderDowntimeTables(d, dtW, filterMonth, filterSite){
     });
   }
 
-  // ── Render Top 10 UDT Reasons Chart (vertical bars) ──────
+  // ── Render Top 10 UDT Sub-Categories Chart (horizontal bars) ──
   var ctx10=document.getElementById('dt-top10-chart');
   if(ctx10){
     if(charts['dt-top10']){try{charts['dt-top10'].destroy();}catch(e){}}
@@ -1735,7 +1737,7 @@ function renderDowntimeTables(d, dtW, filterMonth, filterSite){
       type:'bar',
       data:{
         labels: top10.map(function(r){
-          var lbl = r.Plant+': '+r.Reason;
+          var lbl = r.Plant+': '+r.SubCategory;
           return lbl.length>28 ? lbl.slice(0,28)+'…' : lbl;
         }),
         datasets:[{
