@@ -662,6 +662,31 @@ function render(){
     +'<div class="kc-val" style="font-size:20px;color:'+(rmvws*100<0?'var(--red)':'var(--green-b)')+'">'+(rmvws!==0?(rmvws*100>=0?'+':'')+(rmvws*100).toFixed(3)+'%':'—')+'</div></div>'
     +'</div>';
   })()
+  // Rejection Rate scorecard — 3-up (Total Remill / Outright / Other)
+  +(function(){
+    var rejRate=kpiRows.length?kpiRows.reduce(function(a,r){return a+gf(r,'Rejection Rate, %');},0)/kpiRows.length:0;
+    var rejQty=kpiRows.reduce(function(a,r){return a+gf(r,'Total Remill Reject, mt');},0);
+    var outRate=kpiRows.length?kpiRows.reduce(function(a,r){return a+gf(r,'Outright Reject Rate, %');},0)/kpiRows.length:0;
+    var outQty=kpiRows.reduce(function(a,r){return a+gf(r,'Outright Reject, mt');},0);
+    var othRate=kpiRows.length?kpiRows.reduce(function(a,r){return a+gf(r,'Other Reject Rate, %');},0)/kpiRows.length:0;
+    var othQty=kpiRows.reduce(function(a,r){return a+gf(r,'Other Reject, mt');},0);
+    function pct(p){ return p>1 ? p : p*100; }
+    function seg(label,rate,qty,color){
+      return '<div style="flex:1;text-align:center;padding:0 8px">'
+        +'<div style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:5px">'+label+'</div>'
+        +'<div style="font-family:Barlow Condensed,sans-serif;font-size:24px;font-weight:700;color:'+color+';line-height:1">'+pct(rate).toFixed(2)+'%</div>'
+        +'<div style="font-size:10px;color:var(--text2);margin-top:3px;font-family:DM Mono,monospace">'+qty.toFixed(2)+' mt</div>'
+        +'</div>';
+    }
+    return '<div class="sec"><div class="sec-hdr"><div class="sec-title">Rejection Rate — '+(activeSite==='NATIONAL'?'National':SL[activeSite])+' · Week '+activeWeek+'</div><div class="sec-line"></div></div>'
+    +'<div class="cc" style="display:flex;align-items:stretch">'
+    +seg('Rejection Rate', rejRate, rejQty, 'var(--red)')
+    +'<div style="width:1px;background:var(--border);margin:0 2px"></div>'
+    +seg('Outright Reject', outRate, outQty, 'var(--amber)')
+    +'<div style="width:1px;background:var(--border);margin:0 2px"></div>'
+    +seg('Other Reject', othRate, othQty, 'var(--purple)')
+    +'</div></div>';
+  })()
   // Operational KPI Trends section with all 6 charts
   +'<div class="sec"><div class="sec-hdr"><div class="sec-title">Operational KPI Trends — '+(activeSite==='NATIONAL'?'National':SL[activeSite])+'</div><div class="sec-line"></div></div>'
   +'<div class="g2" style="margin-bottom:8px">'
@@ -675,6 +700,10 @@ function render(){
   +'<div class="g2">'
   +'<div class="cc"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><div class="cc-title" style="margin-bottom:0">Fuel L/ton (Limit: 3.5)</div><div id="fuel-status"></div></div><div style="position:relative;height:160px"><canvas id="c-fuel-trend"></canvas></div></div>'
   +'<div class="cc"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><div class="cc-title" style="margin-bottom:0">Coal kg/ton (Limit: 12)</div><div id="coal-status"></div></div><div style="position:relative;height:160px"><canvas id="c-coal-trend"></canvas></div></div>'
+  +'</div>'
+  +'<div class="g2">'
+  +'<div class="cc"><div class="cc-title">Rejection Rate — % &amp; Qty (mt)</div><div style="position:relative;height:160px"><canvas id="c-reject-combo"></canvas></div></div>'
+  +'<div class="cc"><div class="cc-title">Outright vs Other Reject — % Trend</div><div style="position:relative;height:160px"><canvas id="c-reject-pct"></canvas></div></div>'
   +'</div></div>'
   +'<div class="sec"><div class="sec-hdr"><div class="sec-title">'+(activeSite==='NATIONAL'?'Site Summary — Week '+activeWeek:SL[activeSite]+' · Daily Detail — Week '+activeWeek)+'</div><div class="sec-line"></div></div>'
   +'<div class="cc" id="detail-table-wrap">'
@@ -767,6 +796,41 @@ function render(){
     {label:'kg/ton',data:coalData,borderColor:'#8b949e',backgroundColor:'rgba(139,148,158,0.08)',fill:true,tension:.3,pointRadius:4,spanGaps:true,pointBackgroundColor:coalData.map(function(v){return ptC(v,LIMITS.COAL_TON);})},
     {label:'Limit 12',data:allWeeks.map(function(){return LIMITS.COAL_TON;}),borderColor:'rgba(248,81,73,0.5)',borderDash:[4,4],borderWidth:1.5,pointRadius:0,fill:false}
   ],{plugins:{legend:{display:true,labels:{color:'#8b949e',font:{size:9},boxWidth:10}},tooltip:{backgroundColor:'#1f2631',borderColor:'rgba(255,255,255,.1)',borderWidth:1,bodyFont:{family:"'DM Mono',monospace",size:10}}}});
+
+  // ── Rejection Rate combo chart (qty bars + rate % line) ──
+  var rejQtyData=allWeeks.map(function(w){
+    var wr=rows.filter(function(r){return +(r.Week||r.week||0)===+w&&sf(r);});
+    return +wr.reduce(function(a,r){return a+gf(r,'Total Remill Reject, mt');},0).toFixed(2);
+  });
+  var rejRateData=allWeeks.map(function(w){
+    var r=kpiWkRows.find(function(x){return +(x.Week||x.week||0)===+w;});
+    if(!r) return null;
+    var p=gf(r,'Rejection Rate, %');
+    return +(p>1?p:p*100).toFixed(2);
+  });
+  var rejCanvas=document.getElementById('c-reject-combo');
+  if(rejCanvas){charts['c-reject-combo']=new Chart(rejCanvas.getContext('2d'),{data:{labels:lbl,datasets:[
+    {type:'bar',label:'Reject Qty (mt)',data:rejQtyData,backgroundColor:'rgba(56,139,253,0.45)',borderRadius:3,yAxisID:'y'},
+    {type:'line',label:'Rejection Rate %',data:rejRateData,borderColor:'#f85149',backgroundColor:'transparent',tension:.3,pointRadius:4,pointBackgroundColor:'#f85149',spanGaps:true,yAxisID:'y1'}
+  ]},options:{responsive:true,maintainAspectRatio:false,animation:{duration:200},plugins:{legend:{display:true,labels:{color:'#8b949e',font:{size:9},boxWidth:10}},tooltip:{backgroundColor:'#1f2631',borderColor:'rgba(255,255,255,.1)',borderWidth:1,bodyFont:{family:"'DM Mono',monospace",size:10}}},scales:{x:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'#484f58',font:{size:9}}},y:{position:'left',grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'#484f58',font:{size:9}},title:{display:true,text:'mt',color:'#484f58',font:{size:9}}},y1:{position:'right',grid:{display:false},ticks:{color:'#484f58',font:{size:9},callback:function(v){return v+'%';}},title:{display:true,text:'Rate %',color:'#484f58',font:{size:9}}}}}});}
+
+  // ── Outright vs Other Reject % trend (line only) ──
+  var outrightPctData=allWeeks.map(function(w){
+    var r=kpiWkRows.find(function(x){return +(x.Week||x.week||0)===+w;});
+    if(!r) return null;
+    var p=gf(r,'Outright Reject Rate, %');
+    return +(p>1?p:p*100).toFixed(2);
+  });
+  var otherPctData=allWeeks.map(function(w){
+    var r=kpiWkRows.find(function(x){return +(x.Week||x.week||0)===+w;});
+    if(!r) return null;
+    var p=gf(r,'Other Reject Rate, %');
+    return +(p>1?p:p*100).toFixed(2);
+  });
+  mkChart('c-reject-pct','line',lbl,[
+    {label:'Outright Reject %',data:outrightPctData,borderColor:'#d29922',backgroundColor:'rgba(210,153,34,0.08)',fill:false,tension:.3,pointRadius:4,spanGaps:true},
+    {label:'Other Reject %',data:otherPctData,borderColor:'#a371f7',backgroundColor:'rgba(163,113,247,0.08)',fill:false,tension:.3,pointRadius:4,spanGaps:true}
+  ],{plugins:{legend:{display:true,labels:{color:'#8b949e',font:{size:9},boxWidth:10}},tooltip:{backgroundColor:'#1f2631',borderColor:'rgba(255,255,255,.1)',borderWidth:1,bodyFont:{family:"'DM Mono',monospace",size:10}}},scales:{y:{ticks:{callback:function(v){return v+'%';}}}}});
 }
 function buildDailyChart(){
   var dRows=(DATA.daily_detail&&DATA.daily_detail.rows||[]).filter(function(r){
