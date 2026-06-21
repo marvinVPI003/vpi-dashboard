@@ -678,7 +678,7 @@ function render(){
         +'<div style="font-size:10px;color:var(--text2);margin-top:3px;font-family:DM Mono,monospace">'+qty.toFixed(2)+' mt</div>'
         +'</div>';
     }
-    return '<div class="sec"><div class="sec-hdr"><div class="sec-title">Rejection Rate — '+(activeSite==='NATIONAL'?'National':SL[activeSite])+' · Week '+activeWeek+'</div><div class="sec-line"></div></div>'
+    return '<div class="sec">'
     +'<div class="cc" style="display:flex;align-items:stretch">'
     +seg('Rejection Rate', rejRate, rejQty, 'var(--red)')
     +'<div style="width:1px;background:var(--border);margin:0 2px"></div>'
@@ -869,7 +869,7 @@ function buildDailyChart(){
 function buildNatTable(wkRows){
   var siteRows=wkRows.filter(function(r){return (r.Plant||r.plant||'').toUpperCase()!=='NATIONAL';});
   if(!siteRows.length)return '<div class="no-data">No data</div>';
-  return '<div class="tbl-wrap"><table><thead><tr><th>Site</th><th>Output mt</th><th>PDR t/day</th><th>Cap Util%</th><th>SDT Hr</th><th>UDT Hr</th><th>OEE%</th><th>kWh/ton</th><th>Fuel L/ton</th><th>Coal kg/ton</th><th>RM Var%</th><th>RM Var w/o Sacks%</th></tr></thead><tbody>'
+  return '<div class="tbl-wrap"><table><thead><tr><th>Site</th><th>Output mt</th><th>PDR t/day</th><th>Cap Util%</th><th>SDT Hr</th><th>UDT Hr</th><th>OEE%</th><th>kWh/ton</th><th>Fuel L/ton</th><th>Coal kg/ton</th><th>RM Var%</th><th>RM Var w/o Sacks%</th><th>Rejection Rate%</th></tr></thead><tbody>'
   +siteRows.map(function(r){
     var s=(r.Plant||r.plant||'').toString().toUpperCase();
     var out=gf(r,'Total Plant Output,mt w/o toll','Total Plant Output,mt');
@@ -881,6 +881,7 @@ function buildNatTable(wkRows){
     var kwh=gf(r,'kWh/ton');var fuel=gf(r,'Li/ton');var coal=gf(r,'kg/ton');
     var rmvR=gf(r,'RM Variance, %');var rmv=rmvR*100;
     var rmvwR=gf(r,'RM Variance (w/o used sacks), %');var rmvw=rmvwR*100;
+    var rejR=gf(r,'Rejection Rate, %');var rej=(rejR>1?rejR:rejR*100);
     return '<tr><td>'+dot(s)+(SL[s]||s)+'</td>'
       +'<td>'+(out>0?out.toFixed(1):'—')+'</td>'
       +'<td>'+(pdr>0?pdr.toFixed(2):'—')+'</td>'
@@ -893,6 +894,7 @@ function buildNatTable(wkRows){
       +'<td>'+(coal>0?coal.toFixed(2):'—')+'</td>'
       +'<td class="'+(rmv<0?'tr':rmv>0?'tg':'')+'">'+(rmvR!==0?rmv.toFixed(3)+'%':'—')+'</td>'
       +'<td class="'+(rmvw<0?'tr':rmvw>0?'tg':'')+'">'+(rmvwR!==0?rmvw.toFixed(3)+'%':'—')+'</td>'
+      +'<td class="'+(rej>1?'tr':rej>0.3?'ta':'')+'">'+(rejR!==0?rej.toFixed(2)+'%':'—')+'</td>'
       +'</tr>';
   }).join('')+'</tbody></table></div>';
 }
