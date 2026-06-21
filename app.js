@@ -1082,7 +1082,7 @@ function renderMonthly(){
     +'</div>'
     +'<div class="g2" style="margin-top:8px">'
     +'<div class="cc"><div class="cc-title">Rejection Rate — Qty (mt) &amp; % by Month</div><div style="position:relative;height:160px"><canvas id="cm-reject"></canvas></div></div>'
-    +'<div class="cc"><div class="cc-title">National W/ Toll Cost — Total (₱) &amp; ₱/ton by Month</div><div style="position:relative;height:160px"><canvas id="cm-cost"></canvas></div></div>'
+    +'<div class="cc"><div class="cc-title">National W/ Toll Cost — Total (₱) &amp; ₱/kg by Month</div><div style="position:relative;height:160px"><canvas id="cm-cost"></canvas></div></div>'
     +'</div></div>';
   // ── PROJECTED VOLUME TABLE ─────────────────────────────
   // Remaining days = calendar days in month - days elapsed
@@ -1281,12 +1281,23 @@ function renderMonthly(){
 
   // ── Rejection Rate combo chart (qty bars + rate % line) ──
   var rejQtyMonth=perMonth('Total Remill Reject, mt');
-  var rejRateMonth=avgPerMonth('Rejection Rate, %').map(function(v){return v?(Math.abs(v)>1?v:v*100):null;});
+  var rejRateMonth=months.map(function(m){
+    var mr=rows.filter(function(r){
+      var p=(r.Plant||'').toUpperCase();
+      var match=activeSite==='NATIONAL'?p==='NATIONAL':p===activeSite;
+      return match&&String(r.MONTH||r.Month||'').trim()===m;
+    });
+    if(!mr.length) return null;
+    var v=mr.reduce(function(a,r){return a+gf(r,'Rejection Rate, %');},0)/mr.length;
+    if(v===0) return null;
+    var pctVal=Math.abs(v)>1?v:v*100;
+    return +pctVal.toFixed(3);
+  });
   var rejC=document.getElementById('cm-reject');
   if(rejC){charts['cm-reject']=new Chart(rejC.getContext('2d'),{data:{labels:mLabels,datasets:[
     {type:'bar',label:'Reject Qty (mt)',data:rejQtyMonth,backgroundColor:'rgba(56,139,253,0.45)',borderRadius:3,yAxisID:'y'},
     {type:'line',label:'Rejection Rate %',data:rejRateMonth,borderColor:'#f85149',backgroundColor:'transparent',tension:.3,pointRadius:4,pointBackgroundColor:'#f85149',spanGaps:true,yAxisID:'y1'}
-  ]},options:{responsive:true,maintainAspectRatio:false,animation:{duration:200},plugins:{legend:{display:true,labels:{color:'#8b949e',font:{size:9},boxWidth:10}},tooltip:mTip},scales:{x:sc,y:{position:'left',grid:{color:gc},ticks:{color:'#484f58',font:{size:9}},title:{display:true,text:'mt',color:'#484f58',font:{size:9}}},y1:{position:'right',grid:{display:false},ticks:{color:'#484f58',font:{size:9},callback:function(v){return v+'%';}},title:{display:true,text:'Rate %',color:'#484f58',font:{size:9}}}}}});}
+  ]},options:{responsive:true,maintainAspectRatio:false,animation:{duration:200},plugins:{legend:{display:true,labels:{color:'#8b949e',font:{size:9},boxWidth:10}},tooltip:{backgroundColor:'#1f2631',borderColor:'rgba(255,255,255,.1)',borderWidth:1,bodyFont:{family:"'DM Mono',monospace",size:10},callbacks:{label:function(ctx){if(ctx.dataset.yAxisID==='y1')return ctx.dataset.label+': '+ctx.parsed.y.toFixed(3)+'%';return ctx.dataset.label+': '+ctx.parsed.y.toFixed(2)+' mt';}}}},scales:{x:sc,y:{position:'left',grid:{color:gc},ticks:{color:'#484f58',font:{size:9}},title:{display:true,text:'mt',color:'#484f58',font:{size:9}},beginAtZero:true,min:0},y1:{position:'right',grid:{display:false},beginAtZero:true,min:0,ticks:{color:'#484f58',font:{size:9},callback:function(v){return v.toFixed(2)+'%';}},title:{display:true,text:'Rate %',color:'#484f58',font:{size:9}}}}}});}
 
   // ── National W/ Toll Cost combo chart (₱/ton line + total ₱ bar) — from Prod Cost sheet ──
   (function(){
