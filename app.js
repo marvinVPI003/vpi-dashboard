@@ -1094,7 +1094,7 @@ function renderMonthly(){
         +'</tr>';
     }).join('')
     +'</tbody></table></div></div></div>';
-  ct.innerHTML=(activeSite==='NATIONAL'?scorecard:'')+kpiCards+kpiCards2+chartSection+projTable;
+  ct.innerHTML=(activeSite==='NATIONAL'?scorecard:'')+kpiCards+kpiCards2+chartSection+projTable+'<div id="prodcost-section"><div class="no-data">⟳ Loading monthly production cost...</div></div>';
   // ── RENDER MONTHLY CHARTS ───────────────────────────────
   ['cm-out','cm-udt','cm-kwh','cm-fuel','cm-coal','cm-cu'].forEach(function(id){
     if(charts[id]){try{charts[id].destroy();}catch(e){}}
@@ -1201,6 +1201,7 @@ function renderMonthly(){
      pointBackgroundColor:oeeMonthData.map(function(v){return !v?'grey':v>=85?'#3fb950':v>=70?'#d29922':'#f85149';})},
     {label:'Target 85%',data:months.map(function(){return 85;}),borderColor:'rgba(63,185,80,0.5)',borderDash:[4,4],borderWidth:1.5,pointRadius:0,fill:false}
   ]},options:{responsive:true,maintainAspectRatio:false,animation:{duration:200},plugins:{legend:{display:true,labels:{color:'#8b949e',font:{size:9},boxWidth:10}},tooltip:mTip},scales:{x:sc,y:{grid:{color:gc},ticks:{color:'#484f58',font:{size:9},callback:function(v){return v+'%';}},min:0,max:120}}}});
+  loadProdCostMonthly();
 }
 // ── Monthly Production Cost (Prod Cost sheet, published CSV) ──
 var PRODCOST_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRRx7S_rqgygPQifVep4DtnDFK8gGjAPVbrzCq6sCJcTF6omIGXb73iK8mQZoZjOgUq8CnZ9t7fR_2a/pub?gid=66553768&single=true&output=csv';
@@ -1270,22 +1271,11 @@ function renderProdCostMonthly(){
       iSPDep=idx('SP DEPRECIATION'), iIns=idx('Insurance Personnel'), iWater=idx('WATER'),
       iThread=idx('THREAD'), iToll=idx('TOLLING FEE'), iTotal=idx('Total Cost'), iCpk=idx('Cost, Php/kg');
 
-  // Determine which month to show: use activeMonth global if valid AND has data, else latest 2026 month with non-zero NATIONAL cost
+  // Determine which month to show: directly follow the Monthly tab's selected month
   var allMonths = ['JANUARY','FEBRUARY','MARCH','APRIL','MAY','JUNE','JULY','AUGUST','SEPTEMBER','OCTOBER','NOVEMBER','DECEMBER'];
-
-  function nationalCostFor(monthName){
-    for(var i=1;i<rowsRaw.length;i++){
-      var r=rowsRaw[i];
-      if(r[iYear]==='2026' && (r[iPlant]||'').trim()==='NATIONAL' && (r[iMonth]||'').toUpperCase()===monthName){
-        return pcNum(r[iTotal]);
-      }
-    }
-    return 0;
-  }
-
   var wantMonth = (activeMonth||'').toUpperCase();
-  if(allMonths.indexOf(wantMonth)<0 || nationalCostFor(wantMonth)===0){
-    // fall back: find latest 2026 month present in the sheet that actually has cost data
+  if(allMonths.indexOf(wantMonth)<0){
+    // no month selected yet (e.g. first load before pills initialize) — use latest month with data as a sane default
     var monthsWithData=[];
     for(var i=1;i<rowsRaw.length;i++){
       var r=rowsRaw[i];
@@ -1324,6 +1314,10 @@ function renderProdCostMonthly(){
 
   if(!national){
     target.innerHTML='<div class="no-data">No monthly production cost data found for '+wantMonth+' 2026</div>';
+    return;
+  }
+  if(national.totalCost===0){
+    target.innerHTML='<div class="no-data">Production cost data for '+wantMonth+' 2026 has not been entered yet</div>';
     return;
   }
 
@@ -1457,9 +1451,6 @@ function renderCost(){
     +scCard('Total Cost',sums.CostTotal,perTon(sums.CostTotal),'var(--red)')
     +'</div></div>';
 
-  // ── Monthly Production Cost (Prod Cost sheet, by site) ───
-  html+='<div id="prodcost-section"><div class="no-data">⟳ Loading monthly production cost...</div></div>';
-
   // ── Daily Detail Table ───────────────────────────────────
   html+='<div class="sec"><div class="sec-hdr"><div class="sec-title">Daily Production Cost Detail <span style="font-size:10px;color:var(--text3);font-weight:400">(all values in ₱/ton)</span></div><div class="sec-line"></div></div>';
   html+='<div class="cc"><div class="tbl-wrap"><table style="width:100%;border-collapse:collapse;table-layout:auto;font-size:9px">';
@@ -1516,7 +1507,6 @@ function renderCost(){
   html+='</tbody></table></div></div></div>';
 
   ct.innerHTML = html;
-  loadProdCostMonthly();
 }
 function renderDowntimeMonth(m){
   // Always re-render everything with new month
