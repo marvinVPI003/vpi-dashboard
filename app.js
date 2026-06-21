@@ -1526,19 +1526,24 @@ function loadCostWeeklyTrend(){
   if(!allWeeks.length) return;
 
   if(!DATA.costWeeklyTrend) DATA.costWeeklyTrend={};
-  var missing=allWeeks.filter(function(w){return !DATA.costWeeklyTrend[w];});
+  if(!DATA.costWeeklyTrend[activeSite]) DATA.costWeeklyTrend[activeSite]={};
+  var siteCache=DATA.costWeeklyTrend[activeSite];
+  var missing=allWeeks.filter(function(w){return !siteCache[w];});
+  var _site=activeSite;
 
   if(missing.length){
     Promise.all(missing.map(function(w){
-      return gasGet('pcdaily',{site:'NATIONAL',week:w}).then(function(d){
-        var rows=(d.rows||[]).filter(function(r){return (r.Plant||'').toUpperCase()==='NATIONAL';});
+      return gasGet('pcdaily',{site:_site,week:w}).then(function(d){
+        var rows=(d.rows||[]).filter(function(r){return (r.Plant||'').toUpperCase()===_site;});
         var sum=function(f){return rows.reduce(function(a,r){return a+(r[f]||0);},0);};
-        DATA.costWeeklyTrend[w]={
+        siteCache[w]={
           vol: sum('TotalVolume'), total: sum('CostTotal'),
           fixed: sum('FixedTotal'), variable: sum('VarTotal')
         };
-      }).catch(function(){ DATA.costWeeklyTrend[w]=null; });
-    })).then(renderCostWeeklyTrend);
+      }).catch(function(){ siteCache[w]=null; });
+    })).then(function(){
+      if(activeSite===_site) renderCostWeeklyTrend();
+    });
   } else {
     renderCostWeeklyTrend();
   }
@@ -1547,15 +1552,22 @@ function loadCostWeeklyTrend(){
 function renderCostWeeklyTrend(){
   var allWeeks=(DATA.weekly&&DATA.weekly.weeks||[]).map(function(w){return +w;}).filter(function(w){return w>0;}).sort(function(a,b){return a-b;});
   if(!allWeeks.length) return;
+  var siteCache=(DATA.costWeeklyTrend&&DATA.costWeeklyTrend[activeSite])||{};
   var lbl=allWeeks.map(function(w){return 'W'+w;});
-  var totalData=allWeeks.map(function(w){var d=DATA.costWeeklyTrend[w];return d&&d.total>0?+d.total.toFixed(0):null;});
-  var perTonData=allWeeks.map(function(w){var d=DATA.costWeeklyTrend[w];return d&&d.vol>0?+(d.total/d.vol).toFixed(2):null;});
-  var fixedData=allWeeks.map(function(w){var d=DATA.costWeeklyTrend[w];return d&&d.fixed>0?+d.fixed.toFixed(0):null;});
-  var varData=allWeeks.map(function(w){var d=DATA.costWeeklyTrend[w];return d&&d.variable>0?+d.variable.toFixed(0):null;});
+  var totalData=allWeeks.map(function(w){var d=siteCache[w];return d&&d.total>0?+d.total.toFixed(0):null;});
+  var perTonData=allWeeks.map(function(w){var d=siteCache[w];return d&&d.vol>0?+(d.total/d.vol).toFixed(2):null;});
+  var fixedData=allWeeks.map(function(w){var d=siteCache[w];return d&&d.fixed>0?+d.fixed.toFixed(0):null;});
+  var varData=allWeeks.map(function(w){var d=siteCache[w];return d&&d.variable>0?+d.variable.toFixed(0):null;});
 
   var gc='rgba(255,255,255,0.04)';
   var sc={grid:{color:gc},ticks:{color:'#484f58',font:{size:9,family:"'DM Mono',monospace"}}};
   var tip={backgroundColor:'#1f2631',borderColor:'rgba(255,255,255,.1)',borderWidth:1,bodyFont:{family:"'DM Mono',monospace",size:10}};
+  var siteLbl=activeSite==='NATIONAL'?'National':SL[activeSite];
+
+  var comboTitle=document.querySelector('#c-cost-combo')&&document.querySelector('#c-cost-combo').closest('.cc').querySelector('.cc-title');
+  if(comboTitle) comboTitle.textContent=siteLbl+' Total Cost (₱) & ₱/ton — by Week';
+  var fvTitle=document.querySelector('#c-cost-fixvar')&&document.querySelector('#c-cost-fixvar').closest('.cc').querySelector('.cc-title');
+  if(fvTitle) fvTitle.textContent=siteLbl+' Fixed vs Variable Cost (₱) — by Week';
 
   var comboC=document.getElementById('c-cost-combo');
   if(comboC){
@@ -1652,7 +1664,7 @@ function renderCost(){
     +'</div></div>';
 
   // ── Weekly Cost Trend Charts (National, all weeks) ───────
-  html+='<div class="sec"><div class="sec-hdr"><div class="sec-title">National Weekly Cost Trend</div><div class="sec-line"></div></div>'
+  html+='<div class="sec"><div class="sec-hdr"><div class="sec-title">'+(activeSite==='NATIONAL'?'National':SL[activeSite])+' Weekly Cost Trend</div><div class="sec-line"></div></div>'
     +'<div class="g2">'
     +'<div class="cc"><div class="cc-title">Total Cost (₱) &amp; ₱/ton — by Week</div><div style="position:relative;height:160px"><canvas id="c-cost-combo"></canvas></div></div>'
     +'<div class="cc"><div class="cc-title">Fixed vs Variable Cost (₱) — by Week</div><div style="position:relative;height:160px"><canvas id="c-cost-fixvar"></canvas></div></div>'
