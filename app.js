@@ -1082,7 +1082,7 @@ function renderMonthly(){
     +'</div>'
     +'<div class="g2" style="margin-top:8px">'
     +'<div class="cc"><div class="cc-title">Rejection Rate — Qty (mt) &amp; % by Month</div><div style="position:relative;height:160px"><canvas id="cm-reject"></canvas></div></div>'
-    +'<div class="cc"><div class="cc-title">National W/ Toll Cost — Total (₱) &amp; ₱/kg by Month</div><div style="position:relative;height:160px"><canvas id="cm-cost"></canvas></div></div>'
+    +'<div class="cc"><div class="cc-title">Cost — Total (₱) &amp; ₱/kg by Month</div><div style="position:relative;height:160px"><canvas id="cm-cost"></canvas></div></div>'
     +'</div></div>';
   // ── PROJECTED VOLUME TABLE ─────────────────────────────
   // Remaining days = calendar days in month - days elapsed
@@ -1299,7 +1299,7 @@ function renderMonthly(){
     {type:'line',label:'Rejection Rate %',data:rejRateMonth,borderColor:'#f85149',backgroundColor:'transparent',tension:.3,pointRadius:4,pointBackgroundColor:'#f85149',spanGaps:true,yAxisID:'y1'}
   ]},options:{responsive:true,maintainAspectRatio:false,animation:{duration:200},plugins:{legend:{display:true,labels:{color:'#8b949e',font:{size:9},boxWidth:10}},tooltip:{backgroundColor:'#1f2631',borderColor:'rgba(255,255,255,.1)',borderWidth:1,bodyFont:{family:"'DM Mono',monospace",size:10},callbacks:{label:function(ctx){if(ctx.dataset.yAxisID==='y1')return ctx.dataset.label+': '+ctx.parsed.y.toFixed(3)+'%';return ctx.dataset.label+': '+ctx.parsed.y.toFixed(2)+' mt';}}}},scales:{x:sc,y:{position:'left',grid:{color:gc},ticks:{color:'#484f58',font:{size:9}},title:{display:true,text:'mt',color:'#484f58',font:{size:9}},beginAtZero:true,min:0},y1:{position:'right',grid:{display:false},beginAtZero:true,min:0,ticks:{color:'#484f58',font:{size:9},callback:function(v){return v.toFixed(2)+'%';}},title:{display:true,text:'Rate %',color:'#484f58',font:{size:9}}}}}});}
 
-  // ── National W/ Toll Cost combo chart (₱/ton line + total ₱ bar) — from Prod Cost sheet ──
+  // ── Cost combo chart (₱/kg line + total ₱ bar) — from Prod Cost sheet, site-aware ──
   (function(){
     var costC=document.getElementById('cm-cost');
     if(!costC) return;
@@ -1315,27 +1315,31 @@ function renderMonthly(){
     var header=rowsRaw[0];
     function idx(name){ return header.indexOf(name); }
     var iYear=idx('YEAR'), iPlant=idx('PLANT'), iMonth=idx('MONTH'), iTotal=idx('Total Cost'), iVol=idx('Volume, kg');
-    var costTotalByMonth=months.map(function(m){
+    var targetPlant=activeSite==='NATIONAL'?'NATIONAL W/ TOLL':activeSite;
+    function findRow(m){
       for(var i=1;i<rowsRaw.length;i++){
         var r=rowsRaw[i];
-        if(r[iYear]==='2026' && (r[iPlant]||'').trim()==='NATIONAL W/ TOLL' && (r[iMonth]||'').toUpperCase()===m.toUpperCase()){
-          return pcNum(r[iTotal]);
+        if(r[iYear]==='2026' && (r[iPlant]||'').trim()===targetPlant && (r[iMonth]||'').toUpperCase()===m.toUpperCase()){
+          return r;
         }
       }
       return null;
+    }
+    var costTotalByMonth=months.map(function(m){
+      var r=findRow(m);
+      return r?pcNum(r[iTotal]):null;
     });
     var costPerTonByMonth=months.map(function(m,i){
       var tot=costTotalByMonth[i];
       if(!tot) return null;
-      for(var j=1;j<rowsRaw.length;j++){
-        var r=rowsRaw[j];
-        if(r[iYear]==='2026' && (r[iPlant]||'').trim()==='NATIONAL W/ TOLL' && (r[iMonth]||'').toUpperCase()===m.toUpperCase()){
-          var vol=pcNum(r[iVol]);
-          return vol>0?+(tot/vol).toFixed(2):null;
-        }
-      }
-      return null;
+      var r=findRow(m);
+      if(!r) return null;
+      var vol=pcNum(r[iVol]);
+      return vol>0?+(tot/vol).toFixed(2):null;
     });
+    var costTitle=costC.closest('.cc')&&costC.closest('.cc').querySelector('.cc-title');
+    if(costTitle) costTitle.textContent=(activeSite==='NATIONAL'?'National W/ Toll':SL[activeSite])+' Cost — Total (₱) & ₱/kg by Month';
+    if(charts['cm-cost']){try{charts['cm-cost'].destroy();}catch(e){}}
     charts['cm-cost']=new Chart(costC.getContext('2d'),{data:{labels:mLabels,datasets:[
       {type:'bar',label:'Total Cost (₱)',data:costTotalByMonth,backgroundColor:'rgba(46,160,67,0.45)',borderRadius:3,yAxisID:'y'},
       {type:'line',label:'₱/kg',data:costPerTonByMonth,borderColor:'#d29922',backgroundColor:'transparent',tension:.3,pointRadius:4,pointBackgroundColor:'#d29922',spanGaps:true,yAxisID:'y1'}
