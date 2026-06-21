@@ -1516,6 +1516,62 @@ function renderProdCostMonthly(){
   target.innerHTML = html;
 }
 
+// ── National Weekly Cost Trend (across all weeks, cached) ──
+function loadCostWeeklyTrend(){
+  var allWeeks=(DATA.weekly&&DATA.weekly.weeks||[]).map(function(w){return +w;}).filter(function(w){return w>0;}).sort(function(a,b){return a-b;});
+  if(!allWeeks.length) return;
+
+  if(!DATA.costWeeklyTrend) DATA.costWeeklyTrend={};
+  var missing=allWeeks.filter(function(w){return !DATA.costWeeklyTrend[w];});
+
+  if(missing.length){
+    Promise.all(missing.map(function(w){
+      return gasGet('pcdaily',{site:'NATIONAL',week:w}).then(function(d){
+        var rows=(d.rows||[]).filter(function(r){return (r.Plant||'').toUpperCase()==='NATIONAL';});
+        var sum=function(f){return rows.reduce(function(a,r){return a+(r[f]||0);},0);};
+        DATA.costWeeklyTrend[w]={
+          vol: sum('TotalVolume'), total: sum('CostTotal'),
+          fixed: sum('FixedTotal'), variable: sum('VarTotal')
+        };
+      }).catch(function(){ DATA.costWeeklyTrend[w]=null; });
+    })).then(renderCostWeeklyTrend);
+  } else {
+    renderCostWeeklyTrend();
+  }
+}
+
+function renderCostWeeklyTrend(){
+  var allWeeks=(DATA.weekly&&DATA.weekly.weeks||[]).map(function(w){return +w;}).filter(function(w){return w>0;}).sort(function(a,b){return a-b;});
+  if(!allWeeks.length) return;
+  var lbl=allWeeks.map(function(w){return 'W'+w;});
+  var totalData=allWeeks.map(function(w){var d=DATA.costWeeklyTrend[w];return d&&d.total>0?+d.total.toFixed(0):null;});
+  var perTonData=allWeeks.map(function(w){var d=DATA.costWeeklyTrend[w];return d&&d.vol>0?+(d.total/d.vol).toFixed(2):null;});
+  var fixedData=allWeeks.map(function(w){var d=DATA.costWeeklyTrend[w];return d&&d.fixed>0?+d.fixed.toFixed(0):null;});
+  var varData=allWeeks.map(function(w){var d=DATA.costWeeklyTrend[w];return d&&d.variable>0?+d.variable.toFixed(0):null;});
+
+  var gc='rgba(255,255,255,0.04)';
+  var sc={grid:{color:gc},ticks:{color:'#484f58',font:{size:9,family:"'DM Mono',monospace"}}};
+  var tip={backgroundColor:'#1f2631',borderColor:'rgba(255,255,255,.1)',borderWidth:1,bodyFont:{family:"'DM Mono',monospace",size:10}};
+
+  var comboC=document.getElementById('c-cost-combo');
+  if(comboC){
+    if(charts['c-cost-combo']){try{charts['c-cost-combo'].destroy();}catch(e){}}
+    charts['c-cost-combo']=new Chart(comboC.getContext('2d'),{data:{labels:lbl,datasets:[
+      {type:'bar',label:'Total Cost (₱)',data:totalData,backgroundColor:'rgba(46,160,67,0.45)',borderRadius:3,yAxisID:'y'},
+      {type:'line',label:'₱/ton',data:perTonData,borderColor:'#d29922',backgroundColor:'transparent',tension:.3,pointRadius:4,pointBackgroundColor:'#d29922',spanGaps:true,yAxisID:'y1'}
+    ]},options:{responsive:true,maintainAspectRatio:false,animation:{duration:200},plugins:{legend:{display:true,labels:{color:'#8b949e',font:{size:9},boxWidth:10}},tooltip:{backgroundColor:tip.backgroundColor,borderColor:tip.borderColor,borderWidth:tip.borderWidth,bodyFont:tip.bodyFont,callbacks:{label:function(ctx){if(ctx.dataset.yAxisID==='y')return ctx.dataset.label+': ₱'+(ctx.parsed.y/1000000).toFixed(2)+'M';return ctx.dataset.label+': ₱'+ctx.parsed.y.toFixed(2);}}}},scales:{x:sc,y:{position:'left',grid:{color:gc},ticks:{color:'#484f58',font:{size:9},callback:function(v){return '₱'+(v/1000000).toFixed(1)+'M';}},title:{display:true,text:'Total Cost',color:'#484f58',font:{size:9}},beginAtZero:true,min:0},y1:{position:'right',grid:{display:false},beginAtZero:true,min:0,ticks:{color:'#484f58',font:{size:9},callback:function(v){return '₱'+v;}},title:{display:true,text:'₱/ton',color:'#484f58',font:{size:9}}}}}});
+  }
+
+  var fvC=document.getElementById('c-cost-fixvar');
+  if(fvC){
+    if(charts['c-cost-fixvar']){try{charts['c-cost-fixvar'].destroy();}catch(e){}}
+    charts['c-cost-fixvar']=new Chart(fvC.getContext('2d'),{type:'line',data:{labels:lbl,datasets:[
+      {label:'Fixed Cost (₱)',data:fixedData,borderColor:'#388bfd',backgroundColor:'rgba(56,139,253,0.08)',fill:true,tension:.3,pointRadius:4,spanGaps:true},
+      {label:'Variable Cost (₱)',data:varData,borderColor:'#f85149',backgroundColor:'rgba(248,81,73,0.08)',fill:true,tension:.3,pointRadius:4,spanGaps:true}
+    ]},options:{responsive:true,maintainAspectRatio:false,animation:{duration:200},plugins:{legend:{display:true,labels:{color:'#8b949e',font:{size:9},boxWidth:10}},tooltip:{backgroundColor:tip.backgroundColor,borderColor:tip.borderColor,borderWidth:tip.borderWidth,bodyFont:tip.bodyFont,callbacks:{label:function(ctx){return ctx.dataset.label+': ₱'+(ctx.parsed.y/1000000).toFixed(2)+'M';}}}},scales:{x:sc,y:{grid:{color:gc},ticks:{color:'#484f58',font:{size:9},callback:function(v){return '₱'+(v/1000000).toFixed(1)+'M';}},beginAtZero:true,min:0}}}});
+  }
+}
+
 function renderCost(){
   var ct=document.getElementById('content-cost');
   if(!ct) return;
@@ -1591,6 +1647,13 @@ function renderCost(){
     +scCard('Total Cost',sums.CostTotal,perTon(sums.CostTotal),'var(--red)')
     +'</div></div>';
 
+  // ── Weekly Cost Trend Charts (National, all weeks) ───────
+  html+='<div class="sec"><div class="sec-hdr"><div class="sec-title">National Weekly Cost Trend</div><div class="sec-line"></div></div>'
+    +'<div class="g2">'
+    +'<div class="cc"><div class="cc-title">Total Cost (₱) &amp; ₱/ton — by Week</div><div style="position:relative;height:160px"><canvas id="c-cost-combo"></canvas></div></div>'
+    +'<div class="cc"><div class="cc-title">Fixed vs Variable Cost (₱) — by Week</div><div style="position:relative;height:160px"><canvas id="c-cost-fixvar"></canvas></div></div>'
+    +'</div></div>';
+
   // ── Daily Detail Table ───────────────────────────────────
   html+='<div class="sec"><div class="sec-hdr"><div class="sec-title">Daily Production Cost Detail <span style="font-size:10px;color:var(--text3);font-weight:400">(all values in ₱/ton)</span></div><div class="sec-line"></div></div>';
   html+='<div class="cc"><div class="tbl-wrap"><table style="width:100%;border-collapse:collapse;table-layout:auto;font-size:9px">';
@@ -1647,6 +1710,7 @@ function renderCost(){
   html+='</tbody></table></div></div></div>';
 
   ct.innerHTML = html;
+  loadCostWeeklyTrend();
 }
 function renderDowntimeMonth(m){
   // Always re-render everything with new month
