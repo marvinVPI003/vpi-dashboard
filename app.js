@@ -846,7 +846,8 @@ function renderMonthly(){
     return;
   }
   var rows=DATA.monthly.rows||[];
-  var months=DATA.monthly.months||[];
+  var ALL_MONTH_NAMES=['JANUARY','FEBRUARY','MARCH','APRIL','MAY','JUNE','JULY','AUGUST','SEPTEMBER','OCTOBER','NOVEMBER','DECEMBER'];
+  var months=(DATA.monthly.months||[]).filter(function(m){return ALL_MONTH_NAMES.indexOf(String(m).trim().toUpperCase())>=0;});
   if(!activeMonth||months.indexOf(activeMonth)<0) activeMonth=months[months.length-1]||'';
   var mRows=rows.filter(function(r){return String(r.MONTH||r.Month||'').trim()===activeMonth;});
   var pills=document.getElementById('month-pills');
@@ -1531,7 +1532,8 @@ function renderDowntime(){
     return;
   }
   var mrows=DATA.monthly.rows||[];
-  var months=DATA.monthly.months||[];
+  var ALL_MONTH_NAMES=['JANUARY','FEBRUARY','MARCH','APRIL','MAY','JUNE','JULY','AUGUST','SEPTEMBER','OCTOBER','NOVEMBER','DECEMBER'];
+  var months=(DATA.monthly.months||[]).filter(function(m){return ALL_MONTH_NAMES.indexOf(String(m).trim().toUpperCase())>=0;});
   if(!activeMonth||months.indexOf(activeMonth)<0) activeMonth=months[months.length-1]||'';
 
   // Month pills
