@@ -1550,14 +1550,20 @@ function loadCostWeeklyTrend(){
 }
 
 function renderCostWeeklyTrend(){
-  var allWeeks=(DATA.weekly&&DATA.weekly.weeks||[]).map(function(w){return +w;}).filter(function(w){return w>0;}).sort(function(a,b){return a-b;});
-  if(!allWeeks.length) return;
+  var allWeeksRaw=(DATA.weekly&&DATA.weekly.weeks||[]).map(function(w){return +w;}).filter(function(w){return w>0;}).sort(function(a,b){return a-b;});
+  if(!allWeeksRaw.length) return;
   var siteCache=(DATA.costWeeklyTrend&&DATA.costWeeklyTrend[activeSite])||{};
+
+  // Trim leading weeks with no data at all (start chart from first week that has data)
+  var firstIdx=allWeeksRaw.findIndex(function(w){var d=siteCache[w];return d&&(d.total>0||d.fixed>0||d.variable>0);});
+  var allWeeks=firstIdx>0?allWeeksRaw.slice(firstIdx):allWeeksRaw;
+  if(!allWeeks.length) allWeeks=allWeeksRaw;
+
   var lbl=allWeeks.map(function(w){return 'W'+w;});
   var totalData=allWeeks.map(function(w){var d=siteCache[w];return d&&d.total>0?+d.total.toFixed(0):null;});
   var perTonData=allWeeks.map(function(w){var d=siteCache[w];return d&&d.vol>0?+(d.total/d.vol).toFixed(2):null;});
-  var fixedData=allWeeks.map(function(w){var d=siteCache[w];return d&&d.fixed>0?+d.fixed.toFixed(0):null;});
-  var varData=allWeeks.map(function(w){var d=siteCache[w];return d&&d.variable>0?+d.variable.toFixed(0):null;});
+  var fixedPerTonData=allWeeks.map(function(w){var d=siteCache[w];return d&&d.vol>0&&d.fixed>0?+(d.fixed/d.vol).toFixed(2):null;});
+  var varPerTonData=allWeeks.map(function(w){var d=siteCache[w];return d&&d.vol>0&&d.variable>0?+(d.variable/d.vol).toFixed(2):null;});
 
   var gc='rgba(255,255,255,0.04)';
   var sc={grid:{color:gc},ticks:{color:'#484f58',font:{size:9,family:"'DM Mono',monospace"}}};
@@ -1567,7 +1573,7 @@ function renderCostWeeklyTrend(){
   var comboTitle=document.querySelector('#c-cost-combo')&&document.querySelector('#c-cost-combo').closest('.cc').querySelector('.cc-title');
   if(comboTitle) comboTitle.textContent=siteLbl+' Total Cost (₱) & ₱/ton — by Week';
   var fvTitle=document.querySelector('#c-cost-fixvar')&&document.querySelector('#c-cost-fixvar').closest('.cc').querySelector('.cc-title');
-  if(fvTitle) fvTitle.textContent=siteLbl+' Fixed vs Variable Cost (₱) — by Week';
+  if(fvTitle) fvTitle.textContent=siteLbl+' Fixed vs Variable Cost (₱/ton) — by Week';
 
   var comboC=document.getElementById('c-cost-combo');
   if(comboC){
@@ -1582,9 +1588,9 @@ function renderCostWeeklyTrend(){
   if(fvC){
     if(charts['c-cost-fixvar']){try{charts['c-cost-fixvar'].destroy();}catch(e){}}
     charts['c-cost-fixvar']=new Chart(fvC.getContext('2d'),{type:'line',data:{labels:lbl,datasets:[
-      {label:'Fixed Cost (₱)',data:fixedData,borderColor:'#388bfd',backgroundColor:'rgba(56,139,253,0.08)',fill:true,tension:.3,pointRadius:4,spanGaps:true},
-      {label:'Variable Cost (₱)',data:varData,borderColor:'#f85149',backgroundColor:'rgba(248,81,73,0.08)',fill:true,tension:.3,pointRadius:4,spanGaps:true}
-    ]},options:{responsive:true,maintainAspectRatio:false,animation:{duration:200},plugins:{legend:{display:true,labels:{color:'#8b949e',font:{size:9},boxWidth:10}},tooltip:{backgroundColor:tip.backgroundColor,borderColor:tip.borderColor,borderWidth:tip.borderWidth,bodyFont:tip.bodyFont,callbacks:{label:function(ctx){return ctx.dataset.label+': ₱'+(ctx.parsed.y/1000000).toFixed(2)+'M';}}}},scales:{x:sc,y:{grid:{color:gc},ticks:{color:'#484f58',font:{size:9},callback:function(v){return '₱'+(v/1000000).toFixed(1)+'M';}},beginAtZero:true,min:0}}}});
+      {label:'Fixed Cost (₱/ton)',data:fixedPerTonData,borderColor:'#388bfd',backgroundColor:'rgba(56,139,253,0.08)',fill:true,tension:.3,pointRadius:4,spanGaps:true},
+      {label:'Variable Cost (₱/ton)',data:varPerTonData,borderColor:'#f85149',backgroundColor:'rgba(248,81,73,0.08)',fill:true,tension:.3,pointRadius:4,spanGaps:true}
+    ]},options:{responsive:true,maintainAspectRatio:false,animation:{duration:200},plugins:{legend:{display:true,labels:{color:'#8b949e',font:{size:9},boxWidth:10}},tooltip:{backgroundColor:tip.backgroundColor,borderColor:tip.borderColor,borderWidth:tip.borderWidth,bodyFont:tip.bodyFont,callbacks:{label:function(ctx){return ctx.dataset.label+': ₱'+ctx.parsed.y.toFixed(2)+'/ton';}}}},scales:{x:sc,y:{grid:{color:gc},ticks:{color:'#484f58',font:{size:9},callback:function(v){return '₱'+v;}},title:{display:true,text:'₱/ton',color:'#484f58',font:{size:9}},beginAtZero:true,min:0}}}});
   }
 }
 
