@@ -1041,7 +1041,10 @@ function renderMonthly(){
   var mRMVWS=natR2.length?natR2.reduce(function(a,r){return a+gf(r,'RM Variance (w/o used sacks), %');},0)/natR2.length:0;
   var mRMVpct=Math.abs(mRMV)>1?mRMV:mRMV*100;
   var mRMVWSpct=Math.abs(mRMVWS)>1?mRMVWS:mRMVWS*100;
-  var kpiCards2='<div class="g5" style="margin-top:8px">'
+  var mRejRateRaw=natR2.length?natR2.reduce(function(a,r){return a+gf(r,'Rejection Rate, %');},0)/natR2.length:0;
+  var mRejRate=Math.abs(mRejRateRaw)>1?mRejRateRaw:mRejRateRaw*100;
+  var mRejQty=natR2.reduce(function(a,r){return a+gf(r,'Total Remill Reject, mt');},0);
+  var kpiCards2='<div class="g6" style="margin-top:8px">'
     +'<div class="kc" style="--kc-color:var(--purple)"><div class="kc-lbl">Power</div>'
     +'<div class="kc-val" style="font-size:22px;color:var(--purple)">'+(mKwh>0?mKwh.toFixed(2):'—')+'<span style="font-size:12px;color:var(--text2)"> kWh/t</span></div>'
     +'<div class="kc-sub">Electricity per ton</div>'
@@ -1058,7 +1061,10 @@ function renderMonthly(){
     +'<div class="kc-val" style="font-size:20px;color:'+(mRMVpct<0?'var(--red)':'var(--green-b)')+'">'+(mRMV!==0?(mRMVpct>=0?'+':'')+mRMVpct.toFixed(3)+'%':'—')+'</div>'
     +'<span class="bdg '+(mRMVpct<0?'r':'g')+'">'+(mRMVpct<0?'Under':'Over')+'</span></div>'
     +'<div class="kc" style="--kc-color:'+(mRMVWSpct<0?'var(--red)':'var(--green)')+'"><div class="kc-lbl">RM Var w/o Sacks</div>'
-    +'<div class="kc-val" style="font-size:20px;color:'+(mRMVWSpct<0?'var(--red)':'var(--green-b)')+'">'+(mRMVWS!==0?(mRMVWSpct>=0?'+':'')+mRMVWSpct.toFixed(3)+'%':'—')+'</div>'
+    +'<div class="kc-val" style="font-size:20px;color:'+(mRMVWSpct<0?'var(--red)':'var(--green-b)')+'">'+(mRMVWS!==0?(mRMVWSpct>=0?'+':'')+mRMVWSpct.toFixed(3)+'%':'—')+'</div></div>'
+    +'<div class="kc" style="--kc-color:var(--red)"><div class="kc-lbl">Rejection Rate</div>'
+    +'<div class="kc-val" style="font-size:20px;color:var(--red)">'+(mRejRateRaw!==0?mRejRate.toFixed(2)+'%':'—')+'</div>'
+    +'<div class="kc-sub" style="font-size:9px;font-family:DM Mono,monospace">'+mRejQty.toFixed(2)+' mt</div></div>'
     +'</div></div>';
   // ── MONTHLY CHARTS ─────────────────────────────────────
   var chartSection='<div class="sec"><div class="sec-hdr"><div class="sec-title">Monthly Trends — '+(activeSite==='NATIONAL'?'National':SL[activeSite])+'</div><div class="sec-line"></div></div>'
@@ -1073,6 +1079,10 @@ function renderMonthly(){
     +'<div class="g2">'
     +'<div class="cc"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><div class="cc-title" style="margin-bottom:0">Coal kg/ton (Limit: 12)</div><div id="cm-coal-badge" style="font-size:9px;font-family:DM Mono,monospace;padding:2px 8px;border-radius:10px"></div></div><div style="position:relative;height:160px"><canvas id="cm-coal"></canvas></div></div>'
     +'<div class="cc"><div class="cc-title">OEE % by Month</div><div style="position:relative;height:160px"><canvas id="cm-cu"></canvas></div></div>'
+    +'</div>'
+    +'<div class="g2" style="margin-top:8px">'
+    +'<div class="cc"><div class="cc-title">Rejection Rate — Qty (mt) &amp; % by Month</div><div style="position:relative;height:160px"><canvas id="cm-reject"></canvas></div></div>'
+    +'<div class="cc"><div class="cc-title">National W/ Toll Cost — Total (₱) &amp; ₱/ton by Month</div><div style="position:relative;height:160px"><canvas id="cm-cost"></canvas></div></div>'
     +'</div></div>';
   // ── PROJECTED VOLUME TABLE ─────────────────────────────
   // Remaining days = calendar days in month - days elapsed
@@ -1268,6 +1278,58 @@ function renderMonthly(){
      pointBackgroundColor:oeeMonthData.map(function(v){return !v?'grey':v>=85?'#3fb950':v>=70?'#d29922':'#f85149';})},
     {label:'Target 85%',data:months.map(function(){return 85;}),borderColor:'rgba(63,185,80,0.5)',borderDash:[4,4],borderWidth:1.5,pointRadius:0,fill:false}
   ]},options:{responsive:true,maintainAspectRatio:false,animation:{duration:200},plugins:{legend:{display:true,labels:{color:'#8b949e',font:{size:9},boxWidth:10}},tooltip:mTip},scales:{x:sc,y:{grid:{color:gc},ticks:{color:'#484f58',font:{size:9},callback:function(v){return v+'%';}},min:0,max:120}}}});
+
+  // ── Rejection Rate combo chart (qty bars + rate % line) ──
+  var rejQtyMonth=perMonth('Total Remill Reject, mt');
+  var rejRateMonth=avgPerMonth('Rejection Rate, %').map(function(v){return v?(Math.abs(v)>1?v:v*100):null;});
+  var rejC=document.getElementById('cm-reject');
+  if(rejC){charts['cm-reject']=new Chart(rejC.getContext('2d'),{data:{labels:mLabels,datasets:[
+    {type:'bar',label:'Reject Qty (mt)',data:rejQtyMonth,backgroundColor:'rgba(56,139,253,0.45)',borderRadius:3,yAxisID:'y'},
+    {type:'line',label:'Rejection Rate %',data:rejRateMonth,borderColor:'#f85149',backgroundColor:'transparent',tension:.3,pointRadius:4,pointBackgroundColor:'#f85149',spanGaps:true,yAxisID:'y1'}
+  ]},options:{responsive:true,maintainAspectRatio:false,animation:{duration:200},plugins:{legend:{display:true,labels:{color:'#8b949e',font:{size:9},boxWidth:10}},tooltip:mTip},scales:{x:sc,y:{position:'left',grid:{color:gc},ticks:{color:'#484f58',font:{size:9}},title:{display:true,text:'mt',color:'#484f58',font:{size:9}}},y1:{position:'right',grid:{display:false},ticks:{color:'#484f58',font:{size:9},callback:function(v){return v+'%';}},title:{display:true,text:'Rate %',color:'#484f58',font:{size:9}}}}}});}
+
+  // ── National W/ Toll Cost combo chart (₱/ton line + total ₱ bar) — from Prod Cost sheet ──
+  (function(){
+    var costC=document.getElementById('cm-cost');
+    if(!costC) return;
+    if(!DATA.prodCostCSV){
+      // Trigger a load; chart will populate on next renderMonthly() call once cached
+      fetch(PRODCOST_CSV_URL).then(function(r){return r.text();}).then(function(text){
+        DATA.prodCostCSV=parseCSV(text);
+        renderMonthly();
+      }).catch(function(){});
+      return;
+    }
+    var rowsRaw=DATA.prodCostCSV;
+    var header=rowsRaw[0];
+    function idx(name){ return header.indexOf(name); }
+    var iYear=idx('YEAR'), iPlant=idx('PLANT'), iMonth=idx('MONTH'), iTotal=idx('Total Cost'), iVol=idx('Volume, kg');
+    var costTotalByMonth=months.map(function(m){
+      for(var i=1;i<rowsRaw.length;i++){
+        var r=rowsRaw[i];
+        if(r[iYear]==='2026' && (r[iPlant]||'').trim()==='NATIONAL W/ TOLL' && (r[iMonth]||'').toUpperCase()===m.toUpperCase()){
+          return pcNum(r[iTotal]);
+        }
+      }
+      return null;
+    });
+    var costPerTonByMonth=months.map(function(m,i){
+      var tot=costTotalByMonth[i];
+      if(!tot) return null;
+      for(var j=1;j<rowsRaw.length;j++){
+        var r=rowsRaw[j];
+        if(r[iYear]==='2026' && (r[iPlant]||'').trim()==='NATIONAL W/ TOLL' && (r[iMonth]||'').toUpperCase()===m.toUpperCase()){
+          var vol=pcNum(r[iVol]);
+          return vol>0?+(tot/vol).toFixed(2):null;
+        }
+      }
+      return null;
+    });
+    charts['cm-cost']=new Chart(costC.getContext('2d'),{data:{labels:mLabels,datasets:[
+      {type:'bar',label:'Total Cost (₱)',data:costTotalByMonth,backgroundColor:'rgba(46,160,67,0.45)',borderRadius:3,yAxisID:'y'},
+      {type:'line',label:'₱/kg',data:costPerTonByMonth,borderColor:'#d29922',backgroundColor:'transparent',tension:.3,pointRadius:4,pointBackgroundColor:'#d29922',spanGaps:true,yAxisID:'y1'}
+    ]},options:{responsive:true,maintainAspectRatio:false,animation:{duration:200},plugins:{legend:{display:true,labels:{color:'#8b949e',font:{size:9},boxWidth:10}},tooltip:{backgroundColor:'#1f2631',borderColor:'rgba(255,255,255,.1)',borderWidth:1,bodyFont:{family:"'DM Mono',monospace",size:10},callbacks:{label:function(ctx){if(ctx.dataset.yAxisID==='y')return ctx.dataset.label+': ₱'+(ctx.parsed.y/1000000).toFixed(2)+'M';return ctx.dataset.label+': ₱'+ctx.parsed.y;}}}},scales:{x:sc,y:{position:'left',grid:{color:gc},ticks:{color:'#484f58',font:{size:9},callback:function(v){return '₱'+(v/1000000).toFixed(1)+'M';}},title:{display:true,text:'Total Cost',color:'#484f58',font:{size:9}}},y1:{position:'right',grid:{display:false},ticks:{color:'#484f58',font:{size:9},callback:function(v){return '₱'+v;}},title:{display:true,text:'₱/kg',color:'#484f58',font:{size:9}}}}}});
+  })();
   loadProdCostMonthly();
 }
 // ── Monthly Production Cost (Prod Cost sheet, published CSV) ──
