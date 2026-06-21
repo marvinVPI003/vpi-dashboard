@@ -1270,19 +1270,33 @@ function renderProdCostMonthly(){
       iSPDep=idx('SP DEPRECIATION'), iIns=idx('Insurance Personnel'), iWater=idx('WATER'),
       iThread=idx('THREAD'), iToll=idx('TOLLING FEE'), iTotal=idx('Total Cost'), iCpk=idx('Cost, Php/kg');
 
-  // Determine which month to show: use activeMonth global if it's a valid plain month name (not Q1/Q2 etc), else latest available for 2026
+  // Determine which month to show: use activeMonth global if valid AND has data, else latest 2026 month with non-zero NATIONAL cost
   var allMonths = ['JANUARY','FEBRUARY','MARCH','APRIL','MAY','JUNE','JULY','AUGUST','SEPTEMBER','OCTOBER','NOVEMBER','DECEMBER'];
-  var wantMonth = (activeMonth||'').toUpperCase();
-  if(allMonths.indexOf(wantMonth)<0){
-    // fall back: find latest 2026 month present in the sheet
-    var found=[];
+
+  function nationalCostFor(monthName){
     for(var i=1;i<rowsRaw.length;i++){
       var r=rowsRaw[i];
-      if(r[iYear]==='2026' && allMonths.indexOf((r[iMonth]||'').toUpperCase())>=0){
-        found.push(r[iMonth].toUpperCase());
+      if(r[iYear]==='2026' && (r[iPlant]||'').trim()==='NATIONAL' && (r[iMonth]||'').toUpperCase()===monthName){
+        return pcNum(r[iTotal]);
       }
     }
-    wantMonth = found.length ? found[found.length-1] : 'MAY';
+    return 0;
+  }
+
+  var wantMonth = (activeMonth||'').toUpperCase();
+  if(allMonths.indexOf(wantMonth)<0 || nationalCostFor(wantMonth)===0){
+    // fall back: find latest 2026 month present in the sheet that actually has cost data
+    var monthsWithData=[];
+    for(var i=1;i<rowsRaw.length;i++){
+      var r=rowsRaw[i];
+      if(r[iYear]==='2026' && (r[iPlant]||'').trim()==='NATIONAL'){
+        var mUp=(r[iMonth]||'').toUpperCase();
+        if(allMonths.indexOf(mUp)>=0 && pcNum(r[iTotal])>0){
+          monthsWithData.push(mUp);
+        }
+      }
+    }
+    wantMonth = monthsWithData.length ? monthsWithData[monthsWithData.length-1] : 'MAY';
   }
 
   var plantOrder=['AC','PFMIS','HOREB','BUKID','ARGAO','HOREB MG','AC MG'];
