@@ -1202,6 +1202,172 @@ function renderMonthly(){
     {label:'Target 85%',data:months.map(function(){return 85;}),borderColor:'rgba(63,185,80,0.5)',borderDash:[4,4],borderWidth:1.5,pointRadius:0,fill:false}
   ]},options:{responsive:true,maintainAspectRatio:false,animation:{duration:200},plugins:{legend:{display:true,labels:{color:'#8b949e',font:{size:9},boxWidth:10}},tooltip:mTip},scales:{x:sc,y:{grid:{color:gc},ticks:{color:'#484f58',font:{size:9},callback:function(v){return v+'%';}},min:0,max:120}}}});
 }
+// ── Monthly Production Cost (Prod Cost sheet, published CSV) ──
+var PRODCOST_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRRx7S_rqgygPQifVep4DtnDFK8gGjAPVbrzCq6sCJcTF6omIGXb73iK8mQZoZjOgUq8CnZ9t7fR_2a/pub?gid=66553768&single=true&output=csv';
+
+function parseCSV(text){
+  // Simple RFC4180-ish CSV parser handling quoted fields with commas
+  var rows=[]; var row=[]; var field=''; var inQuotes=false;
+  for(var i=0;i<text.length;i++){
+    var c=text[i], n=text[i+1];
+    if(inQuotes){
+      if(c==='"'&&n==='"'){ field+='"'; i++; }
+      else if(c==='"'){ inQuotes=false; }
+      else field+=c;
+    } else {
+      if(c==='"') inQuotes=true;
+      else if(c===','){ row.push(field); field=''; }
+      else if(c==='\r'){ /* skip */ }
+      else if(c==='\n'){ row.push(field); rows.push(row); row=[]; field=''; }
+      else field+=c;
+    }
+  }
+  if(field.length||row.length){ row.push(field); rows.push(row); }
+  return rows;
+}
+
+function pcNum(s){
+  if(s===undefined||s===null) return 0;
+  s=String(s).trim().replace(/,/g,'');
+  if(s==='') return 0;
+  var v=parseFloat(s);
+  return isNaN(v)?0:v;
+}
+
+function loadProdCostMonthly(){
+  var target=document.getElementById('prodcost-section');
+  if(!target) return;
+
+  if(DATA.prodCostCSV){
+    renderProdCostMonthly();
+    return;
+  }
+
+  fetch(PRODCOST_CSV_URL).then(function(r){
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    return r.text();
+  }).then(function(text){
+    DATA.prodCostCSV = parseCSV(text);
+    renderProdCostMonthly();
+  }).catch(function(e){
+    var t=document.getElementById('prodcost-section');
+    if(t) t.innerHTML='<div class="no-data" style="color:var(--red)">Could not load monthly production cost: '+e.message+'</div>';
+  });
+}
+
+function renderProdCostMonthly(){
+  var target=document.getElementById('prodcost-section');
+  if(!target) return;
+  var rowsRaw=DATA.prodCostCSV;
+  if(!rowsRaw||!rowsRaw.length){ target.innerHTML='<div class="no-data">No monthly cost data available</div>'; return; }
+
+  var header=rowsRaw[0];
+  function idx(name){ return header.indexOf(name); }
+  var iYear=idx('YEAR'), iPlant=idx('PLANT'), iMonth=idx('MONTH'), iVol=idx('Volume, kg'),
+      iRental=idx('Rental/Amor kphp'), iSP=idx('Spare Parts. kphp'), iMP=idx('Manpower Direct, kphp'),
+      iDiesel=idx('Diesel, kphp'), iElec=idx('Electricity Machine, kphp'), iAgency=idx('Manpower Agency, kphp'),
+      iOther=idx('Other, kphp'), i3rd=idx('3RD PARTY SERVICE'), iCESS=idx('CESS DEPRECIATION'),
+      iSPDep=idx('SP DEPRECIATION'), iIns=idx('Insurance Personnel'), iWater=idx('WATER'),
+      iThread=idx('THREAD'), iToll=idx('TOLLING FEE'), iTotal=idx('Total Cost'), iCpk=idx('Cost, Php/kg');
+
+  // Determine which month to show: use activeMonth global if it's a valid plain month name (not Q1/Q2 etc), else latest available for 2026
+  var allMonths = ['JANUARY','FEBRUARY','MARCH','APRIL','MAY','JUNE','JULY','AUGUST','SEPTEMBER','OCTOBER','NOVEMBER','DECEMBER'];
+  var wantMonth = (activeMonth||'').toUpperCase();
+  if(allMonths.indexOf(wantMonth)<0){
+    // fall back: find latest 2026 month present in the sheet
+    var found=[];
+    for(var i=1;i<rowsRaw.length;i++){
+      var r=rowsRaw[i];
+      if(r[iYear]==='2026' && allMonths.indexOf((r[iMonth]||'').toUpperCase())>=0){
+        found.push(r[iMonth].toUpperCase());
+      }
+    }
+    wantMonth = found.length ? found[found.length-1] : 'MAY';
+  }
+
+  var plantOrder=['AC','PFMIS','HOREB','BUKID','ARGAO','HOREB MG','AC MG'];
+  var plants={}, national=null, ccpc=null, south=null, natToll=null;
+
+  for(var i=1;i<rowsRaw.length;i++){
+    var r=rowsRaw[i];
+    if(r[iYear]!=='2026') continue;
+    if((r[iMonth]||'').toUpperCase()!==wantMonth) continue;
+    var p=(r[iPlant]||'').trim();
+    var rec={
+      name:p, volume:pcNum(r[iVol]), rental:pcNum(r[iRental]), spareparts:pcNum(r[iSP]),
+      mpDirect:pcNum(r[iMP]), diesel:pcNum(r[iDiesel]), elecMachine:pcNum(r[iElec]),
+      mpAgency:pcNum(r[iAgency]), other:pcNum(r[iOther]), thirdParty:pcNum(r[i3rd]),
+      cess:pcNum(r[iCESS]), spDep:pcNum(r[iSPDep]), insurance:pcNum(r[iIns]),
+      water:pcNum(r[iWater]), thread:pcNum(r[iThread]), tolling:pcNum(r[iToll]),
+      totalCost:pcNum(r[iTotal]), costPerKg:pcNum(r[iCpk])
+    };
+    if(p==='NATIONAL') national=rec;
+    else if(p==='NATIONAL W/ TOLL') natToll=rec;
+    else if(p==='CCPC') ccpc=rec;
+    else if(p==='SOUTH') south=rec;
+    else if(plantOrder.indexOf(p)>=0) plants[p]=rec;
+  }
+
+  if(!national){
+    target.innerHTML='<div class="no-data">No monthly production cost data found for '+wantMonth+' 2026</div>';
+    return;
+  }
+
+  function fmt0(n){ return (n||n===0) ? Math.round(n).toLocaleString() : '0'; }
+  function fmtPkg(n){ return (n||n===0) ? n.toFixed(2) : '—'; }
+
+  var TH='padding:5px 6px;background:var(--bg3);color:var(--text2);font-size:7px;font-weight:600;text-transform:uppercase;letter-spacing:0.2px;border-bottom:1px solid var(--border);white-space:nowrap;text-align:right;line-height:1.15;';
+  var THL='padding:5px 6px;background:var(--bg3);color:var(--text2);font-size:7px;font-weight:600;text-transform:uppercase;letter-spacing:0.2px;border-bottom:1px solid var(--border);white-space:nowrap;text-align:left;line-height:1.15;';
+  var TD='padding:4px 6px;font-size:9px;border-bottom:1px solid var(--border);text-align:right;white-space:nowrap;';
+  var TDL='padding:4px 6px;font-size:9px;border-bottom:1px solid var(--border);text-align:left;white-space:nowrap;font-weight:600;';
+
+  var cols=[
+    ['Volume, kg','volume',fmt0],['Rental/Amor','rental',fmt0],['Spare Parts','spareparts',fmt0],
+    ['Manpower Direct','mpDirect',fmt0],['Diesel','diesel',fmt0],['Electricity Machine','elecMachine',fmt0],
+    ['Manpower Agency','mpAgency',fmt0],['Other','other',fmt0],['3rd Party Svc','thirdParty',fmt0],
+    ['CESS Dep.','cess',fmt0],['SP Dep.','spDep',fmt0],['Insurance Pers.','insurance',fmt0],
+    ['Water','water',fmt0],['Thread','thread',fmt0],['Tolling Fee','tolling',fmt0],
+    ['Total Cost','totalCost',fmt0],['Cost, ₱/kg','costPerKg',fmtPkg]
+  ];
+
+  var html='<div class="sec"><div class="sec-hdr"><div class="sec-title">Monthly Production Cost — By Site · '+wantMonth+' 2026</div><div class="sec-line"></div></div>';
+  html+='<div class="cc"><div class="tbl-wrap"><table style="width:100%;border-collapse:collapse;table-layout:auto">';
+  html+='<thead><tr><th style="'+THL+'">Plant</th>';
+  cols.forEach(function(c){ html+='<th style="'+TH+'">'+c[0]+'</th>'; });
+  html+='</tr></thead><tbody>';
+
+  function rowHTML(rec, opts){
+    opts=opts||{};
+    var bg = opts.fill || (opts.alt ? 'background:var(--bg2)' : 'background:var(--bg1)');
+    var rowStyle = opts.national ? 'background:var(--blue-d);border-top:2px solid var(--blue)' : bg;
+    var nameColor = opts.national ? 'color:var(--blue)' : '';
+    var s = '<tr style="'+rowStyle+'">';
+    s += '<td style="'+TDL+nameColor+'">'+(opts.national?'':dot(rec.name))+rec.name+'</td>';
+    cols.forEach(function(c){
+      var val = c[2](rec[c[1]]);
+      var emphasize = (c[1]==='totalCost'||c[1]==='costPerKg') ? 'font-weight:700;color:var(--amber)' : '';
+      s += '<td style="'+TD+emphasize+'">'+val+'</td>';
+    });
+    s += '</tr>';
+    return s;
+  }
+
+  var altIdx=0;
+  plantOrder.forEach(function(p){
+    if(plants[p]){ html += rowHTML(plants[p], {alt: (altIdx++%2===1)}); }
+  });
+  html += rowHTML(national, {national:true});
+  if(ccpc) html += rowHTML(ccpc, {alt:(altIdx++%2===1)});
+  if(south) html += rowHTML(south, {alt:(altIdx++%2===1)});
+  if(natToll) html += rowHTML(natToll, {national:true});
+
+  html += '</tbody></table></div></div>';
+  html += '<div style="font-size:8px;color:var(--text3);font-style:italic;margin-top:4px">Source: Prod Cost sheet (per-site monthly actuals, ₱). NATIONAL W/ TOLL includes CCPC/SOUTH tolling fees not present in individual plant cost lines.</div>';
+  html += '</div>';
+
+  target.innerHTML = html;
+}
+
 function renderCost(){
   var ct=document.getElementById('content-cost');
   if(!ct) return;
@@ -1277,6 +1443,9 @@ function renderCost(){
     +scCard('Total Cost',sums.CostTotal,perTon(sums.CostTotal),'var(--red)')
     +'</div></div>';
 
+  // ── Monthly Production Cost (Prod Cost sheet, by site) ───
+  html+='<div id="prodcost-section"><div class="no-data">⟳ Loading monthly production cost...</div></div>';
+
   // ── Daily Detail Table ───────────────────────────────────
   html+='<div class="sec"><div class="sec-hdr"><div class="sec-title">Daily Production Cost Detail <span style="font-size:10px;color:var(--text3);font-weight:400">(all values in ₱/ton)</span></div><div class="sec-line"></div></div>';
   html+='<div class="cc"><div class="tbl-wrap"><table style="width:100%;border-collapse:collapse;table-layout:auto;font-size:9px">';
@@ -1333,6 +1502,7 @@ function renderCost(){
   html+='</tbody></table></div></div></div>';
 
   ct.innerHTML = html;
+  loadProdCostMonthly();
 }
 function renderDowntimeMonth(m){
   // Always re-render everything with new month
