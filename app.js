@@ -78,348 +78,384 @@ function showLoading(){var e=document.getElementById('loading');if(e)e.style.dis
 function hideLoading(){var e=document.getElementById('loading');if(e)e.style.display='none';}
 function scheduleRefresh(){if(refreshTimer)clearInterval(refreshTimer);refreshTimer=setInterval(function(){loadData(true);},5*60*1000);}
 function manualRefresh(){loadData(true);}
-// ── WEEKLY REPORT GENERATOR (.docx) ─────────────────────────
+// ── WEEKLY REPORT GENERATOR (.pptx) ─────────────────────────
 async function downloadWeeklyReport(){
-  var btn = document.getElementById('weekly-report-btn');
-  var origText = btn.innerHTML;
-  btn.innerHTML = '⟳ Building...';
-  btn.disabled = true;
-  try {
-    var wk = activeWeek;
-    var weeklyD = DATA.weekly || await gasGet('weekly');
-    var downtimeD = await gasGet('downtime', {site:'NATIONAL'});
-    var forecastD = DATA.forecast || await gasGet('forecast');
-    var costD = await gasGet('pcdaily', {site:'NATIONAL', week:wk});
+  var btn=document.getElementById('weekly-report-btn');
+  var origText=btn.innerHTML;
+  btn.innerHTML='⟳ Building PPTX...';
+  btn.disabled=true;
+  try{
+    if(typeof PptxGenJS==='undefined') throw new Error('PptxGenJS not loaded');
 
-    var wrows = (weeklyD.rows||[]).filter(function(r){return +r.Week===+wk;});
-    var natRow = wrows.filter(function(r){return (r.Plant||'').toUpperCase()==='NATIONAL';})[0];
-    var siteRowsRaw = wrows.filter(function(r){return (r.Plant||'').toUpperCase()!=='NATIONAL';});
+    var wk=activeWeek;
+    var weeklyD=DATA.weekly||await gasGet('weekly');
+    var downtimeD=await gasGet('downtime',{site:'NATIONAL'});
 
-    var prevWk = wk-1;
-    var prevRows = (weeklyD.rows||[]).filter(function(r){return +r.Week===+prevWk;});
-    var prevNat = prevRows.filter(function(r){return (r.Plant||'').toUpperCase()==='NATIONAL';})[0];
+    var wrows=(weeklyD.rows||[]).filter(function(r){return +r.Week===+wk;});
+    var natRow=wrows.find(function(r){return (r.Plant||'').toUpperCase()==='NATIONAL';})||{};
+    var siteRows=wrows.filter(function(r){return (r.Plant||'').toUpperCase()!=='NATIONAL';});
 
-    var dtRows = (downtimeD.rows||[]).filter(function(r){return String(r.Week)===String(wk);});
-    var udtByCat = {}, udtByPlant = {};
+    // Last 5 weeks reject trend
+    var allWeeks=(weeklyD.weeks||[]).map(Number).sort(function(a,b){return a-b;});
+    var last5=allWeeks.slice(-5);
+    var rLbl=last5.map(function(w){return 'W'+w;});
+    var rQty=last5.map(function(w){
+      var r=(weeklyD.rows||[]).find(function(r){return +r.Week===w&&(r.Plant||'').toUpperCase()==='NATIONAL';});
+      if(!r)return 0;
+      var v=gf(r,'Total Remill Reject, mt'); return +v.toFixed(2);
+    });
+    var rRate=last5.map(function(w){
+      var r=(weeklyD.rows||[]).find(function(r){return +r.Week===w&&(r.Plant||'').toUpperCase()==='NATIONAL';});
+      if(!r)return 0;
+      var p=gf(r,'Rejection Rate, %'); return +(p>1?p:p*100).toFixed(3);
+    });
+    var outRates=last5.map(function(w){
+      var r=(weeklyD.rows||[]).find(function(r){return +r.Week===w&&(r.Plant||'').toUpperCase()==='NATIONAL';});
+      if(!r)return 0;
+      var p=gf(r,'Outright Reject Rate, %'); return +(p>1?p:p*100).toFixed(3);
+    });
+    var othRates=last5.map(function(w){
+      var r=(weeklyD.rows||[]).find(function(r){return +r.Week===w&&(r.Plant||'').toUpperCase()==='NATIONAL';});
+      if(!r)return 0;
+      var p=gf(r,'Other Reject Rate, %'); return +(p>1?p:p*100).toFixed(3);
+    });
+
+    // Cost data for all weeks
+    var costCache=DATA.costWeeklyTrend&&DATA.costWeeklyTrend['NATIONAL']||{};
+    var costTrend=allWeeks.filter(function(w){return costCache[w]&&costCache[w].total>0;}).map(function(w){
+      var d=costCache[w]; return {week:w, total:d.total, cost_ton:d.vol>0?+(d.total/d.vol).toFixed(2):0};
+    });
+    var fvTrend=allWeeks.filter(function(w){return costCache[w]&&costCache[w].total>0;}).map(function(w){
+      var d=costCache[w]; return {week:w, fixed_ton:d.vol>0?+(d.fixed/d.vol).toFixed(2):0, var_ton:d.vol>0?+(d.variable/d.vol).toFixed(2):0};
+    });
+
+    // Current week cost
+    var cD=DATA.costWeeklyTrend&&DATA.costWeeklyTrend['NATIONAL']&&DATA.costWeeklyTrend['NATIONAL'][wk];
+    var totalCost=cD?cD.total:0, costTon=cD&&cD.vol>0?+(cD.total/cD.vol).toFixed(2):0;
+    var fixedCost=cD?cD.fixed:0, fixedTon=cD&&cD.vol>0?+(cD.fixed/cD.vol).toFixed(2):0;
+    var varCost=cD?cD.variable:0, varTon=cD&&cD.vol>0?+(cD.variable/cD.vol).toFixed(2):0;
+
+    // UDT data
+    var dtRows=(downtimeD.rows||[]).filter(function(r){return String(r.Week)===String(wk);});
+    var udtByCat={}, udtSubCats=[];
     dtRows.forEach(function(r){
-      var u = r['Unscheduled Downtime']||0;
-      udtByCat[r.Category] = (udtByCat[r.Category]||0) + u;
-      udtByPlant[r.Plant] = (udtByPlant[r.Plant]||0) + u;
+      var u=+(r['Unscheduled Downtime']||r.UDT_hrs||0);
+      var cat=r.Category||'';
+      var sub=r['Sub-Category']||r.SubCategory||cat;
+      var plant=r.Plant||'';
+      if(u>0){
+        udtByCat[cat]=(udtByCat[cat]||0)+u;
+        if(sub&&plant) udtSubCats.push({label:plant+' – '+sub, hrs:u});
+      }
     });
-    var topCats = Object.keys(udtByCat).map(function(k){return {cat:k, hrs:udtByCat[k]};}).filter(function(x){return x.hrs>0;}).sort(function(a,b){return b.hrs-a.hrs;});
-    var topPlants = Object.keys(udtByPlant).map(function(k){return {plant:k, hrs:udtByPlant[k]};}).filter(function(x){return x.hrs>0;}).sort(function(a,b){return b.hrs-a.hrs;});
+    var paretoArr=Object.keys(udtByCat).map(function(k){return {cat:k,hrs:udtByCat[k]};}).filter(function(x){return x.hrs>0;}).sort(function(a,b){return b.hrs-a.hrs;});
+    udtSubCats.sort(function(a,b){return b.hrs-a.hrs;});
+    var top10=udtSubCats.slice(0,10).map(function(r,i){return {rank:i+1,label:r.label,hrs:r.hrs};});
 
-    var fAreas = forecastD.rows||[];
-    var fNat = forecastD.national || {};
-
-    var cRows = (costD.rows||[]).filter(function(r){return r.Plant==='NATIONAL';});
-    var totalVol = cRows.reduce(function(a,r){return a+(r.TotalVolume||0);},0);
-    var totalCost = cRows.reduce(function(a,r){return a+(r.CostTotal||0);},0);
-    var totalFixed = cRows.reduce(function(a,r){return a+(r.FixedTotal||0);},0);
-    var totalVar = cRows.reduce(function(a,r){return a+(r.VarTotal||0);},0);
-
-    var doc = buildWeeklyReportDoc({
-      week: wk, natRow: natRow, siteRows: siteRowsRaw, prevNat: prevNat,
-      topCats: topCats, topPlants: topPlants, dtRows: dtRows,
-      fAreas: fAreas, fNat: fNat,
-      cRows: cRows, totalVol: totalVol, totalCost: totalCost, totalFixed: totalFixed, totalVar: totalVar
+    // Site cost detail — use available week data
+    var siteCostRows=[];
+    var siteNames=['AC','PFMIS','HOREB','BUKID','ARGAO','HOREB MG','AC MG','NATIONAL'];
+    siteNames.forEach(function(plant){
+      var sc=DATA.costWeeklyTrend&&DATA.costWeeklyTrend[plant]&&DATA.costWeeklyTrend[plant][wk];
+      var siteOut=siteRows.find(function(r){return (r.Plant||'').toUpperCase()===plant.toUpperCase();});
+      var vol=sc?sc.vol:(siteOut?gf(siteOut,'Total Plant Output,mt w/o toll'):0);
+      var total=sc?sc.total:0;
+      var fixed=sc?sc.fixed:0, variable=sc?sc.variable:0;
+      siteCostRows.push({plant:plant,vol:Math.round(vol),total:+(total/1000).toFixed(1),fixed:+(fixed/1000).toFixed(1),variable:+(variable/1000).toFixed(1),cpt:vol>0?Math.round(total/vol):0});
     });
 
-    var blob = await docx.Packer.toBlob(doc);
-    var url = URL.createObjectURL(blob);
-    var a = document.createElement('a');
-    a.href = url;
-    a.download = 'VPI_Weekly_Report_Week' + wk + '.docx';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  } catch(e){
-    alert('Error building report: ' + e.message);
+    // Build pptx
+    await buildWeeklyReportPptx({
+      week:wk, month:natRow.MONTH||'', natRow:natRow, siteRows:siteRows,
+      rLbl:rLbl, rQty:rQty, rRate:rRate, outRates:outRates, othRates:othRates,
+      costTrend:costTrend, fvTrend:fvTrend,
+      totalCost:totalCost, costTon:costTon, fixedCost:fixedCost, fixedTon:fixedTon, varCost:varCost, varTon:varTon,
+      paretoArr:paretoArr, top10:top10, udtByCat:udtByCat,
+      siteCostRows:siteCostRows
+    });
+  }catch(e){
+    alert('Error building PPTX: '+e.message);
     console.error(e);
-  } finally {
-    btn.innerHTML = origText;
-    btn.disabled = false;
+  }finally{
+    btn.innerHTML=origText;
+    btn.disabled=false;
   }
 }
 
-function buildWeeklyReportDoc(d){
-  var D = docx;
-  var navy = "1F3864", lightBlue="DCE6F1", greenBg="E2EFDA", redBg="FCE4E4", amberBg="FFF2CC";
-  var border = { style: D.BorderStyle.SINGLE, size: 1, color: "CCCCCC" };
-  var borders = { top: border, bottom: border, left: border, right: border };
+async function buildWeeklyReportPptx(d){
+  var pres=new PptxGenJS();
+  pres.layout='LAYOUT_WIDE';
 
-  function fmtN(n,dec){ if(n===undefined||n===null||isNaN(n)) return '\u2014'; dec=dec===undefined?1:dec; return n.toLocaleString(undefined,{minimumFractionDigits:dec,maximumFractionDigits:dec}); }
-  function pesoM(n){ if(!n) return '\u2014'; return (n/1000000).toFixed(2)+'M'; }
-  function pct(n){ if(n===undefined||n===null||isNaN(n)) return '\u2014'; return (n*100).toFixed(1)+'%'; }
-  function pctChange(a,b){ if(!a||!b) return '\u2014'; var c=(a-b)/b*100; return (c>=0?'+':'')+c.toFixed(1)+'%'; }
+  var NAVY='0B1F3A', BLUE='1E5AA8', SKY='4A90D9', ICE='E8F1FA', WHITE='FFFFFF';
+  var RED='D62828', AMBER='E07B00', GREEN='1A7A3C', SLATE='546E7A';
+  var PURPLE='7B2D8B', TEAL='0097A7', GOLD='F4A300';
 
-  function cell(text, opts){
-    opts = opts||{};
-    return new D.TableCell({
-      borders: borders,
-      width: { size: opts.width||1500, type: D.WidthType.DXA },
-      shading: opts.fill ? { fill: opts.fill, type: D.ShadingType.CLEAR } : undefined,
-      margins: { top: 60, bottom: 60, left: 100, right: 100 },
-      verticalAlign: D.VerticalAlign.CENTER,
-      children: [new D.Paragraph({
-        alignment: opts.align || D.AlignmentType.LEFT,
-        children: [new D.TextRun({ text: String(text), bold: opts.bold||false, size: opts.size||18, color: opts.color||"000000" })]
-      })]
+  function fmtN(v,dec){dec=dec||0;if(v===null||v===undefined)return '—';return Number(v).toLocaleString('en-PH',{minimumFractionDigits:dec,maximumFractionDigits:dec});}
+  function fmtM(v){return v>=1000000?'₱'+(v/1000000).toFixed(2)+'M':v>=1000?'₱'+(v/1000).toFixed(1)+'K':'₱'+fmtN(v,0);}
+  function gfN(r,k){return gf(r,k)||0;}
+
+  var wk=d.week, nat=d.natRow||{};
+  var outputMT=siteRows_sum(d.siteRows,'Total Plant Output,mt w/o toll');
+  function siteRows_sum(rows,field){return (rows||[]).reduce(function(a,r){return a+gf(r,field);},0);}
+
+  var planMT=gfN(nat,'Planned, mt');
+  var capUtil=gfN(nat,'Capacity Utilization Rate,%'); if(capUtil<1)capUtil*=100;
+  var oee=gfN(nat,'OEE'); if(oee<1)oee*=100;
+  var udtHr=gfN(nat,'Unscheduled Down Time, hr');
+  var sdtHr=gfN(nat,'Scheduled Down Time, hr');
+  var udtPct=gfN(nat,'Unscheduled Down Time, %'); if(udtPct<1)udtPct*=100;
+  var kwh=gfN(nat,'kWh/ton'), fuel=gfN(nat,'Li/ton'), coal=gfN(nat,'kg/ton');
+  var rmv=gfN(nat,'RM Variance, %'); if(Math.abs(rmv)<1&&rmv!==0)rmv*=100;
+  var rejRate=gfN(nat,'Rejection Rate, %'); if(rejRate<1&&rejRate!==0)rejRate*=100;
+  var rejQty=gfN(nat,'Total Remill Reject, mt');
+  var outRate=gfN(nat,'Outright Reject Rate, %'); if(outRate<1&&outRate!==0)outRate*=100;
+  var outQty=gfN(nat,'Outright Reject, mt');
+  var othRate=gfN(nat,'Other Reject Rate, %'); if(othRate<1&&othRate!==0)othRate*=100;
+  var othQty=gfN(nat,'Other Reject, mt');
+
+  function addHdr(s,title,sub){
+    s.addText(title,{x:0.5,y:0.2,w:12,h:0.45,fontFace:'Cambria',fontSize:26,color:NAVY,bold:true,margin:0});
+    s.addText(sub,{x:0.5,y:0.62,w:12,h:0.28,fontFace:'Calibri',fontSize:11,color:SLATE,charSpacing:0.5,margin:0});
+  }
+  function addComment(s,y,txt){
+    s.addShape(pres.ShapeType.roundRect,{x:0.5,y:y,w:12.33,h:0.58,rectRadius:0.05,fill:{color:ICE},line:{pt:0.5,color:'D0DCEC'}});
+    s.addText(txt,{x:0.68,y:y+0.08,w:12.0,h:0.44,fontFace:'Calibri',fontSize:9,color:'333333',valign:'top',margin:0,lineSpacingMultiple:1.15});
+  }
+  function kc(s,x,y,w,h,label,val,sub,col,badge,ok){
+    s.addShape(pres.ShapeType.roundRect,{x,y,w,h,rectRadius:0.06,fill:{color:ICE},line:{type:'none'}});
+    s.addText(label,{x:x+0.16,y:y+0.08,w:w-0.32,h:0.24,fontFace:'Calibri',fontSize:8,color:SLATE,bold:true,charSpacing:0.5,margin:0});
+    s.addText(val,{x:x+0.16,y:y+0.28,w:w-0.32,h:0.5,fontFace:'Cambria',fontSize:21,color:col,bold:true,margin:0});
+    if(sub)s.addText(sub,{x:x+0.16,y:y+0.78,w:w-0.32,h:0.22,fontFace:'Calibri',fontSize:7.5,color:SLATE,margin:0});
+    if(badge){s.addShape(pres.ShapeType.roundRect,{x:x+0.16,y:y+1.01,w:w-0.32,h:0.18,rectRadius:0.04,fill:{color:ok?GREEN:RED},line:{type:'none'}});s.addText(badge,{x:x+0.16,y:y+1.01,w:w-0.32,h:0.18,fontFace:'Calibri',fontSize:7,color:WHITE,bold:true,align:'center',margin:0,valign:'middle'});}
+  }
+
+  var mnth=d.month||nat.MONTH||'';
+
+  // SLIDE 1 — TITLE
+  {
+    var s=pres.addSlide();
+    s.background={color:NAVY};
+    s.addShape(pres.ShapeType.rect,{x:0,y:5.9,w:13.33,h:1.6,fill:{color:BLUE},line:{type:'none'}});
+    s.addShape(pres.ShapeType.rect,{x:0,y:5.85,w:13.33,h:0.08,fill:{color:SKY},line:{type:'none'}});
+    s.addText('VPI OPERATIONS',{x:0.7,y:1.2,w:11,h:1,fontFace:'Cambria',fontSize:48,color:WHITE,bold:true,margin:0});
+    s.addText('WEEKLY PERFORMANCE REPORT',{x:0.7,y:2.2,w:11,h:0.65,fontFace:'Calibri',fontSize:28,color:SKY,bold:true,margin:0});
+    s.addText('Week '+wk+'  ·  '+mnth+' 2026  ·  National',{x:0.7,y:2.95,w:11,h:0.45,fontFace:'Calibri',fontSize:17,color:'CADCFC',margin:0});
+    s.addText('CONFIDENTIAL — FOR INTERNAL USE ONLY',{x:0.7,y:6.2,w:11,h:0.38,fontFace:'Calibri',fontSize:10,color:'88AACC',italic:true,margin:0});
+    s.addText('VPI Operations Dashboard',{x:0.7,y:6.65,w:11,h:0.32,fontFace:'Calibri',fontSize:10,color:'CADCFC',margin:0});
+  }
+
+  // SLIDE 2 — PRODUCTION PERFORMANCE
+  {
+    var s=pres.addSlide();
+    s.background={color:WHITE};
+    addHdr(s,'PRODUCTION PERFORMANCE','WEEK '+wk+' · '+mnth+' 2026 · NATIONAL');
+    var cw=3.0,cg=0.17,cx0=0.5,cy=0.95;
+    kc(s,cx0,cy,cw,1.25,'OUTPUT',fmtN(outputMT,0)+' MT','Plan: '+fmtN(planMT,0)+' MT',BLUE,outputMT>=planMT?'On Target':'Below Plan',outputMT>=planMT);
+    kc(s,cx0+cw+cg,cy,cw,1.25,'CAP. UTILIZATION',capUtil.toFixed(1)+'%','Scheduled capacity',BLUE,capUtil>=80?'Good':'Low',capUtil>=80);
+    kc(s,cx0+2*(cw+cg),cy,cw,1.25,'OEE',oee.toFixed(1)+'%','Overall Equip. Eff.',oee>=85?GREEN:RED,oee>=85?'Target Met':'Below Target',oee>=85);
+    kc(s,cx0+3*(cw+cg),cy,cw,1.25,'UDT',fmtN(udtHr,1)+' hrs',udtPct.toFixed(1)+'% of sched.',udtHr<=20?GREEN:RED,udtHr<=20?'Within Limit':'Exceeded',udtHr<=20);
+    var cy2=2.32;
+    [{label:'POWER',value:kwh.toFixed(2)+' kWh/ton',ok:kwh<=35},{label:'FUEL',value:fuel.toFixed(2)+' L/ton',ok:fuel<=3.5},{label:'COAL',value:coal.toFixed(2)+' kg/ton',ok:coal<=12},{label:'RM VARIANCE',value:(rmv>=0?'+':'')+rmv.toFixed(2)+'%',ok:rmv>=0}].forEach(function(c,i){
+      var x=cx0+i*(cw+cg);
+      s.addShape(pres.ShapeType.roundRect,{x,y:cy2,w:cw,h:0.75,rectRadius:0.06,fill:{color:ICE},line:{type:'none'}});
+      s.addText(c.label,{x:x+0.16,y:cy2+0.07,w:cw-0.32,h:0.22,fontFace:'Calibri',fontSize:7.5,color:SLATE,bold:true,margin:0});
+      s.addText(c.value,{x:x+0.16,y:cy2+0.27,w:cw-0.32,h:0.38,fontFace:'Cambria',fontSize:18,color:c.ok?NAVY:RED,bold:true,margin:0});
     });
+    s.addShape(pres.ShapeType.roundRect,{x:0.5,y:3.18,w:12.33,h:0.58,rectRadius:0.05,fill:{color:ICE},line:{pt:0.5,color:'D0DCEC'}});
+    s.addText([{text:'Analysis: ',options:{bold:true,color:NAVY}},{text:'National output '+fmtN(outputMT,0)+' MT in Week '+wk+' — '+(outputMT>=planMT?'meeting':'below')+' the '+fmtN(planMT,0)+' MT plan. OEE '+oee.toFixed(1)+'%. UDT '+fmtN(udtHr,1)+' hrs ('+udtPct.toFixed(1)+'%).',options:{color:'333333'}}],{x:0.68,y:3.24,w:12.0,h:0.46,fontFace:'Calibri',fontSize:9,valign:'top',margin:0,lineSpacingMultiple:1.15});
+    // site table
+    var tHdr=[{text:'Site',options:{fill:{color:NAVY},color:WHITE,bold:true,fontSize:7.5,align:'left'}},{text:'Output MT',options:{fill:{color:NAVY},color:WHITE,bold:true,fontSize:7.5,align:'right'}},{text:'Cap Util%',options:{fill:{color:NAVY},color:WHITE,bold:true,fontSize:7.5,align:'right'}},{text:'OEE%',options:{fill:{color:NAVY},color:WHITE,bold:true,fontSize:7.5,align:'right'}},{text:'UDT hrs',options:{fill:{color:NAVY},color:WHITE,bold:true,fontSize:7.5,align:'right'}},{text:'Power kWh/t',options:{fill:{color:NAVY},color:WHITE,bold:true,fontSize:7.5,align:'right'}},{text:'Fuel L/ton',options:{fill:{color:NAVY},color:WHITE,bold:true,fontSize:7.5,align:'right'}},{text:'Coal kg/t',options:{fill:{color:NAVY},color:WHITE,bold:true,fontSize:7.5,align:'right'}},{text:'RM Var%',options:{fill:{color:NAVY},color:WHITE,bold:true,fontSize:7.5,align:'right'}},{text:'Rej Rate%',options:{fill:{color:NAVY},color:WHITE,bold:true,fontSize:7.5,align:'right'}}];
+    var tData=[tHdr];
+    var allSiteRows=d.siteRows.concat([nat]);
+    var SITE_ORDER=['AC','PFMIS','HOREB','BUKID','ARGAO','HOREB MG','AC MG','CCPC','SOUTH'];
+    var sortedSites=[];
+    SITE_ORDER.forEach(function(n){var r=allSiteRows.find(function(x){return (x.Plant||'').toUpperCase()===n.toUpperCase();});if(r)sortedSites.push(r);});
+    sortedSites.forEach(function(r,i){
+      var pname=(r.Plant||'').toUpperCase();
+      var bg=i%2===0?WHITE:ICE;
+      var out=gfN(r,'Total Plant Output,mt w/o toll');
+      var cu=gfN(r,'Capacity Utilization Rate,%'); if(cu<1&&cu>0)cu*=100;
+      var oe=gfN(r,'OEE'); if(oe<1&&oe>0)oe*=100;
+      var udt=gfN(r,'Unscheduled Down Time, hr');
+      var pw=gfN(r,'kWh/ton'),fl=gfN(r,'Li/ton'),cl=gfN(r,'kg/ton');
+      var rv=gfN(r,'RM Variance, %'); if(Math.abs(rv)<1&&rv!==0)rv*=100;
+      var rj=gfN(r,'Rejection Rate, %'); if(rj<1&&rj>0)rj*=100;
+      tData.push([
+        {text:pname,options:{fill:{color:bg},color:'222222',bold:true,fontSize:8,align:'left'}},
+        {text:out>0?fmtN(out,0):'—',options:{fill:{color:bg},color:'333333',fontSize:8,align:'right'}},
+        {text:cu>0?cu.toFixed(1)+'%':'—',options:{fill:{color:bg},color:cu>=80?GREEN:RED,bold:cu>0&&cu<80,fontSize:8,align:'right'}},
+        {text:oe>0?oe.toFixed(1)+'%':'—',options:{fill:{color:bg},color:oe>0&&oe<85?RED:'333333',fontSize:8,align:'right'}},
+        {text:udt>0?udt.toFixed(1):'—',options:{fill:{color:bg},color:udt>20?RED:udt>10?AMBER:SLATE,fontSize:8,align:'right'}},
+        {text:pw>0?pw.toFixed(1):'—',options:{fill:{color:bg},color:pw>35?RED:'333333',fontSize:8,align:'right'}},
+        {text:fl>0?fl.toFixed(2):'—',options:{fill:{color:bg},color:fl>3.5?RED:'333333',fontSize:8,align:'right'}},
+        {text:cl>0?cl.toFixed(1):'—',options:{fill:{color:bg},color:'333333',fontSize:8,align:'right'}},
+        {text:rv!==0?(rv>=0?'+':'')+rv.toFixed(2)+'%':'—',options:{fill:{color:bg},color:rv<0?RED:GREEN,fontSize:8,align:'right'}},
+        {text:rj>0?rj.toFixed(2)+'%':'—',options:{fill:{color:bg},color:rj>1?RED:rj>0.3?AMBER:'333333',bold:rj>1,fontSize:8,align:'right'}},
+      ]);
+    });
+    s.addTable(tData,{x:0.5,y:3.88,w:12.33,colW:[0.82,0.97,0.97,0.88,0.88,1.05,1.0,0.88,0.92,0.95],border:{pt:0.4,color:'D9E2EC'},autoPage:false,rowH:0.27,valign:'middle'});
   }
-  function headerRow(headers, widths){
-    return new D.TableRow({ tableHeader:true, children: headers.map(function(h,i){
-      return cell(h, {fill:navy, color:"FFFFFF", bold:true, width:widths[i], align: i===0?D.AlignmentType.LEFT:D.AlignmentType.CENTER, size:16});
-    })});
+
+  // SLIDE 3 — REJECTION RATE
+  {
+    var s=pres.addSlide();
+    s.background={color:WHITE};
+    addHdr(s,'REJECTION RATE ANALYSIS','WEEK '+wk+' · '+mnth+' 2026 · NATIONAL');
+    var sw=4.0,sg=0.17,sy=0.95,sh=1.38;
+    [[RED,'TOTAL REJECTION RATE',rejRate,rejQty,'Total Remill Reject'],[AMBER,'OUTRIGHT REJECT RATE',outRate,outQty,'Outright Reject'],[PURPLE,'OTHER REJECT RATE',othRate,othQty,'Other Reject']].forEach(function(arr,i){
+      var col=arr[0],label=arr[1],pct=arr[2],qty=arr[3],desc=arr[4];
+      var x=0.5+i*(sw+sg);
+      s.addShape(pres.ShapeType.roundRect,{x,y:sy,w:sw,h:sh,rectRadius:0.08,fill:{color:ICE},line:{pt:0.5,color:'D9E2EC'}});
+      s.addText(label,{x:x+0.2,y:sy+0.09,w:sw-0.4,h:0.24,fontFace:'Calibri',fontSize:8,color:SLATE,bold:true,margin:0});
+      s.addText(pct.toFixed(2)+'%',{x:x+0.2,y:sy+0.3,w:sw-0.4,h:0.65,fontFace:'Cambria',fontSize:40,color:col,bold:true,margin:0});
+      s.addText(fmtN(qty,2)+' mt  ·  '+desc,{x:x+0.2,y:sy+1.0,w:sw-0.4,h:0.3,fontFace:'Calibri',fontSize:8.5,color:SLATE,margin:0});
+    });
+    s.addShape(pres.ShapeType.roundRect,{x:0.5,y:2.45,w:12.33,h:0.58,rectRadius:0.05,fill:{color:ICE},line:{pt:0.5,color:'D0DCEC'}});
+    s.addText([{text:'Analysis: ',options:{bold:true,color:NAVY}},{text:'Week '+wk+' rejection: '+rejRate.toFixed(2)+'% ('+fmtN(rejQty,2)+' MT). Outright: '+outRate.toFixed(2)+'%; Other: '+othRate.toFixed(2)+'%. '+(rejRate>1?'Exceeds 1% threshold — root cause action required.':'Within acceptable 1% threshold.'),options:{color:'333333'}}],{x:0.68,y:2.51,w:12.0,h:0.46,fontFace:'Calibri',fontSize:9,valign:'top',margin:0,lineSpacingMultiple:1.15});
+    // Combo chart
+    s.addChart(pres.charts.BAR,[{name:'Reject Qty (mt)',labels:d.rLbl,values:d.rQty},{name:'Rejection Rate %',labels:d.rLbl,values:d.rRate}],{x:0.5,y:3.15,w:6.0,h:3.85,barDir:'col',showTitle:true,title:'Reject Qty (mt) & Rejection Rate %',titleFontSize:10,titleColor:NAVY,showLegend:true,legendPos:'b',legendFontSize:9,showValue:true,dataLabelFontSize:8,dataLabelColor:NAVY,dataLabelFormatCode:'0.00',chartColors:[SKY,RED],chartArea:{fill:{color:WHITE}}});
+    s.addChart(pres.charts.LINE,[{name:'Outright Reject %',labels:d.rLbl,values:d.outRates},{name:'Other Reject %',labels:d.rLbl,values:d.othRates}],{x:6.83,y:3.15,w:6.0,h:3.85,showTitle:true,title:'Outright vs Other Reject % Trend',titleFontSize:10,titleColor:NAVY,chartColors:[AMBER,PURPLE],lineSize:2.5,lineDataSymbol:'circle',lineDataSymbolSize:6,showLegend:true,legendPos:'b',legendFontSize:9,showValue:true,dataLabelFontSize:8.5,dataLabelColor:NAVY,dataLabelFormatCode:'0.00"%"',chartArea:{fill:{color:WHITE}}});
   }
-  function dataRow(cells, widths, opts){
-    opts=opts||{};
-    return new D.TableRow({ children: cells.map(function(c,i){
-      return cell(c, {width:widths[i], align: i===0?D.AlignmentType.LEFT:D.AlignmentType.CENTER, fill:opts.fill, bold:opts.bold});
-    })});
+
+  // SLIDE 4 — PRODUCTION COST
+  {
+    var s=pres.addSlide();
+    s.background={color:WHITE};
+    addHdr(s,'PRODUCTION COST','WEEK '+wk+' · '+mnth+' 2026 · NATIONAL');
+    var ccw=3.9,ccg=0.18,ccy=0.95;
+    [[RED,'TOTAL COST',fmtM(d.totalCost),'₱'+fmtN(d.costTon,2)+'/ton avg'],[BLUE,'FIXED COST',fmtM(d.fixedCost),'₱'+fmtN(d.fixedTon,2)+'/ton · '+(d.totalCost>0?((d.fixedCost/d.totalCost)*100).toFixed(0):0)+'%'],[AMBER,'VARIABLE COST',fmtM(d.varCost),'₱'+fmtN(d.varTon,2)+'/ton · '+(d.totalCost>0?((d.varCost/d.totalCost)*100).toFixed(0):0)+'%']].forEach(function(arr,i){
+      var col=arr[0],label=arr[1],val=arr[2],sub=arr[3];
+      var x=0.5+i*(ccw+ccg);
+      s.addShape(pres.ShapeType.roundRect,{x,y:ccy,w:ccw,h:1.1,rectRadius:0.06,fill:{color:ICE},line:{type:'none'}});
+      s.addText(label,{x:x+0.18,y:ccy+0.08,w:ccw-0.36,h:0.24,fontFace:'Calibri',fontSize:8,color:SLATE,bold:true,margin:0});
+      s.addText(val,{x:x+0.18,y:ccy+0.28,w:ccw-0.36,h:0.48,fontFace:'Cambria',fontSize:24,color:col,bold:true,margin:0});
+      s.addText(sub,{x:x+0.18,y:ccy+0.78,w:ccw-0.36,h:0.26,fontFace:'Calibri',fontSize:8,color:SLATE,margin:0});
+    });
+    s.addShape(pres.ShapeType.roundRect,{x:0.5,y:2.16,w:12.33,h:0.5,rectRadius:0.05,fill:{color:ICE},line:{pt:0.5,color:'D0DCEC'}});
+    s.addText([{text:'Analysis: ',options:{bold:true,color:NAVY}},{text:'Cost ₱'+fmtN(d.costTon,2)+'/ton. Fixed '+(d.totalCost>0?((d.fixedCost/d.totalCost)*100).toFixed(0):0)+'% (₱'+fmtN(d.fixedTon,2)+'/ton), Variable '+(d.totalCost>0?((d.varCost/d.totalCost)*100).toFixed(0):0)+'% (₱'+fmtN(d.varTon,2)+'/ton).',options:{color:'333333'}}],{x:0.68,y:2.22,w:12.0,h:0.4,fontFace:'Calibri',fontSize:9,valign:'top',margin:0});
+    var cLbl=d.costTrend.map(function(r){return 'W'+r.week;});
+    s.addChart(pres.charts.BAR,[{name:'Total Cost (₱)',labels:cLbl,values:d.costTrend.map(function(r){return r.total;})},{name:'₱/ton',labels:cLbl,values:d.costTrend.map(function(r){return r.cost_ton;})}],{x:0.5,y:2.78,w:7.8,h:3.5,barDir:'col',showTitle:true,title:'Weekly Total Cost (₱) & ₱/ton',titleFontSize:10,titleColor:NAVY,showLegend:true,legendPos:'b',legendFontSize:9,showValue:true,dataLabelFontSize:7.5,dataLabelColor:NAVY,chartColors:[SKY,RED],chartArea:{fill:{color:WHITE}}});
+    var fLbl=d.fvTrend.map(function(r){return 'W'+r.week;});
+    s.addChart(pres.charts.LINE,[{name:'Fixed (₱/ton)',labels:fLbl,values:d.fvTrend.map(function(r){return r.fixed_ton;})},{name:'Variable (₱/ton)',labels:fLbl,values:d.fvTrend.map(function(r){return r.var_ton;})}],{x:8.63,y:2.78,w:4.2,h:3.5,showTitle:true,title:'Fixed vs Variable (₱/ton)',titleFontSize:10,titleColor:NAVY,chartColors:[BLUE,AMBER],lineSize:2.5,lineDataSymbol:'circle',lineDataSymbolSize:5,showLegend:true,legendPos:'b',legendFontSize:9,showValue:true,dataLabelFontSize:7.5,dataLabelColor:NAVY,chartArea:{fill:{color:ICE}}});
   }
-  function sectionHeading(text){
-    return new D.Paragraph({ heading: D.HeadingLevel.HEADING_1, children:[new D.TextRun(text)],
-      border:{bottom:{style:D.BorderStyle.SINGLE, size:6, color:navy, space:4}} });
+
+  // SLIDE 5 — COST SITE DETAIL
+  {
+    var s=pres.addSlide();
+    s.background={color:WHITE};
+    addHdr(s,'PRODUCTION COST — SITE DETAIL','WEEK '+wk+' · '+mnth+' 2026 · COSTS IN ₱000 (KPHP) · VOLUME = WEEKLY TOTAL MT');
+    var hRow=[{text:'Plant',options:{fill:{color:NAVY},color:WHITE,bold:true,fontSize:7.5,align:'left'}},{text:'Volume',options:{fill:{color:NAVY},color:WHITE,bold:true,fontSize:7.5,align:'right'}},{text:'Fixed',options:{fill:{color:NAVY},color:WHITE,bold:true,fontSize:7.5,align:'right'}},{text:'Variable',options:{fill:{color:NAVY},color:WHITE,bold:true,fontSize:7.5,align:'right'}},{text:'Total Cost',options:{fill:{color:NAVY},color:WHITE,bold:true,fontSize:7.5,align:'right'}},{text:'₱/ton',options:{fill:{color:NAVY},color:WHITE,bold:true,fontSize:7.5,align:'right'}}];
+    var tData=[hRow];
+    d.siteCostRows.forEach(function(r,i){
+      var bg=i%2===0?WHITE:ICE;
+      var isNat=r.plant==='NATIONAL';
+      var fill=isNat?BLUE:bg, tc=isNat?WHITE:'333333';
+      tData.push([
+        {text:r.plant,options:{fill:{color:fill},color:tc,bold:true,fontSize:8.5,align:'left'}},
+        {text:r.vol>0?fmtN(r.vol,0):'—',options:{fill:{color:fill},color:tc,fontSize:8.5,align:'right'}},
+        {text:r.fixed>0?r.fixed.toFixed(1):'—',options:{fill:{color:fill},color:isNat?WHITE:BLUE,bold:true,fontSize:8.5,align:'right'}},
+        {text:r.variable>0?r.variable.toFixed(1):'—',options:{fill:{color:fill},color:isNat?WHITE:AMBER,bold:true,fontSize:8.5,align:'right'}},
+        {text:r.total>0?r.total.toFixed(1):'—',options:{fill:{color:fill},color:isNat?WHITE:RED,bold:true,fontSize:8.5,align:'right'}},
+        {text:r.cpt>0?'₱'+fmtN(r.cpt,0):'—',options:{fill:{color:fill},color:isNat?WHITE:RED,bold:true,fontSize:8.5,align:'right'}},
+      ]);
+    });
+    s.addTable(tData,{x:0.5,y:1.05,w:12.33,colW:[2.0,1.5,1.8,1.8,2.0,1.8],border:{pt:0.5,color:'D9E2EC'},autoPage:false,rowH:0.35,valign:'middle'});
+    s.addText('Cost columns in ₱000 (kphp). Volume = weekly MT produced. ₱/ton = Total Cost × 1,000 ÷ Volume.',{x:0.5,y:4.65,w:12.33,h:0.28,fontFace:'Calibri',fontSize:7.5,color:SLATE,italic:true,margin:0});
   }
-  function subHeading(text){ return new D.Paragraph({heading: D.HeadingLevel.HEADING_2, children:[new D.TextRun(text)]}); }
-  function bodyText(text, opts){ opts=opts||{}; return new D.Paragraph({spacing:{after:120}, children:[new D.TextRun({text:text, italics:opts.italics||false, bold:opts.bold||false, size:20})]}); }
-  function bullet(text){ return new D.Paragraph({numbering:{reference:"bullets", level:0}, spacing:{after:60}, children:[new D.TextRun({text:text, size:20})]}); }
 
-  var siteRows = (d.siteRows||[]).map(function(r){
-    var output = r['Total Plant Output,mt']||0;
-    var planned = r['Planned, mt']||0;
-    var attain = planned>0 ? output/planned : 0;
-    var oee = r.OEE;
-    var udt = r['Unscheduled Down Time, hr']||0;
-    var lowOee = (oee!==undefined && oee!==null && oee!=='' && oee<0.85);
-    var highUdt = udt > 20;
-    return dataRow([
-      r.Plant, fmtN(output,1), fmtN(planned,1), pct(attain),
-      (oee===undefined||oee===null||oee==='')?'N/A':pct(oee),
-      fmtN(udt,1)
-    ], [1800,1300,1300,1180,1300,1300], { fill: (lowOee||highUdt) ? amberBg : undefined });
-  });
-
-  var natOutput = d.natRow ? d.natRow['Total Plant Output,mt']||0 : 0;
-  var natPlanned = d.natRow ? d.natRow['Planned, mt']||0 : 0;
-  var natOee = d.natRow ? d.natRow.OEE : null;
-  var natUdt = d.natRow ? d.natRow['Unscheduled Down Time, hr']||0 : 0;
-  var prevOutput = d.prevNat ? d.prevNat['Total Plant Output,mt']||0 : 0;
-  var prevOee = d.prevNat ? d.prevNat.OEE : null;
-  var prevUdt = d.prevNat ? d.prevNat['Unscheduled Down Time, hr']||0 : 0;
-
-  var catRows = (d.topCats||[]).slice(0,8).map(function(c){
-    return dataRow([c.cat, fmtN(c.hrs,2)+' hrs'], [6885,2295]);
-  });
-  var plantUdtRows = (d.topPlants||[]).map(function(p){
-    return dataRow([p.plant, fmtN(p.hrs,2)+' hrs'], [6885,2295]);
-  });
-
-  var areaRows = (d.fAreas||[]).map(function(a){
-    var mtdPct = parseFloat(a.MTDPct)||0;
-    var remDays = a.RemDays;
-    var fillC = (remDays!==undefined && remDays<-5) ? redBg : (remDays<0 ? amberBg : undefined);
-    return dataRow([
-      a.Area, pesoM(a.Forecast), pesoM(a.MTDPullout), pct(mtdPct),
-      (remDays===undefined?'\u2014':remDays.toFixed(1))
-    ], [1800,1800,1800,1890,1890], {fill: a.Area==='NATIONAL'?lightBlue:fillC, bold: a.Area==='NATIONAL'});
-  });
-
-  var costCats = [
-    {name:'Rental', field:'RentalTon'}, {name:'Spareparts', field:'SPTon'},
-    {name:'Manpower Direct', field:'MPTon'}, {name:'Power', field:'PowerTon'},
-    {name:'Fuel', field:'FuelTon'}, {name:'Coal', field:'CoalTon'},
-    {name:'Agency Manpower', field:'AgencyTon'}, {name:'Others', field:'OthersTon'}
-  ];
-  var avgCostTon = d.totalVol>0 ? d.totalCost/d.totalVol : 0;
-  var costRows = costCats.map(function(c){
-    var vals = (d.cRows||[]).map(function(r){return r[c.field]||0;}).filter(function(v){return v>0;});
-    var avg = vals.length ? vals.reduce(function(a,b){return a+b;},0)/vals.length : 0;
-    var share = avgCostTon>0 ? avg/avgCostTon*100 : 0;
-    return {row: dataRow([c.name, '\u20b1'+fmtN(avg,2), share.toFixed(1)+'%'], [3060,3060,3060]), avg: avg};
-  }).sort(function(a,b){return b.avg-a.avg;}).map(function(x){return x.row;});
-
-  var weekLabel = 'Week ' + d.week;
-  var attainPct = natPlanned>0 ? natOutput/natPlanned : 0;
-
-  var summaryText = "National output reached "+fmtN(natOutput,1)+" mt against a plan of "+fmtN(natPlanned,1)+" mt ("+pct(attainPct)+" attainment)";
-  if(prevOutput) summaryText += ", "+(natOutput>=prevOutput?'up':'down')+" "+Math.abs(parseFloat(pctChange(natOutput,prevOutput))).toFixed(1)+"% from the prior week's "+fmtN(prevOutput,1)+" mt";
-  summaryText += ". National OEE was "+(natOee?pct(natOee):'N/A');
-  if(prevOee && natOee) summaryText += (natOee>=prevOee?", up ":", down ")+Math.abs((natOee-prevOee)*100).toFixed(1)+" points week-over-week";
-  summaryText += ". Unscheduled downtime totaled "+fmtN(natUdt,1)+" hours";
-  if(prevUdt) summaryText += (natUdt<=prevUdt?", an improvement of ":", an increase of ")+fmtN(Math.abs(natUdt-prevUdt),1)+" hours vs. the prior week";
-  summaryText += ". Production cost averaged \u20b1"+fmtN(avgCostTon,0)+"/ton for the week.";
-
-  // ── COMMENT GENERATION ──────────────────────────────────
-  var rawSiteRows = d.siteRows||[];
-
-  // 1. Production Performance comments
-  var prodComments = [];
-  if(prevOutput && natOutput!==undefined){
-    var outChange = parseFloat(pctChange(natOutput, prevOutput));
-    prodComments.push("National attainment was "+(attainPct>=0.98?'strong':attainPct>=0.9?'solid':'soft')+" at "+pct(attainPct)+" of plan, "+(outChange>=0?'up':'down')+" "+Math.abs(outChange).toFixed(1)+"% vs. the prior week.");
+  // SLIDE 6 — DOWNTIME PARETO
+  {
+    var s=pres.addSlide();
+    s.background={color:WHITE};
+    addHdr(s,'DOWNTIME ANALYSIS','WEEK '+wk+' · '+mnth+' 2026 · NATIONAL — CATEGORY PARETO');
+    var dtNames=['Scheduled DT','Unscheduled DT','Mechanical','Change Over','Change Die','Change Screen','Warehouse','Process','Electrical','Raw Materials'];
+    var dtVals=[sdtHr,udtHr,d.udtByCat['Mechanical']||0,d.udtByCat['Change Over']||0,d.udtByCat['Change Die']||0,d.udtByCat['Change Screen']||0,d.udtByCat['Warehouse']||0,d.udtByCat['Process']||0,d.udtByCat['Electrical']||0,d.udtByCat['Raw Materials']||0];
+    var dtCols=[SLATE,udtHr>20?RED:GREEN,RED,AMBER,AMBER,SLATE,AMBER,AMBER,SLATE,SLATE];
+    var dcW=1.26,dcH=0.75,dcG=0.05,dcY=0.95;
+    dtNames.forEach(function(lbl,i){
+      var x=0.5+i*(dcW+dcG);
+      s.addShape(pres.ShapeType.roundRect,{x,y:dcY,w:dcW,h:dcH,rectRadius:0.05,fill:{color:ICE},line:{type:'none'}});
+      s.addText(lbl,{x:x+0.08,y:dcY+0.07,w:dcW-0.16,h:0.22,fontFace:'Calibri',fontSize:6.5,color:SLATE,bold:true,align:'center',margin:0});
+      s.addText((dtVals[i]||0).toFixed(1)+' hrs',{x:x+0.08,y:dcY+0.3,w:dcW-0.16,h:0.36,fontFace:'Cambria',fontSize:14,color:dtCols[i],bold:true,align:'center',margin:0});
+    });
+    var pHrs=d.paretoArr.map(function(r){return r.hrs;}),pTotal=pHrs.reduce(function(a,b){return a+b;},0)||1;
+    var cum=0,pCum=pHrs.map(function(h){cum+=h;return +((cum/pTotal)*100).toFixed(1);});
+    s.addChart(pres.charts.BAR,[{name:'UDT (hrs)',labels:d.paretoArr.map(function(r){return r.cat;}),values:pHrs},{name:'Cumulative %',labels:d.paretoArr.map(function(r){return r.cat;}),values:pCum}],{x:0.5,y:1.85,w:7.8,h:3.5,barDir:'col',showTitle:true,title:'UDT Pareto by Category',titleFontSize:10,titleColor:NAVY,showLegend:true,legendPos:'b',legendFontSize:9,showValue:true,dataLabelFontSize:8,dataLabelColor:NAVY,chartColors:[RED,NAVY],chartArea:{fill:{color:WHITE}}});
+    var ptRows=[[{text:'#',options:{fill:{color:NAVY},color:WHITE,bold:true,fontSize:8.5,align:'center'}},{text:'CATEGORY',options:{fill:{color:NAVY},color:WHITE,bold:true,fontSize:8.5,align:'left'}},{text:'HRS',options:{fill:{color:NAVY},color:WHITE,bold:true,fontSize:8.5,align:'right'}},{text:'%',options:{fill:{color:NAVY},color:WHITE,bold:true,fontSize:8.5,align:'right'}},{text:'CUM%',options:{fill:{color:NAVY},color:WHITE,bold:true,fontSize:8.5,align:'right'}}]];
+    var cumP=0;
+    d.paretoArr.forEach(function(r,i){var pct=(r.hrs/pTotal)*100;cumP+=pct;var bg=i%2===0?WHITE:ICE;ptRows.push([{text:String(i+1),options:{fill:{color:bg},color:SLATE,fontSize:8.5,align:'center'}},{text:r.cat,options:{fill:{color:bg},color:'333333',bold:cumP<=80+pct&&cumP-pct<80,fontSize:8.5,align:'left'}},{text:r.hrs.toFixed(1),options:{fill:{color:bg},color:RED,bold:true,fontSize:8.5,align:'right'}},{text:pct.toFixed(1)+'%',options:{fill:{color:bg},color:'333333',fontSize:8.5,align:'right'}},{text:cumP.toFixed(1)+'%',options:{fill:{color:bg},color:cumP>=80?AMBER:GREEN,bold:cumP>=80,fontSize:8.5,align:'right'}}]);});
+    s.addTable(ptRows,{x:8.63,y:1.85,w:4.2,colW:[0.36,1.52,0.68,0.72,0.72],border:{pt:0.5,color:'D9E2EC'},autoPage:false,rowH:0.33,valign:'middle'});
   }
-  var sortedByOee = rawSiteRows.filter(function(r){return r.OEE!==undefined && r.OEE!==null && r.OEE!=='';}).sort(function(a,b){return a.OEE-b.OEE;});
-  if(sortedByOee.length){
-    var worstOee = sortedByOee[0];
-    var bestOee = sortedByOee[sortedByOee.length-1];
-    if(worstOee.OEE < 0.85){
-      prodComments.push(worstOee.Plant+" posted the lowest OEE this week at "+pct(worstOee.OEE)+(((worstOee['Unscheduled Down Time, hr']||0)>15)?", consistent with its elevated downtime hours.":".") );
-    }
-    if(bestOee.OEE >= 0.9 && bestOee.Plant!==worstOee.Plant){
-      prodComments.push(bestOee.Plant+" led the network on OEE at "+pct(bestOee.OEE)+".");
-    }
+
+  // SLIDE 7 — TOP 10 UDT SUB-CATEGORY
+  {
+    var s=pres.addSlide();
+    s.background={color:WHITE};
+    addHdr(s,'DOWNTIME — TOP 10 SUB-CATEGORY CONTRIBUTORS','WEEK '+wk+' · '+mnth+' 2026 · NATIONAL — RANKED BY HOURS');
+    var top10Rev=[].concat(d.top10).reverse();
+    s.addChart(pres.charts.BAR,[{name:'UDT (hrs)',labels:top10Rev.map(function(r){return r.label;}),values:top10Rev.map(function(r){return r.hrs;})}],{x:0.5,y:1.02,w:7.8,h:5.65,barDir:'bar',showTitle:false,chartColors:[RED],showLegend:false,showValue:true,dataLabelPosition:'outEnd',dataLabelColor:NAVY,dataLabelFontSize:9,chartArea:{fill:{color:WHITE}}});
+    var tRows=[[{text:'#',options:{fill:{color:NAVY},color:WHITE,bold:true,fontSize:9,align:'center'}},{text:'PLANT – SUB-CATEGORY',options:{fill:{color:NAVY},color:WHITE,bold:true,fontSize:9,align:'left'}},{text:'HRS',options:{fill:{color:NAVY},color:WHITE,bold:true,fontSize:9,align:'right'}}]];
+    d.top10.forEach(function(r,i){var bg=i%2===0?WHITE:ICE;tRows.push([{text:String(r.rank),options:{fill:{color:bg},color:SLATE,fontSize:9,align:'center'}},{text:r.label,options:{fill:{color:bg},color:'333333',bold:i<3,fontSize:8.5,align:'left'}},{text:r.hrs.toFixed(1),options:{fill:{color:bg},color:i<3?RED:SLATE,bold:i<3,fontSize:9,align:'right'}}]);});
+    s.addTable(tRows,{x:8.63,y:1.02,w:4.2,colW:[0.4,3.0,0.8],border:{pt:0.5,color:'D9E2EC'},autoPage:false,rowH:0.35,valign:'middle'});
   }
-  var sortedByUdt = rawSiteRows.slice().sort(function(a,b){return (b['Unscheduled Down Time, hr']||0)-(a['Unscheduled Down Time, hr']||0);});
-  if(sortedByUdt.length && (sortedByUdt[0]['Unscheduled Down Time, hr']||0) > 15){
-    prodComments.push(sortedByUdt[0].Plant+" carried the heaviest unscheduled downtime load at "+fmtN(sortedByUdt[0]['Unscheduled Down Time, hr'],1)+" hrs \u2014 worth a closer look at root causes.");
+
+  // SLIDE 8 — SUMMARY
+  {
+    var s=pres.addSlide();
+    s.background={color:NAVY};
+    s.addShape(pres.ShapeType.rect,{x:0,y:0,w:0.3,h:7.5,fill:{color:SKY},line:{type:'none'}});
+    s.addShape(pres.ShapeType.rect,{x:13.03,y:0,w:0.3,h:7.5,fill:{color:BLUE},line:{type:'none'}});
+    s.addShape(pres.ShapeType.rect,{x:0,y:6.78,w:13.33,h:0.72,fill:{color:BLUE},line:{type:'none'}});
+    s.addShape(pres.ShapeType.rect,{x:0.3,y:1.0,w:12.73,h:0.04,fill:{color:SKY},line:{type:'none'}});
+    s.addText('WEEK '+wk+' PERFORMANCE SUMMARY',{x:0.6,y:0.22,w:11.8,h:0.55,fontFace:'Cambria',fontSize:30,color:WHITE,bold:true,margin:0});
+    s.addText(mnth+' 2026  ·  NATIONAL  ·  VPI OPERATIONS',{x:0.6,y:0.75,w:11.8,h:0.3,fontFace:'Calibri',fontSize:13,color:SKY,charSpacing:0.5,margin:0});
+    var bigCards=[
+      {label:'OUTPUT',value:fmtN(outputMT,0)+' MT',sub:'vs plan '+fmtN(planMT,0)+' MT',color:outputMT>=planMT?'3AE374':RED},
+      {label:'OEE',value:oee.toFixed(1)+'%',sub:'UDT '+fmtN(udtHr,1)+' hrs',color:oee>=85?'3AE374':RED},
+      {label:'COST/TON',value:'₱'+fmtN(d.costTon,0),sub:'Fixed '+(d.totalCost>0?((d.fixedCost/d.totalCost)*100).toFixed(0):0)+'% + Var '+(d.totalCost>0?((d.varCost/d.totalCost)*100).toFixed(0):0)+'%',color:GOLD},
+      {label:'REJECTION RATE',value:rejRate.toFixed(2)+'%',sub:fmtN(rejQty,2)+' MT rejected',color:rejRate>1?RED:GOLD},
+      {label:'POWER',value:kwh.toFixed(2)+' kWh/t',sub:'Fuel '+fuel.toFixed(2)+' L/ton',color:TEAL},
+      {label:'RM VARIANCE',value:(rmv>=0?'+':'')+rmv.toFixed(2)+'%',sub:'vs target',color:rmv>=0?'3AE374':RED},
+    ];
+    var bw=3.8,bhh=1.15,bgap=0.22,bx0=0.6;
+    bigCards.forEach(function(c,i){
+      var row=Math.floor(i/3),col=i%3;
+      var x=bx0+col*(bw+bgap),y=row===0?1.15:2.45;
+      s.addShape(pres.ShapeType.roundRect,{x,y,w:bw,h:bhh,rectRadius:0.1,fill:{color:'102340'},line:{pt:1.2,color:BLUE}});
+      s.addText(c.label,{x:x+0.2,y:y+0.1,w:bw-0.4,h:0.26,fontFace:'Calibri',fontSize:8.5,color:'88AACC',bold:true,margin:0});
+      s.addText(c.value,{x:x+0.2,y:y+0.32,w:bw-0.4,h:0.5,fontFace:'Cambria',fontSize:26,color:c.color,bold:true,margin:0});
+      s.addText(c.sub,{x:x+0.2,y:y+0.85,w:bw-0.4,h:0.25,fontFace:'Calibri',fontSize:8.5,color:'88AACC',margin:0});
+    });
+    s.addShape(pres.ShapeType.roundRect,{x:0.6,y:3.73,w:12.0,h:0.36,rectRadius:0.05,fill:{color:BLUE},line:{type:'none'}});
+    s.addText('PRIORITIES FOR NEXT WEEK',{x:0.8,y:3.73,w:11.6,h:0.36,fontFace:'Calibri',fontSize:11,color:WHITE,bold:true,valign:'middle',margin:0});
+    var topCat=d.paretoArr[0]||{cat:'N/A',hrs:0};
+    var pItems=[
+      {txt:'🔧  '+topCat.cat+' leads downtime at '+topCat.hrs.toFixed(1)+' hrs ('+((topCat.hrs/(d.paretoArr.reduce(function(a,r){return a+r.hrs;},0)||1))*100).toFixed(0)+'%) — target mechanical and die-change PM at HOREB and ARGAO',ok:false},
+      {txt:'📉  Review under-utilized sites — ensure schedule adherence and production recovery plan for next week',ok:false},
+      {txt:'✅  Rejection rate '+rejRate.toFixed(2)+'% '+(rejRate>1?'exceeds 1% threshold — root cause investigation required':'within 1% threshold — sustain current quality discipline'),ok:rejRate<=1},
+      {txt:'⏱️  Monitor Change Over hours — coordinate die-scheduling to reduce idle time between production runs',ok:false},
+    ];
+    pItems.forEach(function(p,i){
+      var y=4.17+i*0.62;
+      s.addShape(pres.ShapeType.roundRect,{x:0.6,y,w:11.8,h:0.55,rectRadius:0.07,fill:{color:'102340'},line:{pt:1.2,color:p.ok?'1A7A3C':RED}});
+      s.addShape(pres.ShapeType.rect,{x:0.6,y:y+0.06,w:0.06,h:0.43,fill:{color:p.ok?'3AE374':RED},line:{type:'none'}});
+      s.addText(p.txt,{x:0.78,y,w:11.42,h:0.55,fontFace:'Calibri',fontSize:10,color:WHITE,valign:'middle',margin:0});
+    });
+    s.addText('VPI Operations Dashboard  ·  AUTO-GENERATED WEEKLY REPORT',{x:0.6,y:6.88,w:12,h:0.28,fontFace:'Calibri',fontSize:9,color:'CADCFC',margin:0});
   }
-  var noOeeSites = rawSiteRows.filter(function(r){return r.OEE===undefined||r.OEE===null||r.OEE==='';});
-  if(noOeeSites.length){
-    prodComments.push(noOeeSites.map(function(r){return r.Plant;}).join(', ')+" "+(noOeeSites.length>1?'have':'has')+" no OEE figure logged for the week \u2014 recommend confirming data entry is current.");
-  }
-  if(!prodComments.length) prodComments.push("Production performance was broadly in line with plan across all sites this week.");
 
-  // 2. Downtime comments
-  var dtComments = [];
-  if((d.topCats||[]).length){
-    var top3Cats = d.topCats.slice(0,3).map(function(c){return c.cat;}).join(', ');
-    dtComments.push("The leading downtime categories this week were "+top3Cats+".");
-  }
-  if((d.topPlants||[]).length){
-    var worstPlant = d.topPlants[0];
-    var totalUdtAll = d.topPlants.reduce(function(a,p){return a+p.hrs;},0);
-    var sharePct = totalUdtAll>0 ? (worstPlant.hrs/totalUdtAll*100).toFixed(0) : 0;
-    dtComments.push(worstPlant.plant+" accounted for the largest share of logged unscheduled downtime ("+fmtN(worstPlant.hrs,1)+" hrs, ~"+sharePct+"% of the network total).");
-  }
-  var mechCat = (d.topCats||[]).filter(function(c){return /mechanical/i.test(c.cat);})[0];
-  var whCat = (d.topCats||[]).filter(function(c){return /warehouse/i.test(c.cat);})[0];
-  if(mechCat) dtComments.push("Mechanical issues ("+fmtN(mechCat.hrs,1)+" hrs) point to equipment reliability as a recurring theme rather than isolated incidents \u2014 a focused maintenance review may help.");
-  if(whCat) dtComments.push("Warehouse-related delays ("+fmtN(whCat.hrs,1)+" hrs) suggest logistics/FG handling capacity, not production itself, is constraining throughput at the affected sites.");
-  if(!dtComments.length) dtComments.push("No significant downtime patterns were logged for the week.");
-
-  // 3. Forecast comments
-  var fcComments = [];
-  var natRemDays = d.fNat.RemDays;
-  if(natRemDays!==undefined){
-    fcComments.push("National remaining-days against forecast is "+natRemDays.toFixed(1)+" \u2014 "+(natRemDays<0?'the current pace is behind what\u2019s needed to hit the month-end target.':'the network is tracking ahead of pace to hit the month-end target.'));
-  }
-  var areasOnly = (d.fAreas||[]).filter(function(a){return a.Area!=='NATIONAL';});
-  if(areasOnly.length){
-    var worstArea = areasOnly.slice().sort(function(a,b){return (a.RemDays||0)-(b.RemDays||0);})[0];
-    var bestArea = areasOnly.slice().sort(function(a,b){return (b.RemDays||0)-(a.RemDays||0);})[0];
-    if(worstArea) fcComments.push(worstArea.Area+" is furthest behind forecast at "+(worstArea.RemDays!==undefined?worstArea.RemDays.toFixed(1):'\u2014')+" remaining days \u2014 the area needing the most attention this week.");
-    if(bestArea && bestArea.Area!==worstArea.Area) fcComments.push(bestArea.Area+" is closest to (or ahead of) pace at "+(bestArea.RemDays!==undefined?bestArea.RemDays.toFixed(1):'\u2014')+" remaining days.");
-  }
-  if(!fcComments.length) fcComments.push("Forecast data was not available to generate area-level commentary this week.");
-
-  // 4. Cost comments
-  var costComments = [];
-  var sortedCostCats = costCats.map(function(c){
-    var vals = (d.cRows||[]).map(function(r){return r[c.field]||0;}).filter(function(v){return v>0;});
-    var avg = vals.length ? vals.reduce(function(a,b){return a+b;},0)/vals.length : 0;
-    return {name:c.name, avg:avg};
-  }).sort(function(a,b){return b.avg-a.avg;});
-  if(sortedCostCats.length && avgCostTon>0){
-    var topDriver = sortedCostCats[0];
-    var topShare = (topDriver.avg/avgCostTon*100).toFixed(0);
-    costComments.push(topDriver.name+" is the largest cost driver at \u20b1"+fmtN(topDriver.avg,0)+"/ton (~"+topShare+"% of total cost/ton).");
-  }
-  if(d.cRows && d.cRows.length>1){
-    var byVol = d.cRows.slice().sort(function(a,b){return (b.TotalVolume||0)-(a.TotalVolume||0);});
-    var hiVolDay = byVol[0], loVolDay = byVol[byVol.length-1];
-    if(hiVolDay && loVolDay && hiVolDay.Date!==loVolDay.Date){
-      costComments.push("Cost/ton ranged from \u20b1"+fmtN(loVolDay.CostTon||0,0)+" on the highest-volume day ("+fmtN(hiVolDay.TotalVolume,0)+" mt) to \u20b1"+fmtN(hiVolDay.CostTon||0,0)+" \u2014 reinforcing that volume, not input cost inflation, is the main driver of daily cost/ton variance.");
-    }
-  }
-  var fixedShare = (d.totalFixed+d.totalVar)>0 ? d.totalFixed/(d.totalFixed+d.totalVar)*100 : 0;
-  costComments.push("Fixed costs made up "+fixedShare.toFixed(0)+"% of total cost this week \u2014 "+(fixedShare>55?'higher fixed-cost leverage means cost/ton is especially sensitive to volume swings.':'a relatively balanced fixed/variable cost split.'));
-  if(!costComments.length) costComments.push("Cost data was not available to generate commentary this week.");
-
-  // 5. Priorities for the week ahead
-  var priorities = [];
-  if(sortedByUdt.length && (sortedByUdt[0]['Unscheduled Down Time, hr']||0) > 15){
-    priorities.push(sortedByUdt[0].Plant+": schedule a focused downtime review \u2014 this was the heaviest UDT site this week and is dragging both OEE and output attainment.");
-  }
-  if(areasOnly.length){
-    var worstAreaP = areasOnly.slice().sort(function(a,b){return (a.RemDays||0)-(b.RemDays||0);})[0];
-    if(worstAreaP && worstAreaP.RemDays<0) priorities.push("Close the pull-out gap in "+worstAreaP.Area+" \u2014 currently "+worstAreaP.RemDays.toFixed(1)+" remaining days behind forecast pace.");
-  }
-  if(whCat) priorities.push("Address warehouse/FG handling bottlenecks at the affected sites so plant output isn't capped by downstream logistics.");
-  if(noOeeSites.length) priorities.push("Confirm "+noOeeSites.map(function(r){return r.Plant;}).join(', ')+" downtime/OEE data entry is current so performance can be tracked alongside the rest of the network.");
-  if(!priorities.length) priorities.push("Maintain current performance levels \u2014 no major red flags identified this week.");
-
-
-  var children = [
-    new D.Paragraph({ alignment: D.AlignmentType.CENTER, spacing:{after:60}, children:[new D.TextRun({text:"VPI OPERATIONS WEEKLY REPORT", bold:true, size:36, color:navy})]}),
-    new D.Paragraph({ alignment: D.AlignmentType.CENTER, spacing:{after:60}, children:[new D.TextRun({text: weekLabel, size:24, color:"555555"})]}),
-    new D.Paragraph({ alignment: D.AlignmentType.CENTER, spacing:{after:300}, children:[new D.TextRun({text:"Generated from VPI Operations Dashboard", italics:true, size:18, color:"808080"})]}),
-
-    sectionHeading("Executive Summary"),
-    bodyText(summaryText),
-
-    sectionHeading("1. Production Performance \u2014 National & By Site"),
-    new D.Table({ width:{size:9180,type:D.WidthType.DXA}, columnWidths:[1800,1300,1300,1180,1300,1300], rows: [
-      headerRow(["Plant","Output (mt)","Planned (mt)","Attain. %","OEE","UDT (hrs)"], [1800,1300,1300,1180,1300,1300])
-    ].concat(siteRows).concat([
-      dataRow(["NATIONAL", fmtN(natOutput,1), fmtN(natPlanned,1), pct(attainPct), natOee?pct(natOee):'N/A', fmtN(natUdt,1)], [1800,1300,1300,1180,1300,1300], {fill:lightBlue, bold:true})
-    ])}),
-    subHeading("Comments"),
-  ].concat(prodComments.map(bullet)).concat([
-
-    subHeading("Downtime by Category (Top Contributors)"),
-    new D.Table({ width:{size:9180,type:D.WidthType.DXA}, columnWidths:[6885,2295], rows: [
-      headerRow(["Category","Total UDT"], [6885,2295])
-    ].concat(catRows.length?catRows:[dataRow(["No data logged",""],[6885,2295])])}),
-
-    subHeading("Downtime by Plant"),
-    new D.Table({ width:{size:9180,type:D.WidthType.DXA}, columnWidths:[6885,2295], rows: [
-      headerRow(["Plant","Total UDT"], [6885,2295])
-    ].concat(plantUdtRows.length?plantUdtRows:[dataRow(["No data logged",""],[6885,2295])])}),
-    subHeading("Comments"),
-  ]).concat(dtComments.map(bullet)).concat([
-
-    sectionHeading("2. Forecast & CSD Pull-Out"),
-    bodyText("National MTD pull-out stands at "+pesoM(d.fNat.MTDPullout)+" against a "+pesoM(d.fNat.Forecast)+" forecast ("+pct(parseFloat(d.fNat.MTDPct)||0)+" complete), due "+(d.fNat.DueDate||'\u2014')+"."),
-    new D.Table({ width:{size:9180,type:D.WidthType.DXA}, columnWidths:[1800,1800,1800,1890,1890], rows: [
-      headerRow(["Area","Forecast","MTD Pull-out","MTD %","Rem. Days"], [1800,1800,1800,1890,1890])
-    ].concat(areaRows)}),
-    subHeading("Comments"),
-  ]).concat(fcComments.map(bullet)).concat([
-
-    sectionHeading("3. Production Cost"),
-    bodyText("National production cost for the week averaged \u20b1"+fmtN(avgCostTon,0)+"/ton across "+fmtN(d.totalVol,1)+" mt produced. Total fixed cost: \u20b1"+fmtN(d.totalFixed,0)+" ("+fmtN(d.totalVol>0?d.totalFixed/d.totalVol:0,2)+"/ton). Total variable cost: \u20b1"+fmtN(d.totalVar,0)+" ("+fmtN(d.totalVol>0?d.totalVar/d.totalVol:0,2)+"/ton)."),
-    new D.Table({ width:{size:9180,type:D.WidthType.DXA}, columnWidths:[3060,3060,3060], rows: [
-      headerRow(["Cost Component","Avg \u20b1/ton","Share of Total"], [3060,3060,3060])
-    ].concat(costRows)}),
-    subHeading("Comments"),
-  ]).concat(costComments.map(bullet)).concat([
-
-    sectionHeading("4. Priorities for the Week Ahead"),
-  ]).concat(priorities.map(bullet)).concat([
-
-    new D.Paragraph({ spacing:{before:300}, alignment:D.AlignmentType.CENTER, children:[new D.TextRun({text:"\u2014 End of Report \u2014", italics:true, size:18, color:"808080"})]})
-  ]);
-
-  return new D.Document({
-    styles: {
-      default: { document: { run: { font:"Calibri", size:22 } } },
-      paragraphStyles: [
-        { id:"Heading1", name:"Heading 1", basedOn:"Normal", next:"Normal", quickFormat:true,
-          run:{size:28, bold:true, font:"Calibri", color:navy}, paragraph:{spacing:{before:320,after:160}, outlineLevel:0} },
-        { id:"Heading2", name:"Heading 2", basedOn:"Normal", next:"Normal", quickFormat:true,
-          run:{size:23, bold:true, font:"Calibri", color:navy}, paragraph:{spacing:{before:200,after:100}, outlineLevel:1} }
-      ]
-    },
-    numbering: { config: [{ reference:"bullets", levels:[{level:0, format:D.LevelFormat.BULLET, text:"\u2022", alignment:D.AlignmentType.LEFT, style:{paragraph:{indent:{left:720,hanging:360}}}}] }]},
-    sections: [{
-      properties: { page: { size:{width:12240,height:15840}, margin:{top:1080,right:1080,bottom:1080,left:1080} } },
-      children: children
-    }]
-  });
+  var out=await pres.write({outputType:'blob'});
+  var url=URL.createObjectURL(out);
+  var a=document.createElement('a');
+  a.href=url;
+  a.download='VPI_Weekly_Report_Week'+wk+'.pptx';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
 }
+
+
 
 function destroyCharts(){Object.keys(charts).forEach(function(k){try{charts[k].destroy();}catch(e){}});charts={};}
 function mkChart(id,type,labels,datasets,opts){
