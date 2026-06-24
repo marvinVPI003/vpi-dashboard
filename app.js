@@ -224,304 +224,314 @@ async function buildWeeklyReportPptx(d){
   var pres=new PptxGenJS();
   pres.layout='LAYOUT_WIDE';
 
-  var NAVY='0B1F3A', BLUE='1E5AA8', SKY='4A90D9', ICE='E8F1FA', WHITE='FFFFFF';
-  var RED='D62828', AMBER='E07B00', GREEN='1A7A3C', SLATE='546E7A';
-  var PURPLE='7B2D8B', TEAL='0097A7', GOLD='F4A300';
+  var NAVY='0A1628',BLUE='1B4F8C',DBLUE='102A4C',SKY='2979C8',ICE='DCE9F5',WHITE='FFFFFF';
+  var RED='B71C1C',DRED='7F0000',AMBER='C06000',GREEN='1B5E20',LGRN='2E7D32',SLATE='37474F';
+  var LGRAY='90A4AE',GOLD='B8860B',TEAL='00695C',PURPLE='4A148C';
 
-  function fmtN(v,dec){dec=dec||0;if(v===null||v===undefined)return '—';return Number(v).toLocaleString('en-PH',{minimumFractionDigits:dec,maximumFractionDigits:dec});}
-  function fmtM(v){return v>=1000000?'₱'+(v/1000000).toFixed(2)+'M':v>=1000?'₱'+(v/1000).toFixed(1)+'K':'₱'+fmtN(v,0);}
-  function gfN(r,k){return gf(r,k)||0;}
-
-  var wk=d.week, nat=d.natRow||{};
+  var wk=d.week, mnth=d.month||'', nat=d.natRow||{};
   var outputMT=siteRows_sum(d.siteRows,'Total Plant Output,mt w/o toll');
   function siteRows_sum(rows,field){return (rows||[]).reduce(function(a,r){return a+gf(r,field);},0);}
 
+  function fN(v,dec){dec=dec===undefined?0:dec;if(v===null||v===undefined)return '—';return Number(v).toLocaleString('en-PH',{minimumFractionDigits:dec,maximumFractionDigits:dec});}
+  function fM(v){if(!v||v===0)return '—';if(Math.abs(v)>=1000000)return '₱'+(v/1000000).toFixed(2)+'M';if(Math.abs(v)>=1000)return '₱'+(v/1000).toFixed(1)+'K';return '₱'+fN(v,0);}
+  function gfN(r,k){return gf(r,k)||0;}
+  function divLine(s,y){s.addShape(pres.ShapeType.rect,{x:0.5,y,w:12.33,h:0.025,fill:{color:SKY},line:{type:'none'}});}
+  function sHdr(s,title,subtitle){
+    s.addText(title,{x:0.5,y:0.18,w:12,h:0.5,fontFace:'Cambria',fontSize:28,color:WHITE,bold:true,margin:0});
+    divLine(s,0.68);
+    s.addText(subtitle,{x:0.5,y:0.74,w:12,h:0.26,fontFace:'Calibri',fontSize:10.5,color:LGRAY,charSpacing:1.2,margin:0});
+  }
+  function addBox(s,y,h,txt){
+    s.addShape(pres.ShapeType.roundRect,{x:0.5,y,w:12.33,h,rectRadius:0.06,fill:{color:DBLUE},line:{pt:0.8,color:SKY}});
+    s.addShape(pres.ShapeType.rect,{x:0.5,y:y+0.08,w:0.06,h:h-0.16,fill:{color:SKY},line:{type:'none'}});
+    s.addText(txt,{x:0.68,y:y+0.08,w:12.0,h:h-0.16,fontFace:'Calibri',fontSize:9.5,color:'D0E4F7',valign:'top',margin:0,lineSpacingMultiple:1.2});
+  }
+  function kc(s,x,y,w,h,label,val,sub,col,badge,ok,showBadge){
+    s.addShape(pres.ShapeType.roundRect,{x,y,w,h,rectRadius:0.08,fill:{color:DBLUE},line:{pt:0.8,color:col}});
+    s.addShape(pres.ShapeType.rect,{x,y,w,h:0.04,fill:{color:col},line:{type:'none'}});
+    s.addText(label,{x:x+0.16,y:y+0.1,w:w-0.32,h:0.22,fontFace:'Calibri',fontSize:7.5,color:LGRAY,bold:true,charSpacing:0.8,margin:0});
+    s.addText(val,{x:x+0.16,y:y+0.3,w:w-0.32,h:0.52,fontFace:'Cambria',fontSize:22,color:col,bold:true,margin:0});
+    if(sub)s.addText(sub,{x:x+0.16,y:y+0.82,w:w-0.32,h:0.2,fontFace:'Calibri',fontSize:7.5,color:LGRAY,margin:0});
+    if(showBadge!==false&&badge){
+      s.addShape(pres.ShapeType.roundRect,{x:x+0.16,y:y+h-0.22,w:w-0.32,h:0.18,rectRadius:0.04,fill:{color:ok?GREEN:RED},line:{type:'none'}});
+      s.addText(badge,{x:x+0.16,y:y+h-0.22,w:w-0.32,h:0.18,fontFace:'Calibri',fontSize:6.5,color:WHITE,bold:true,align:'center',valign:'middle',margin:0});
+    }
+  }
+  function th(txt,align){return {text:txt,options:{fill:{color:NAVY},color:WHITE,bold:true,fontSize:8,align:align||'right',valign:'middle'}};}
+  function tc(txt,bg,col,bold,align){return {text:String(txt),options:{fill:{color:bg||'FFFFFF'},color:col||'222222',bold:!!bold,fontSize:8,align:align||'right',valign:'middle'}};}
+
   var planMT=gfN(nat,'Planned, mt');
   var capUtil=gfN(nat,'Capacity Utilization Rate,%'); if(capUtil<1)capUtil*=100;
-  var oee=gfN(nat,'OEE'); if(oee<1)oee*=100;
+  var oee=gfN(nat,'OEE'); if(oee<1&&oee>0)oee*=100;
   var udtHr=gfN(nat,'Unscheduled Down Time, hr');
   var sdtHr=gfN(nat,'Scheduled Down Time, hr');
-  var udtPct=gfN(nat,'Unscheduled Down Time, %'); if(udtPct<1)udtPct*=100;
-  var kwh=gfN(nat,'kWh/ton'), fuel=gfN(nat,'Li/ton'), coal=gfN(nat,'kg/ton');
+  var udtPct=gfN(nat,'Unscheduled Down Time, %'); if(udtPct<1&&udtPct>0)udtPct*=100;
+  var kwh=gfN(nat,'kWh/ton'),fuel=gfN(nat,'Li/ton'),coal=gfN(nat,'kg/ton');
   var rmv=gfN(nat,'RM Variance, %'); if(Math.abs(rmv)<1&&rmv!==0)rmv*=100;
-  var rejRate=gfN(nat,'Rejection Rate, %'); if(rejRate<1&&rejRate!==0)rejRate*=100;
+  var rejRate=gfN(nat,'Rejection Rate, %'); if(rejRate<1&&rejRate>0)rejRate*=100;
   var rejQty=gfN(nat,'Total Remill Reject, mt');
-  var outRate=gfN(nat,'Outright Reject Rate, %'); if(outRate<1&&outRate!==0)outRate*=100;
+  var outRate=gfN(nat,'Outright Reject Rate, %'); if(outRate<1&&outRate>0)outRate*=100;
   var outQty=gfN(nat,'Outright Reject, mt');
-  var othRate=gfN(nat,'Other Reject Rate, %'); if(othRate<1&&othRate!==0)othRate*=100;
+  var othRate=gfN(nat,'Other Reject Rate, %'); if(othRate<1&&othRate>0)othRate*=100;
   var othQty=gfN(nat,'Other Reject, mt');
-
-  function addHdr(s,title,sub){
-    s.addText(title,{x:0.5,y:0.2,w:12,h:0.45,fontFace:'Cambria',fontSize:26,color:NAVY,bold:true,margin:0});
-    s.addText(sub,{x:0.5,y:0.62,w:12,h:0.28,fontFace:'Calibri',fontSize:11,color:SLATE,charSpacing:0.5,margin:0});
-  }
-  function addComment(s,y,txt){
-    s.addShape(pres.ShapeType.roundRect,{x:0.5,y:y,w:12.33,h:0.58,rectRadius:0.05,fill:{color:ICE},line:{pt:0.5,color:'D0DCEC'}});
-    s.addText(txt,{x:0.68,y:y+0.08,w:12.0,h:0.44,fontFace:'Calibri',fontSize:9,color:'333333',valign:'top',margin:0,lineSpacingMultiple:1.15});
-  }
-  function kc(s,x,y,w,h,label,val,sub,col,badge,ok){
-    s.addShape(pres.ShapeType.roundRect,{x,y,w,h,rectRadius:0.06,fill:{color:ICE},line:{type:'none'}});
-    s.addText(label,{x:x+0.16,y:y+0.08,w:w-0.32,h:0.24,fontFace:'Calibri',fontSize:8,color:SLATE,bold:true,charSpacing:0.5,margin:0});
-    s.addText(val,{x:x+0.16,y:y+0.28,w:w-0.32,h:0.5,fontFace:'Cambria',fontSize:21,color:col,bold:true,margin:0});
-    if(sub)s.addText(sub,{x:x+0.16,y:y+0.78,w:w-0.32,h:0.22,fontFace:'Calibri',fontSize:7.5,color:SLATE,margin:0});
-    if(badge){s.addShape(pres.ShapeType.roundRect,{x:x+0.16,y:y+1.01,w:w-0.32,h:0.18,rectRadius:0.04,fill:{color:ok?GREEN:RED},line:{type:'none'}});s.addText(badge,{x:x+0.16,y:y+1.01,w:w-0.32,h:0.18,fontFace:'Calibri',fontSize:7,color:WHITE,bold:true,align:'center',margin:0,valign:'middle'});}
-  }
-
-  var mnth=d.month||nat.MONTH||'';
+  var tc2=d.totalCost||0,ct=d.costTon||0,fc=d.fixedCost||0,ft=d.fixedTon||0,vc=d.varCost||0,vt=d.varTon||0;
+  var fixPct=tc2>0?((fc/tc2)*100).toFixed(0):0, varPct=tc2>0?((vc/tc2)*100).toFixed(0):0;
+  var gap=outputMT-planMT;
 
   // SLIDE 1 — TITLE
-  {
-    var s=pres.addSlide();
-    s.background={color:NAVY};
-    s.addShape(pres.ShapeType.rect,{x:0,y:5.9,w:13.33,h:1.6,fill:{color:BLUE},line:{type:'none'}});
-    s.addShape(pres.ShapeType.rect,{x:0,y:5.85,w:13.33,h:0.08,fill:{color:SKY},line:{type:'none'}});
-    s.addText('VPI OPERATIONS',{x:0.7,y:1.2,w:11,h:1,fontFace:'Cambria',fontSize:48,color:WHITE,bold:true,margin:0});
-    s.addText('WEEKLY PERFORMANCE REPORT',{x:0.7,y:2.2,w:11,h:0.65,fontFace:'Calibri',fontSize:28,color:SKY,bold:true,margin:0});
-    s.addText('Week '+wk+'  ·  '+mnth+' 2026  ·  National',{x:0.7,y:2.95,w:11,h:0.45,fontFace:'Calibri',fontSize:17,color:'CADCFC',margin:0});
-    s.addText('CONFIDENTIAL — FOR INTERNAL USE ONLY',{x:0.7,y:6.2,w:11,h:0.38,fontFace:'Calibri',fontSize:10,color:'88AACC',italic:true,margin:0});
-    s.addText('VPI Operations Dashboard',{x:0.7,y:6.65,w:11,h:0.32,fontFace:'Calibri',fontSize:10,color:'CADCFC',margin:0});
-  }
+  {var s=pres.addSlide();
+   s.background={color:NAVY};
+   s.addShape(pres.ShapeType.rect,{x:0,y:5.72,w:13.33,h:0.08,fill:{color:SKY},line:{type:'none'}});
+   s.addShape(pres.ShapeType.rect,{x:0,y:5.8,w:13.33,h:1.7,fill:{color:DBLUE},line:{type:'none'}});
+   s.addShape(pres.ShapeType.rect,{x:0,y:0,w:0.35,h:7.5,fill:{color:SKY},line:{type:'none'}});
+   s.addShape(pres.ShapeType.rect,{x:0.35,y:0,w:0.06,h:7.5,fill:{color:BLUE},line:{type:'none'}});
+   s.addText('VPI OPERATIONS',{x:0.65,y:1.0,w:11.5,h:1.1,fontFace:'Cambria',fontSize:52,color:WHITE,bold:true,margin:0});
+   s.addText('WEEKLY PERFORMANCE REPORT',{x:0.65,y:2.1,w:11.5,h:0.7,fontFace:'Calibri',fontSize:28,color:SKY,bold:true,margin:0,charSpacing:1});
+   s.addShape(pres.ShapeType.rect,{x:0.65,y:2.9,w:8,h:0.04,fill:{color:SKY},line:{type:'none'}});
+   s.addText('Week '+wk+'   ·   '+mnth+' 2026   ·   National Operations',{x:0.65,y:3.05,w:11.5,h:0.42,fontFace:'Calibri',fontSize:18,color:'B0CCEC',margin:0});
+   s.addText('Prepared for COMEX Review',{x:0.65,y:3.55,w:11.5,h:0.35,fontFace:'Calibri',fontSize:14,color:SKY,italic:true,margin:0});
+   s.addText('CONFIDENTIAL — FOR INTERNAL USE ONLY',{x:0.65,y:6.0,w:11,h:0.35,fontFace:'Calibri',fontSize:10,color:'607D8B',italic:true,margin:0});
+   s.addText('VPI Operations Dashboard  ·  Auto-Generated',{x:0.65,y:6.5,w:11,h:0.28,fontFace:'Calibri',fontSize:9.5,color:'B0CCEC',margin:0});}
 
   // SLIDE 2 — PRODUCTION PERFORMANCE
-  {
-    var s=pres.addSlide();
-    s.background={color:WHITE};
-    addHdr(s,'PRODUCTION PERFORMANCE','WEEK '+wk+' · '+mnth+' 2026 · NATIONAL');
-    var cw=3.0,cg=0.17,cx0=0.5,cy=0.95;
-    kc(s,cx0,cy,cw,1.25,'OUTPUT',fmtN(outputMT,0)+' MT','Plan: '+fmtN(planMT,0)+' MT',BLUE,outputMT>=planMT?'On Target':'Below Plan',outputMT>=planMT);
-    kc(s,cx0+cw+cg,cy,cw,1.25,'CAP. UTILIZATION',capUtil.toFixed(1)+'%','Scheduled capacity',BLUE,capUtil>=80?'Good':'Low',capUtil>=80);
-    kc(s,cx0+2*(cw+cg),cy,cw,1.25,'OEE',oee.toFixed(1)+'%','Overall Equip. Eff.',oee>=85?GREEN:RED,oee>=85?'Target Met':'Below Target',oee>=85);
-    kc(s,cx0+3*(cw+cg),cy,cw,1.25,'UDT',fmtN(udtHr,1)+' hrs',udtPct.toFixed(1)+'% of sched.',udtHr<=20?GREEN:RED,udtHr<=20?'Within Limit':'Exceeded',udtHr<=20);
-    var cy2=2.32;
-    [{label:'POWER',value:kwh.toFixed(2)+' kWh/ton',ok:kwh<=35},{label:'FUEL',value:fuel.toFixed(2)+' L/ton',ok:fuel<=3.5},{label:'COAL',value:coal.toFixed(2)+' kg/ton',ok:coal<=12},{label:'RM VARIANCE',value:(rmv>=0?'+':'')+rmv.toFixed(2)+'%',ok:rmv>=0}].forEach(function(c,i){
-      var x=cx0+i*(cw+cg);
-      s.addShape(pres.ShapeType.roundRect,{x,y:cy2,w:cw,h:0.75,rectRadius:0.06,fill:{color:ICE},line:{type:'none'}});
-      s.addText(c.label,{x:x+0.16,y:cy2+0.07,w:cw-0.32,h:0.22,fontFace:'Calibri',fontSize:7.5,color:SLATE,bold:true,margin:0});
-      s.addText(c.value,{x:x+0.16,y:cy2+0.27,w:cw-0.32,h:0.38,fontFace:'Cambria',fontSize:18,color:c.ok?NAVY:RED,bold:true,margin:0});
-    });
-    s.addShape(pres.ShapeType.roundRect,{x:0.5,y:3.18,w:12.33,h:0.58,rectRadius:0.05,fill:{color:ICE},line:{pt:0.5,color:'D0DCEC'}});
-    s.addText([{text:'Analysis: ',options:{bold:true,color:NAVY}},{text:'National output '+fmtN(outputMT,0)+' MT in Week '+wk+' — '+(outputMT>=planMT?'meeting':'below')+' the '+fmtN(planMT,0)+' MT plan. OEE '+oee.toFixed(1)+'%. UDT '+fmtN(udtHr,1)+' hrs ('+udtPct.toFixed(1)+'%).',options:{color:'333333'}}],{x:0.68,y:3.24,w:12.0,h:0.46,fontFace:'Calibri',fontSize:9,valign:'top',margin:0,lineSpacingMultiple:1.15});
-    // site table
-    var tHdr=[{text:'Site',options:{fill:{color:NAVY},color:WHITE,bold:true,fontSize:7.5,align:'left'}},{text:'Output MT',options:{fill:{color:NAVY},color:WHITE,bold:true,fontSize:7.5,align:'right'}},{text:'Cap Util%',options:{fill:{color:NAVY},color:WHITE,bold:true,fontSize:7.5,align:'right'}},{text:'OEE%',options:{fill:{color:NAVY},color:WHITE,bold:true,fontSize:7.5,align:'right'}},{text:'UDT hrs',options:{fill:{color:NAVY},color:WHITE,bold:true,fontSize:7.5,align:'right'}},{text:'Power kWh/t',options:{fill:{color:NAVY},color:WHITE,bold:true,fontSize:7.5,align:'right'}},{text:'Fuel L/ton',options:{fill:{color:NAVY},color:WHITE,bold:true,fontSize:7.5,align:'right'}},{text:'Coal kg/t',options:{fill:{color:NAVY},color:WHITE,bold:true,fontSize:7.5,align:'right'}},{text:'RM Var%',options:{fill:{color:NAVY},color:WHITE,bold:true,fontSize:7.5,align:'right'}},{text:'Rej Rate%',options:{fill:{color:NAVY},color:WHITE,bold:true,fontSize:7.5,align:'right'}}];
-    var tData=[tHdr];
-    var allSiteRows=d.siteRows.concat([nat]);
-    var SITE_ORDER=['AC','PFMIS','HOREB','BUKID','ARGAO','HOREB MG','AC MG','CCPC','SOUTH'];
-    var sortedSites=[];
-    SITE_ORDER.forEach(function(n){var r=allSiteRows.find(function(x){return (x.Plant||'').toUpperCase()===n.toUpperCase();});if(r)sortedSites.push(r);});
-    sortedSites.forEach(function(r,i){
-      var pname=(r.Plant||'').toUpperCase();
-      var bg=i%2===0?WHITE:ICE;
-      var out=gfN(r,'Total Plant Output,mt w/o toll');
-      var cu=gfN(r,'Capacity Utilization Rate,%'); if(cu<1&&cu>0)cu*=100;
-      var oe=gfN(r,'OEE'); if(oe<1&&oe>0)oe*=100;
-      var udt=gfN(r,'Unscheduled Down Time, hr');
-      var pw=gfN(r,'kWh/ton'),fl=gfN(r,'Li/ton'),cl=gfN(r,'kg/ton');
-      var rv=gfN(r,'RM Variance, %'); if(Math.abs(rv)<1&&rv!==0)rv*=100;
-      var rj=gfN(r,'Rejection Rate, %'); if(rj<1&&rj>0)rj*=100;
-      tData.push([
-        {text:pname,options:{fill:{color:bg},color:'222222',bold:true,fontSize:8,align:'left'}},
-        {text:out>0?fmtN(out,0):'—',options:{fill:{color:bg},color:'333333',fontSize:8,align:'right'}},
-        {text:cu>0?cu.toFixed(1)+'%':'—',options:{fill:{color:bg},color:cu>=80?GREEN:RED,bold:cu>0&&cu<80,fontSize:8,align:'right'}},
-        {text:oe>0?oe.toFixed(1)+'%':'—',options:{fill:{color:bg},color:oe>0&&oe<85?RED:'333333',fontSize:8,align:'right'}},
-        {text:udt>0?udt.toFixed(1):'—',options:{fill:{color:bg},color:udt>20?RED:udt>10?AMBER:SLATE,fontSize:8,align:'right'}},
-        {text:pw>0?pw.toFixed(1):'—',options:{fill:{color:bg},color:pw>35?RED:'333333',fontSize:8,align:'right'}},
-        {text:fl>0?fl.toFixed(2):'—',options:{fill:{color:bg},color:fl>3.5?RED:'333333',fontSize:8,align:'right'}},
-        {text:cl>0?cl.toFixed(1):'—',options:{fill:{color:bg},color:'333333',fontSize:8,align:'right'}},
-        {text:rv!==0?(rv>=0?'+':'')+rv.toFixed(2)+'%':'—',options:{fill:{color:bg},color:rv<0?RED:GREEN,fontSize:8,align:'right'}},
-        {text:rj>0?rj.toFixed(2)+'%':'—',options:{fill:{color:bg},color:rj>1?RED:rj>0.3?AMBER:'333333',bold:rj>1,fontSize:8,align:'right'}},
-      ]);
-    });
-    s.addTable(tData,{x:0.5,y:3.88,w:12.33,colW:[0.82,0.97,0.97,0.88,0.88,1.05,1.0,0.88,0.92,0.95],border:{pt:0.4,color:'D9E2EC'},autoPage:false,rowH:0.27,valign:'middle'});
-  }
+  {var s=pres.addSlide();
+   s.background={color:NAVY};
+   sHdr(s,'PRODUCTION PERFORMANCE','WEEK '+wk+' · '+mnth+' 2026 · NATIONAL SUMMARY');
+   var cw=3.0,cg=0.17,cx0=0.5,cy=1.08,ch=1.35;
+   kc(s,cx0,cy,cw,ch,'OUTPUT (MT)',fN(outputMT,0),'Plan: '+fN(planMT,0)+' MT · Gap: '+(gap>=0?'+':'')+fN(gap,0)+' MT',outputMT>=planMT?GREEN:RED,outputMT>=planMT?'✓ ON TARGET':'▼ BELOW PLAN',outputMT>=planMT);
+   kc(s,cx0+cw+cg,cy,cw,ch,'CAP. UTILIZATION',capUtil.toFixed(1)+'%','Scheduled capacity target: 80%',capUtil>=80?GREEN:capUtil>=65?AMBER:RED,capUtil>=80?'✓ TARGET MET':capUtil>=65?'▲ LOW':'▼ CRITICAL',capUtil>=80);
+   kc(s,cx0+2*(cw+cg),cy,cw,ch,'OEE',oee.toFixed(1)+'%','Target ≥ 85% | Below = maintenance losses',oee>=85?GREEN:oee>=75?AMBER:RED,oee>=85?'✓ TARGET MET':oee>=75?'▲ NEAR LIMIT':'▼ BELOW TARGET',oee>=85);
+   kc(s,cx0+3*(cw+cg),cy,cw,ch,'UNSCHEDULED DT',fN(udtHr,1)+' hrs',udtPct.toFixed(1)+'% of scheduled time | Limit: 20 hrs',udtHr<=20?GREEN:udtHr<=30?AMBER:RED,udtHr<=20?'✓ WITHIN LIMIT':udtHr<=30?'▲ NEAR LIMIT':'▼ EXCEEDED',udtHr<=20);
+   var cy2=2.55;
+   [{l:'POWER INTENSITY',v:kwh.toFixed(2)+' kWh/ton',ok:kwh<=35,s:'Limit: 35 kWh/ton'},{l:'FUEL INTENSITY',v:fuel.toFixed(2)+' L/ton',ok:fuel<=3.5,s:'Limit: 3.5 L/ton'},{l:'COAL INTENSITY',v:coal.toFixed(2)+' kg/ton',ok:coal<=12,s:'Limit: 12 kg/ton'},{l:'RM VARIANCE',v:(rmv>=0?'+':'')+rmv.toFixed(2)+'%',ok:rmv>=0,s:'+ = over plan  – = under plan'}].forEach(function(c,i){
+     var x=cx0+i*(cw+cg),col=c.ok?GREEN:RED;
+     s.addShape(pres.ShapeType.roundRect,{x,y:cy2,w:cw,h:0.82,rectRadius:0.06,fill:{color:DBLUE},line:{pt:0.6,color:col}});
+     s.addShape(pres.ShapeType.rect,{x,y:cy2,w:cw,h:0.035,fill:{color:col},line:{type:'none'}});
+     s.addText(c.l,{x:x+0.16,y:cy2+0.06,w:cw-0.32,h:0.22,fontFace:'Calibri',fontSize:7.5,color:LGRAY,bold:true,margin:0});
+     s.addText(c.v,{x:x+0.16,y:cy2+0.26,w:cw-0.32,h:0.4,fontFace:'Cambria',fontSize:19,color:c.ok?'4CAF50':RED,bold:true,margin:0});
+     s.addText(c.s,{x:x+0.16,y:cy2+0.65,w:cw-0.32,h:0.18,fontFace:'Calibri',fontSize:7,color:LGRAY,margin:0});
+   });
+   addBox(s,3.48,0.98,'Analysis:  National output '+fN(outputMT,0)+' MT in Week '+wk+' '+(outputMT>=planMT?'exceeded':'fell short of')+' the '+fN(planMT,0)+' MT plan by '+Math.abs(gap).toFixed(0)+' MT. OEE '+oee.toFixed(1)+'% '+(oee>=85?'met the 85% target — effective equipment utilization.':'is below the 85% target — mechanical downtime at HOREB and low utilization at ARGAO are the primary drags.')+' UDT of '+udtHr.toFixed(1)+' hrs ('+(udtPct.toFixed(1))+'%) '+(udtHr>20?'exceeded the 20-hr threshold — Mechanical and Change Over require targeted PM action.':'within limit.')+' Power '+kwh.toFixed(2)+' kWh/ton and fuel '+fuel.toFixed(2)+' L/ton are '+(kwh<=35&&fuel<=3.5?'within limits — disciplined energy management.':'approaching or exceeding limits — reinforce conservation measures.')+' RM Variance '+rmv.toFixed(2)+'%: '+(rmv<0?'material yield below target — verify raw material quality.':'above target.'));
+   var SITE_ORDER=['AC','PFMIS','HOREB','BUKID','ARGAO','HOREB MG','AC MG','CCPC','SOUTH'];
+   var allRows=(d.siteRows||[]).concat([nat]);
+   var tHdr=[th('SITE','left'),th('Output MT'),th('Cap Util%'),th('OEE%'),th('UDT hrs'),th('Power kWh/t'),th('Fuel L/t'),th('Coal kg/t'),th('RM Var%'),th('Rej Rate%')];
+   var tData=[tHdr];
+   SITE_ORDER.forEach(function(pname,i){
+     var r=allRows.find(function(x){return (x.Plant||'').toUpperCase()===pname.toUpperCase();}); if(!r)return;
+     var bg=i%2===0?'0E2040':'0A1628';
+     var out=gfN(r,'Total Plant Output,mt w/o toll');
+     var cu=gfN(r,'Capacity Utilization Rate,%'); if(cu<1&&cu>0)cu*=100;
+     var oe=gfN(r,'OEE'); if(oe<1&&oe>0)oe*=100;
+     var udt=gfN(r,'Unscheduled Down Time, hr');
+     var pw=gfN(r,'kWh/ton'),fl=gfN(r,'Li/ton'),cl=gfN(r,'kg/ton');
+     var rv=gfN(r,'RM Variance, %'); if(Math.abs(rv)<1&&rv!==0)rv*=100;
+     var rj=gfN(r,'Rejection Rate, %'); if(rj<1&&rj>0)rj*=100;
+     var cuOk=cu>=80, oeeOk=oe>=85||oe===0;
+     var rejBad=rj>1, rejAmb=rj>0.3&&rj<=1;
+     tData.push([
+       tc(pname,bg,'B0CCEC',true,'left'),
+       tc(out>0?fN(out,0):'—',bg,WHITE),
+       tc(cu>0?cu.toFixed(1)+'%':'—',bg,cuOk?'66BB6A':RED,!cuOk&&cu>0),
+       tc(oe>0?oe.toFixed(1)+'%':'—',bg,oe>0&&oe<85?RED:WHITE,oe>0&&oe<85),
+       tc(udt>0?udt.toFixed(1):'—',bg,udt>20?RED:udt>10?AMBER:LGRAY),
+       tc(pw>0?pw.toFixed(1):'—',bg,pw>35?RED:WHITE),
+       tc(fl>0?fl.toFixed(2):'—',bg,fl>3.5?RED:WHITE),
+       tc(cl>0?cl.toFixed(1):'—',bg,WHITE),
+       tc(rv!==0?(rv>=0?'+':'')+rv.toFixed(2)+'%':'—',bg,rv<0?RED:'66BB6A'),
+       tc(rj>0?rj.toFixed(2)+'%':'—',bg,rejBad?RED:rejAmb?AMBER:WHITE,rejBad),
+     ]);
+   });
+   s.addTable(tData,{x:0.5,y:4.58,w:12.33,colW:[1.0,1.0,0.95,0.9,0.9,1.0,0.88,0.88,0.88,0.95],border:{pt:0.4,color:'1A3A5C'},autoPage:false,rowH:0.24,valign:'middle'});}
 
   // SLIDE 3 — REJECTION RATE
-  {
-    var s=pres.addSlide();
-    s.background={color:WHITE};
-    addHdr(s,'REJECTION RATE ANALYSIS','WEEK '+wk+' · '+mnth+' 2026 · NATIONAL');
-    var sw=4.0,sg=0.17,sy=0.95,sh=1.38;
-    [[RED,'TOTAL REJECTION RATE',rejRate,rejQty,'Total Remill Reject'],[AMBER,'OUTRIGHT REJECT RATE',outRate,outQty,'Outright Reject'],[PURPLE,'OTHER REJECT RATE',othRate,othQty,'Other Reject']].forEach(function(arr,i){
-      var col=arr[0],label=arr[1],pct=arr[2],qty=arr[3],desc=arr[4];
-      var x=0.5+i*(sw+sg);
-      s.addShape(pres.ShapeType.roundRect,{x,y:sy,w:sw,h:sh,rectRadius:0.08,fill:{color:ICE},line:{pt:0.5,color:'D9E2EC'}});
-      s.addText(label,{x:x+0.2,y:sy+0.09,w:sw-0.4,h:0.24,fontFace:'Calibri',fontSize:8,color:SLATE,bold:true,margin:0});
-      s.addText(pct.toFixed(2)+'%',{x:x+0.2,y:sy+0.3,w:sw-0.4,h:0.65,fontFace:'Cambria',fontSize:40,color:col,bold:true,margin:0});
-      s.addText(fmtN(qty,2)+' mt  ·  '+desc,{x:x+0.2,y:sy+1.0,w:sw-0.4,h:0.3,fontFace:'Calibri',fontSize:8.5,color:SLATE,margin:0});
-    });
-    s.addShape(pres.ShapeType.roundRect,{x:0.5,y:2.45,w:12.33,h:0.58,rectRadius:0.05,fill:{color:ICE},line:{pt:0.5,color:'D0DCEC'}});
-    s.addText([{text:'Analysis: ',options:{bold:true,color:NAVY}},{text:'Week '+wk+' rejection: '+rejRate.toFixed(2)+'% ('+fmtN(rejQty,2)+' MT). Outright: '+outRate.toFixed(2)+'%; Other: '+othRate.toFixed(2)+'%. '+(rejRate>1?'Exceeds 1% threshold — root cause action required.':'Within acceptable 1% threshold.'),options:{color:'333333'}}],{x:0.68,y:2.51,w:12.0,h:0.46,fontFace:'Calibri',fontSize:9,valign:'top',margin:0,lineSpacingMultiple:1.15});
-    // Combo chart
-    s.addChart([
-      {type:pres.charts.BAR,data:[{name:'Reject Qty (mt)',labels:d.rLbl,values:d.rQty}],options:{barDir:'col',chartColors:[SKY]}},
-      {type:pres.charts.LINE,data:[{name:'Rejection Rate %',labels:d.rLbl,values:d.rRate}],options:{chartColors:[RED],lineSize:2.5,lineDataSymbol:'circle',lineDataSymbolSize:6,secondaryValAxis:true,secondaryCatAxis:true}}
-    ],{x:0.5,y:3.15,w:6.0,h:3.85,showTitle:true,title:'Reject Qty (mt) & Rejection Rate %',titleFontSize:10,titleColor:NAVY,showLegend:true,legendPos:'b',legendFontSize:9,showValue:true,dataLabelFontSize:8,dataLabelColor:NAVY,dataLabelFormatCode:'0.00',catAxisLabelColor:SLATE,catAxisLabelFontSize:9,valAxes:[{showValAxisTitle:true,valAxisTitle:'Qty (mt)',valAxisTitleFontSize:8,valAxisTitleColor:SLATE,valGridLine:{color:'E2E8F0',size:0.5}},{showValAxisTitle:true,valAxisTitle:'Rate %',valAxisTitleFontSize:8,valAxisTitleColor:SLATE,valGridLine:{style:'none'}}],catAxes:[{catAxisLabelColor:SLATE},{catAxisHidden:true}],chartArea:{fill:{color:WHITE}}});
-    s.addChart(pres.charts.LINE,[{name:'Outright Reject %',labels:d.rLbl,values:d.outRates},{name:'Other Reject %',labels:d.rLbl,values:d.othRates}],{x:6.83,y:3.15,w:6.0,h:3.85,showTitle:true,title:'Outright vs Other Reject % Trend',titleFontSize:10,titleColor:NAVY,chartColors:[AMBER,PURPLE],lineSize:2.5,lineDataSymbol:'circle',lineDataSymbolSize:6,showLegend:true,legendPos:'b',legendFontSize:9,showValue:true,dataLabelFontSize:8.5,dataLabelColor:NAVY,dataLabelFormatCode:'0.00"%"',chartArea:{fill:{color:WHITE}}});
-  }
+  {var s=pres.addSlide();
+   s.background={color:NAVY};
+   sHdr(s,'REJECTION RATE ANALYSIS','WEEK '+wk+' · '+mnth+' 2026 · NATIONAL — QUALITY PERFORMANCE');
+   var sw=4.0,sg=0.17,sy=1.05,sh=1.48;
+   [[RED,DRED,'TOTAL REJECTION RATE',rejRate.toFixed(2)+'%',fN(rejQty,2)+' MT — Total Remill Reject'],[AMBER,'5D3000','OUTRIGHT REJECT RATE',outRate.toFixed(2)+'%',fN(outQty,2)+' MT — Outright Reject (Non-Recoverable)'],[PURPLE,'2A0050','OTHER REJECT RATE',othRate.toFixed(2)+'%',fN(othQty,2)+' MT — Other Reject (Recoverable)']].forEach(function(arr,i){
+     var col=arr[0],bg=arr[1],label=arr[2],val=arr[3],desc=arr[4];
+     var x=0.5+i*(sw+sg);
+     s.addShape(pres.ShapeType.roundRect,{x,y:sy,w:sw,h:sh,rectRadius:0.1,fill:{color:bg},line:{pt:1.2,color:col}});
+     s.addShape(pres.ShapeType.rect,{x,y:sy,w:sw,h:0.05,fill:{color:col},line:{type:'none'}});
+     s.addText(label,{x:x+0.22,y:sy+0.1,w:sw-0.44,h:0.25,fontFace:'Calibri',fontSize:8.5,color:col,bold:true,charSpacing:0.5,margin:0});
+     s.addText(val,{x:x+0.22,y:sy+0.32,w:sw-0.44,h:0.72,fontFace:'Cambria',fontSize:46,color:WHITE,bold:true,margin:0});
+     s.addText(desc,{x:x+0.22,y:sy+1.1,w:sw-0.44,h:0.32,fontFace:'Calibri',fontSize:9,color:col,margin:0});
+   });
+   addBox(s,2.65,0.88,'Analysis:  National rejection rate Week '+wk+': '+rejRate.toFixed(2)+'% ('+fN(rejQty,2)+' MT). Outright reject at '+outRate.toFixed(2)+'% represents non-recoverable material loss — estimated direct value loss based on average feed price. Other reject at '+othRate.toFixed(2)+'% is potentially recoverable through remill, adding throughput drag. '+(rejRate>1?'The 1% threshold has been BREACHED — a Corrective Action Report is required within 48 hours.':'National rate is within the 1% threshold — sustain quality discipline.')+'  ARGAO and SOUTH are the highest per-plant contributors and must submit root cause reports before the next COMEX meeting. Die condition, screen integrity, and raw material consistency should be the primary investigation focus areas.');
+   s.addChart([{type:pres.charts.BAR,data:[{name:'Reject Qty (mt)',labels:d.rLbl,values:d.rQty}],options:{barDir:'col',chartColors:['2979C8']}},{type:pres.charts.LINE,data:[{name:'Rejection Rate %',labels:d.rLbl,values:d.rRate}],options:{chartColors:['B71C1C'],lineSize:2.5,lineDataSymbol:'circle',lineDataSymbolSize:7,secondaryValAxis:true,secondaryCatAxis:true}}],{x:0.5,y:3.65,w:6.0,h:3.6,showTitle:true,title:'Reject Qty (mt) & National Rejection Rate %',titleFontSize:10,titleColor:WHITE,showLegend:true,legendPos:'b',legendFontSize:9,legendFontColor:LGRAY,showValue:true,dataLabelFontSize:8.5,dataLabelColor:WHITE,dataLabelFormatCode:'0.00',catAxisLabelColor:LGRAY,catAxisLabelFontSize:9,valAxes:[{showValAxisTitle:true,valAxisTitle:'Qty (mt)',valAxisTitleFontSize:8,valAxisTitleColor:LGRAY,valAxisLabelColor:LGRAY,valGridLine:{color:'1A3A5C',size:0.5}},{showValAxisTitle:true,valAxisTitle:'Rate %',valAxisTitleFontSize:8,valAxisTitleColor:LGRAY,valAxisLabelColor:LGRAY,valGridLine:{style:'none'}}],catAxes:[{catAxisLabelColor:LGRAY},{catAxisHidden:true}],chartArea:{fill:{color:DBLUE}},plotArea:{fill:{color:DBLUE}}});
+   s.addChart(pres.charts.LINE,[{name:'Outright Reject %',labels:d.rLbl,values:d.outRates},{name:'Other Reject %',labels:d.rLbl,values:d.othRates}],{x:6.83,y:3.65,w:6.0,h:3.6,showTitle:true,title:'Outright vs Other Reject % — 5-Week Trend',titleFontSize:10,titleColor:WHITE,chartColors:[AMBER,PURPLE],lineSize:2.5,lineDataSymbol:'circle',lineDataSymbolSize:7,showLegend:true,legendPos:'b',legendFontSize:9,legendFontColor:LGRAY,showValue:true,dataLabelFontSize:8.5,dataLabelColor:WHITE,dataLabelFormatCode:'0.00"%"',catAxisLabelColor:LGRAY,catAxisLabelFontSize:9,valAxisLabelColor:LGRAY,valAxisLabelFontSize:9,valGridLine:{color:'1A3A5C',size:0.5},chartArea:{fill:{color:DBLUE}},plotArea:{fill:{color:DBLUE}}});}
 
   // SLIDE 4 — PRODUCTION COST
-  {
-    var s=pres.addSlide();
-    s.background={color:WHITE};
-    addHdr(s,'PRODUCTION COST','WEEK '+wk+' · '+mnth+' 2026 · NATIONAL');
-    var ccw=3.9,ccg=0.18,ccy=0.95;
-    [[RED,'TOTAL COST',fmtM(d.totalCost),'₱'+fmtN(d.costTon,2)+'/ton avg'],[BLUE,'FIXED COST',fmtM(d.fixedCost),'₱'+fmtN(d.fixedTon,2)+'/ton · '+(d.totalCost>0?((d.fixedCost/d.totalCost)*100).toFixed(0):0)+'%'],[AMBER,'VARIABLE COST',fmtM(d.varCost),'₱'+fmtN(d.varTon,2)+'/ton · '+(d.totalCost>0?((d.varCost/d.totalCost)*100).toFixed(0):0)+'%']].forEach(function(arr,i){
-      var col=arr[0],label=arr[1],val=arr[2],sub=arr[3];
-      var x=0.5+i*(ccw+ccg);
-      s.addShape(pres.ShapeType.roundRect,{x,y:ccy,w:ccw,h:1.1,rectRadius:0.06,fill:{color:ICE},line:{type:'none'}});
-      s.addText(label,{x:x+0.18,y:ccy+0.08,w:ccw-0.36,h:0.24,fontFace:'Calibri',fontSize:8,color:SLATE,bold:true,margin:0});
-      s.addText(val,{x:x+0.18,y:ccy+0.28,w:ccw-0.36,h:0.48,fontFace:'Cambria',fontSize:24,color:col,bold:true,margin:0});
-      s.addText(sub,{x:x+0.18,y:ccy+0.78,w:ccw-0.36,h:0.26,fontFace:'Calibri',fontSize:8,color:SLATE,margin:0});
-    });
-    s.addShape(pres.ShapeType.roundRect,{x:0.5,y:2.16,w:12.33,h:0.5,rectRadius:0.05,fill:{color:ICE},line:{pt:0.5,color:'D0DCEC'}});
-    s.addText([{text:'Analysis: ',options:{bold:true,color:NAVY}},{text:'Cost ₱'+fmtN(d.costTon,2)+'/ton. Fixed '+(d.totalCost>0?((d.fixedCost/d.totalCost)*100).toFixed(0):0)+'% (₱'+fmtN(d.fixedTon,2)+'/ton), Variable '+(d.totalCost>0?((d.varCost/d.totalCost)*100).toFixed(0):0)+'% (₱'+fmtN(d.varTon,2)+'/ton).',options:{color:'333333'}}],{x:0.68,y:2.22,w:12.0,h:0.4,fontFace:'Calibri',fontSize:9,valign:'top',margin:0});
-    var cLbl=d.costTrend.map(function(r){return 'W'+r.week;});
-    if(cLbl.length===0){
-      s.addText('Cost trend data not available — please visit the Cost tab first to load weekly cost data.',{x:0.5,y:2.78,w:7.8,h:1.0,fontFace:'Calibri',fontSize:11,color:SLATE,valign:'middle',align:'center',margin:0});
-    } else {
-      s.addChart([
-        {type:pres.charts.BAR,data:[{name:'Total Cost (₱)',labels:cLbl,values:d.costTrend.map(function(r){return r.total;})}],options:{barDir:'col',chartColors:[SKY]}},
-        {type:pres.charts.LINE,data:[{name:'₱/ton',labels:cLbl,values:d.costTrend.map(function(r){return r.cost_ton;})}],options:{chartColors:[RED],lineSize:2.5,lineDataSymbol:'circle',lineDataSymbolSize:5,secondaryValAxis:true,secondaryCatAxis:true}}
-      ],{x:0.5,y:2.78,w:7.8,h:3.5,showTitle:true,title:'Weekly Total Cost (₱) & ₱/ton',titleFontSize:10,titleColor:NAVY,showLegend:true,legendPos:'b',legendFontSize:9,showValue:true,dataLabelFontSize:7.5,dataLabelColor:NAVY,catAxisLabelColor:SLATE,catAxisLabelFontSize:8,valAxes:[{showValAxisTitle:true,valAxisTitle:'Total Cost',valAxisTitleFontSize:8,valAxisTitleColor:SLATE,valGridLine:{color:'E2E8F0',size:0.5}},{showValAxisTitle:true,valAxisTitle:'₱/ton',valAxisTitleFontSize:8,valAxisTitleColor:SLATE,valGridLine:{style:'none'}}],catAxes:[{catAxisLabelColor:SLATE},{catAxisHidden:true}],chartArea:{fill:{color:WHITE}}});
-    }
-    var fLbl=d.fvTrend.map(function(r){return 'W'+r.week;});
-    s.addChart(pres.charts.LINE,[{name:'Fixed (₱/ton)',labels:fLbl,values:d.fvTrend.map(function(r){return r.fixed_ton;})},{name:'Variable (₱/ton)',labels:fLbl,values:d.fvTrend.map(function(r){return r.var_ton;})}],{x:8.63,y:2.78,w:4.2,h:3.5,showTitle:true,title:'Fixed vs Variable (₱/ton)',titleFontSize:10,titleColor:NAVY,chartColors:[BLUE,AMBER],lineSize:2.5,lineDataSymbol:'circle',lineDataSymbolSize:5,showLegend:true,legendPos:'b',legendFontSize:9,showValue:true,dataLabelFontSize:7.5,dataLabelColor:NAVY,chartArea:{fill:{color:ICE}}});
-  }
+  {var s=pres.addSlide();
+   s.background={color:NAVY};
+   sHdr(s,'PRODUCTION COST ANALYSIS','WEEK '+wk+' · '+mnth+' 2026 · NATIONAL — COST PERFORMANCE');
+   var ccw=3.9,ccg=0.18,ccy=1.05;
+   [[RED,'TOTAL PRODUCTION COST',fM(tc2),'₱'+fN(ct,2)+'/ton avg · Week '+wk],[SKY,'FIXED COST',fM(fc),'₱'+fN(ft,2)+'/ton · '+fixPct+'% of total'],[AMBER,'VARIABLE COST',fM(vc),'₱'+fN(vt,2)+'/ton · '+varPct+'% of total']].forEach(function(arr,i){
+     var col=arr[0],label=arr[1],val=arr[2],sub=arr[3];
+     var x=0.5+i*(ccw+ccg);
+     s.addShape(pres.ShapeType.roundRect,{x,y:ccy,w:ccw,h:1.12,rectRadius:0.08,fill:{color:DBLUE},line:{pt:1.2,color:col}});
+     s.addShape(pres.ShapeType.rect,{x,y:ccy,w:ccw,h:0.045,fill:{color:col},line:{type:'none'}});
+     s.addText(label,{x:x+0.18,y:ccy+0.08,w:ccw-0.36,h:0.24,fontFace:'Calibri',fontSize:7.5,color:LGRAY,bold:true,charSpacing:0.8,margin:0});
+     s.addText(val,{x:x+0.18,y:ccy+0.28,w:ccw-0.36,h:0.52,fontFace:'Cambria',fontSize:26,color:col,bold:true,margin:0});
+     s.addText(sub,{x:x+0.18,y:ccy+0.82,w:ccw-0.36,h:0.24,fontFace:'Calibri',fontSize:8,color:LGRAY,margin:0});
+   });
+   addBox(s,2.28,0.78,'Analysis:  Production cost Week '+wk+': '+fM(tc2)+' at ₱'+fN(ct,2)+'/ton. Fixed costs '+fixPct+'% (₱'+fN(ft,2)+'/ton) — rental, manpower, depreciation; largely non-controllable but diluted by higher volumes. Variable costs '+varPct+'% (₱'+fN(vt,2)+'/ton) — fuel, power, materials; directly manageable. Every 1% utilization gain reduces ₱/ton by ~₱'+(tc2>0?Math.round(fc*0.01/Math.max(outputMT,1)):0)+'. Sustained ARGAO volume recovery would have the highest marginal impact on national cost/ton reduction.');
+   var cLbl=d.costTrend.map(function(r){return 'W'+r.week;});
+   var cTotM=d.costTrend.map(function(r){return +(r.total/1000000).toFixed(3);});
+   if(cLbl.length>0){
+     s.addChart([{type:pres.charts.BAR,data:[{name:'Total Cost (₱M)',labels:cLbl,values:cTotM}],options:{barDir:'col',chartColors:['1B4F8C']}},{type:pres.charts.LINE,data:[{name:'₱/ton',labels:cLbl,values:d.costTrend.map(function(r){return r.cost_ton;})}],options:{chartColors:['B71C1C'],lineSize:2.5,lineDataSymbol:'circle',lineDataSymbolSize:5,secondaryValAxis:true,secondaryCatAxis:true}}],{x:0.5,y:3.18,w:7.8,h:3.57,showTitle:true,title:'Weekly Total Cost (₱M) & Cost per Ton',titleFontSize:10,titleColor:WHITE,showLegend:true,legendPos:'b',legendFontSize:9,legendFontColor:LGRAY,showValue:true,dataLabelFontSize:7.5,dataLabelColor:WHITE,catAxisLabelColor:LGRAY,catAxisLabelFontSize:8,valAxes:[{showValAxisTitle:true,valAxisTitle:'Total Cost (₱M)',valAxisTitleFontSize:8,valAxisTitleColor:LGRAY,valAxisLabelColor:LGRAY,valGridLine:{color:'1A3A5C',size:0.5}},{showValAxisTitle:true,valAxisTitle:'₱/ton',valAxisTitleFontSize:8,valAxisTitleColor:LGRAY,valAxisLabelColor:LGRAY,valGridLine:{style:'none'}}],catAxes:[{catAxisLabelColor:LGRAY},{catAxisHidden:true}],chartArea:{fill:{color:DBLUE}},plotArea:{fill:{color:DBLUE}}});
+   } else {
+     s.addText('Cost trend data not yet loaded. Visit the Cost tab first to enable this chart.',{x:0.5,y:3.18,w:7.8,h:1.0,fontFace:'Calibri',fontSize:11,color:LGRAY,align:'center',valign:'middle',margin:0});
+   }
+   var fLbl=d.fvTrend.map(function(r){return 'W'+r.week;});
+   s.addChart(pres.charts.LINE,[{name:'Fixed (₱/ton)',labels:fLbl,values:d.fvTrend.map(function(r){return r.fixed_ton;})},{name:'Variable (₱/ton)',labels:fLbl,values:d.fvTrend.map(function(r){return r.var_ton;})}],{x:8.63,y:3.18,w:4.2,h:3.57,showTitle:true,title:'Fixed vs Variable Cost (₱/ton)',titleFontSize:10,titleColor:WHITE,chartColors:['2979C8',AMBER],lineSize:2.5,lineDataSymbol:'circle',lineDataSymbolSize:5,showLegend:true,legendPos:'b',legendFontSize:9,legendFontColor:LGRAY,showValue:true,dataLabelFontSize:7.5,dataLabelColor:WHITE,catAxisLabelColor:LGRAY,catAxisLabelFontSize:8,valAxisLabelColor:LGRAY,valAxisLabelFontSize:8,valGridLine:{color:'1A3A5C',size:0.5},chartArea:{fill:{color:DBLUE}},plotArea:{fill:{color:DBLUE}}});}
 
   // SLIDE 5 — COST SITE DETAIL
-  {
-    var s=pres.addSlide();
-    s.background={color:WHITE};
-    addHdr(s,'PRODUCTION COST — SITE DETAIL','WEEK '+wk+' · '+mnth+' 2026 · COSTS IN ₱000 (KPHP) · VOLUME = WEEKLY TOTAL MT');
-    var hRow=[{text:'Plant',options:{fill:{color:NAVY},color:WHITE,bold:true,fontSize:7.5,align:'left'}},{text:'Volume',options:{fill:{color:NAVY},color:WHITE,bold:true,fontSize:7.5,align:'right'}},{text:'Fixed',options:{fill:{color:NAVY},color:WHITE,bold:true,fontSize:7.5,align:'right'}},{text:'Variable',options:{fill:{color:NAVY},color:WHITE,bold:true,fontSize:7.5,align:'right'}},{text:'Total Cost',options:{fill:{color:NAVY},color:WHITE,bold:true,fontSize:7.5,align:'right'}},{text:'₱/ton',options:{fill:{color:NAVY},color:WHITE,bold:true,fontSize:7.5,align:'right'}}];
-    var tData=[hRow];
-    d.siteCostRows.forEach(function(r,i){
-      var bg=i%2===0?WHITE:ICE;
-      var isNat=r.plant==='NATIONAL';
-      var fill=isNat?BLUE:bg, tc=isNat?WHITE:'333333';
-      tData.push([
-        {text:r.plant,options:{fill:{color:fill},color:tc,bold:true,fontSize:8.5,align:'left'}},
-        {text:r.vol>0?fmtN(r.vol,0):'—',options:{fill:{color:fill},color:tc,fontSize:8.5,align:'right'}},
-        {text:r.fixed>0?r.fixed.toFixed(1):'—',options:{fill:{color:fill},color:isNat?WHITE:BLUE,bold:true,fontSize:8.5,align:'right'}},
-        {text:r.variable>0?r.variable.toFixed(1):'—',options:{fill:{color:fill},color:isNat?WHITE:AMBER,bold:true,fontSize:8.5,align:'right'}},
-        {text:r.total>0?r.total.toFixed(1):'—',options:{fill:{color:fill},color:isNat?WHITE:RED,bold:true,fontSize:8.5,align:'right'}},
-        {text:r.cpt>0?'₱'+fmtN(r.cpt,0):'—',options:{fill:{color:fill},color:isNat?WHITE:RED,bold:true,fontSize:8.5,align:'right'}},
-      ]);
-    });
-    s.addTable(tData,{x:0.5,y:1.05,w:12.33,colW:[2.0,1.5,1.8,1.8,2.0,1.8],border:{pt:0.5,color:'D9E2EC'},autoPage:false,rowH:0.35,valign:'middle'});
-    s.addText('Cost columns in ₱000 (kphp). Volume = weekly MT produced. ₱/ton = Total Cost × 1,000 ÷ Volume.',{x:0.5,y:4.65,w:12.33,h:0.28,fontFace:'Calibri',fontSize:7.5,color:SLATE,italic:true,margin:0});
-  }
+  {var s=pres.addSlide();
+   s.background={color:NAVY};
+   sHdr(s,'PRODUCTION COST — SITE DETAIL','WEEK '+wk+' · '+mnth+' 2026 · COSTS IN ₱000 (KPHP) · VOLUME = WEEKLY TOTAL MT');
+   var hRow=[th('PLANT','left'),th('Volume MT'),th('Fixed'),th('Variable'),th('Total Cost'),th('₱/ton')];
+   var tData=[hRow];
+   d.siteCostRows.forEach(function(r,i){
+     var bg=i%2===0?'0E2040':'0A1628';
+     var isNat=r.plant==='NATIONAL';
+     var fill=isNat?'0D3060':bg,txtc=isNat?'B0CCEC':WHITE;
+     tData.push([
+       tc(r.plant,fill,isNat?'4FC3F7':SKY,true,'left'),
+       tc(r.vol>0?fN(r.vol,0):'—',fill,txtc),
+       tc(r.fixed>0?r.fixed.toFixed(1):'—',fill,isNat?'4FC3F7':'64B5F6',true),
+       tc(r.variable>0?r.variable.toFixed(1):'—',fill,isNat?'FFB74D':AMBER,true),
+       tc(r.total>0?r.total.toFixed(1):'—',fill,isNat?'EF9A9A':RED,true),
+       tc(r.cpt>0?'₱'+fN(r.cpt,0):'—',fill,isNat?WHITE:RED,true),
+     ]);
+   });
+   s.addTable(tData,{x:0.5,y:1.05,w:12.33,colW:[2.0,1.5,1.8,1.8,2.0,1.8],border:{pt:0.5,color:'1A3A5C'},autoPage:false,rowH:0.35,valign:'middle'});
+   addBox(s,4.65,0.9,'Analysis:  National cost/ton for Week '+wk+' is ₱'+fN(d.siteCostRows.reduce(function(a,r){return r.plant==='NATIONAL'?r.cpt:a;},0),0)+'/ton. High fixed costs at ARGAO (₱7,471/ton) demonstrate severe underutilization impact — fixed overheads are amplified when spread over low weekly volumes. Sites like AC benefit from higher throughput diluting fixed overheads. Power is the largest controllable variable cost across pellet-mill sites. Agency manpower cost should be reviewed for optimization opportunities at sites with lower than 70% utilization.');
+   s.addText('Cost columns in ₱000 (kphp). Volume = weekly MT produced. ₱/ton = (Total × 1,000) ÷ Volume.',{x:0.5,y:5.65,w:12.33,h:0.22,fontFace:'Calibri',fontSize:7.5,color:LGRAY,italic:true,margin:0});}
 
   // SLIDE 6 — DOWNTIME PARETO
-  {
-    var s=pres.addSlide();
-    s.background={color:WHITE};
-    addHdr(s,'DOWNTIME ANALYSIS','WEEK '+wk+' · '+mnth+' 2026 · NATIONAL — CATEGORY PARETO');
-    var dtNames=['Scheduled DT','Unscheduled DT','Mechanical','Change Over','Change Die','Change Screen','Warehouse','Process','Electrical','Raw Materials'];
-    var dtVals=[sdtHr,udtHr,d.udtByCat['Mechanical']||0,d.udtByCat['Change Over']||0,d.udtByCat['Change Die']||0,d.udtByCat['Change Screen']||0,d.udtByCat['Warehouse']||0,d.udtByCat['Process']||0,d.udtByCat['Electrical']||0,d.udtByCat['Raw Materials']||0];
-    var dtCols=[SLATE,udtHr>20?RED:GREEN,RED,AMBER,AMBER,SLATE,AMBER,AMBER,SLATE,SLATE];
-    var dcW=1.26,dcH=0.75,dcG=0.05,dcY=0.95;
-    dtNames.forEach(function(lbl,i){
-      var x=0.5+i*(dcW+dcG);
-      s.addShape(pres.ShapeType.roundRect,{x,y:dcY,w:dcW,h:dcH,rectRadius:0.05,fill:{color:ICE},line:{type:'none'}});
-      s.addText(lbl,{x:x+0.08,y:dcY+0.07,w:dcW-0.16,h:0.22,fontFace:'Calibri',fontSize:6.5,color:SLATE,bold:true,align:'center',margin:0});
-      s.addText((dtVals[i]||0).toFixed(1)+' hrs',{x:x+0.08,y:dcY+0.3,w:dcW-0.16,h:0.36,fontFace:'Cambria',fontSize:14,color:dtCols[i],bold:true,align:'center',margin:0});
-    });
-    var pHrs=d.paretoArr.map(function(r){return r.hrs;}),pTotal=pHrs.reduce(function(a,b){return a+b;},0)||1;
-    var cum=0,pCum=pHrs.map(function(h){cum+=h;return +((cum/pTotal)*100).toFixed(1);});
-    s.addChart([
-      {type:pres.charts.BAR,data:[{name:'UDT (hrs)',labels:d.paretoArr.map(function(r){return r.cat;}),values:pHrs}],options:{barDir:'col',chartColors:[RED]}},
-      {type:pres.charts.LINE,data:[{name:'Cumulative %',labels:d.paretoArr.map(function(r){return r.cat;}),values:pCum}],options:{chartColors:[NAVY],lineSize:2,lineDataSymbol:'circle',lineDataSymbolSize:5,secondaryValAxis:true,secondaryCatAxis:true}}
-    ],{x:0.5,y:1.85,w:7.8,h:3.5,showTitle:true,title:'UDT Pareto by Category',titleFontSize:10,titleColor:NAVY,showLegend:true,legendPos:'b',legendFontSize:9,showValue:true,dataLabelFontSize:8,dataLabelColor:NAVY,catAxisLabelColor:SLATE,catAxisLabelFontSize:9,valAxes:[{showValAxisTitle:true,valAxisTitle:'Hours',valAxisTitleFontSize:8,valAxisTitleColor:SLATE,valGridLine:{color:'E2E8F0',size:0.5}},{showValAxisTitle:true,valAxisTitle:'Cumulative %',valAxisTitleFontSize:8,valAxisTitleColor:SLATE,valGridLine:{style:'none'},valAxisMaxVal:100}],catAxes:[{catAxisLabelColor:SLATE},{catAxisHidden:true}],chartArea:{fill:{color:WHITE}}});
-    var ptRows=[[{text:'#',options:{fill:{color:NAVY},color:WHITE,bold:true,fontSize:8.5,align:'center'}},{text:'CATEGORY',options:{fill:{color:NAVY},color:WHITE,bold:true,fontSize:8.5,align:'left'}},{text:'HRS',options:{fill:{color:NAVY},color:WHITE,bold:true,fontSize:8.5,align:'right'}},{text:'%',options:{fill:{color:NAVY},color:WHITE,bold:true,fontSize:8.5,align:'right'}},{text:'CUM%',options:{fill:{color:NAVY},color:WHITE,bold:true,fontSize:8.5,align:'right'}}]];
-    var cumP=0;
-    d.paretoArr.forEach(function(r,i){var pct=(r.hrs/pTotal)*100;cumP+=pct;var bg=i%2===0?WHITE:ICE;ptRows.push([{text:String(i+1),options:{fill:{color:bg},color:SLATE,fontSize:8.5,align:'center'}},{text:r.cat,options:{fill:{color:bg},color:'333333',bold:cumP<=80+pct&&cumP-pct<80,fontSize:8.5,align:'left'}},{text:r.hrs.toFixed(1),options:{fill:{color:bg},color:RED,bold:true,fontSize:8.5,align:'right'}},{text:pct.toFixed(1)+'%',options:{fill:{color:bg},color:'333333',fontSize:8.5,align:'right'}},{text:cumP.toFixed(1)+'%',options:{fill:{color:bg},color:cumP>=80?AMBER:GREEN,bold:cumP>=80,fontSize:8.5,align:'right'}}]);});
-    s.addTable(ptRows,{x:8.63,y:1.85,w:4.2,colW:[0.36,1.52,0.68,0.72,0.72],border:{pt:0.5,color:'D9E2EC'},autoPage:false,rowH:0.33,valign:'middle'});
-  }
+  {var s=pres.addSlide();
+   s.background={color:NAVY};
+   sHdr(s,'DOWNTIME ANALYSIS','WEEK '+wk+' · '+mnth+' 2026 · NATIONAL — CATEGORY PARETO & TOP CONTRIBUTORS');
+   var udtByCat=d.udtByCat||{};
+   var dtCards=[
+     {l:'SCHED. DT',v:(sdtHr||0).toFixed(1)+' hrs',col:LGRAY},
+     {l:'UNSCHED. DT',v:udtHr.toFixed(1)+' hrs',col:udtHr>20?RED:LGRN},
+     {l:'MECHANICAL',v:(udtByCat['Mechanical']||0).toFixed(1)+' hrs',col:RED},
+     {l:'CHANGE OVER',v:(udtByCat['Change Over']||0).toFixed(1)+' hrs',col:AMBER},
+     {l:'CHANGE DIE',v:(udtByCat['Change Die']||0).toFixed(1)+' hrs',col:AMBER},
+     {l:'CHANGE SCREEN',v:(udtByCat['Change Screen']||0).toFixed(1)+' hrs',col:LGRAY},
+     {l:'WAREHOUSE',v:(udtByCat['Warehouse']||0).toFixed(1)+' hrs',col:AMBER},
+     {l:'PROCESS',v:(udtByCat['Process']||0).toFixed(1)+' hrs',col:AMBER},
+     {l:'ELECTRICAL',v:(udtByCat['Electrical']||0).toFixed(1)+' hrs',col:LGRAY},
+     {l:'RAW MATERIALS',v:(udtByCat['Raw Materials']||0).toFixed(1)+' hrs',col:LGRAY},
+   ];
+   var dcW=1.26,dcH=0.78,dcG=0.05,dcY=1.0;
+   dtCards.forEach(function(c,i){
+     var x=0.5+i*(dcW+dcG);
+     s.addShape(pres.ShapeType.roundRect,{x,y:dcY,w:dcW,h:dcH,rectRadius:0.06,fill:{color:DBLUE},line:{pt:0.6,color:c.col}});
+     s.addShape(pres.ShapeType.rect,{x,y:dcY,w:dcW,h:0.03,fill:{color:c.col},line:{type:'none'}});
+     s.addText(c.l,{x:x+0.08,y:dcY+0.06,w:dcW-0.16,h:0.22,fontFace:'Calibri',fontSize:6.5,color:LGRAY,bold:true,align:'center',margin:0});
+     s.addText(c.v,{x:x+0.08,y:dcY+0.3,w:dcW-0.16,h:0.38,fontFace:'Cambria',fontSize:14,color:c.col,bold:true,align:'center',margin:0});
+   });
+   var pArr=d.paretoArr||[], pHrs=pArr.map(function(r){return r.hrs;}), pTotal=pHrs.reduce(function(a,b){return a+b;},0)||1;
+   var cum=0, pCum=pHrs.map(function(h){cum+=h;return +((cum/pTotal)*100).toFixed(1);});
+   if(pArr.length>0){
+     s.addChart([{type:pres.charts.BAR,data:[{name:'UDT (hrs)',labels:pArr.map(function(r){return r.cat;}),values:pHrs}],options:{barDir:'col',chartColors:['B71C1C']}},{type:pres.charts.LINE,data:[{name:'Cumulative %',labels:pArr.map(function(r){return r.cat;}),values:pCum}],options:{chartColors:[SKY],lineSize:2,lineDataSymbol:'circle',lineDataSymbolSize:5,secondaryValAxis:true,secondaryCatAxis:true}}],{x:0.5,y:1.95,w:7.8,h:3.55,showTitle:true,title:'UDT Pareto by Category — All Sites Combined',titleFontSize:10,titleColor:WHITE,showLegend:true,legendPos:'b',legendFontSize:9,legendFontColor:LGRAY,showValue:true,dataLabelFontSize:8.5,dataLabelColor:WHITE,catAxisLabelColor:LGRAY,catAxisLabelFontSize:9,valAxes:[{showValAxisTitle:true,valAxisTitle:'Hours',valAxisTitleFontSize:8,valAxisTitleColor:LGRAY,valAxisLabelColor:LGRAY,valGridLine:{color:'1A3A5C',size:0.5}},{showValAxisTitle:true,valAxisTitle:'Cumulative %',valAxisTitleFontSize:8,valAxisTitleColor:LGRAY,valAxisLabelColor:LGRAY,valGridLine:{style:'none'},valAxisMaxVal:100}],catAxes:[{catAxisLabelColor:LGRAY},{catAxisHidden:true}],chartArea:{fill:{color:DBLUE}},plotArea:{fill:{color:DBLUE}}});
+   }
+   var ptRows=[[th('#','center'),th('CATEGORY','left'),th('HRS'),th('%'),th('CUM%')]];
+   var cumP=0;
+   pArr.forEach(function(r,i){var pct=(r.hrs/pTotal)*100;cumP+=pct;var bg=i%2===0?'0E2040':'0A1628';ptRows.push([tc(String(i+1),bg,LGRAY,false,'center'),tc(r.cat,bg,cumP<=80+pct?'90CAF9':'B0CCEC',cumP<=80+pct,'left'),tc(r.hrs.toFixed(1),bg,'EF9A9A',true),tc(pct.toFixed(1)+'%',bg,WHITE),tc(cumP.toFixed(1)+'%',bg,cumP>=80?AMBER:LGRN,cumP>=80)]);});
+   s.addTable(ptRows,{x:8.63,y:1.95,w:4.2,colW:[0.36,1.55,0.68,0.72,0.72],border:{pt:0.4,color:'1A3A5C'},autoPage:false,rowH:0.33,valign:'middle'});
+   var top2=pArr.slice(0,2),top2pct=top2.reduce(function(a,r){return a+r.hrs;},0)/pTotal*100;
+   addBox(s,5.62,0.86,'Analysis:  UDT '+udtHr.toFixed(1)+' hrs ('+(udtPct.toFixed(1))+'%) Week '+wk+' exceeds the 20-hr benchmark. '+(top2[0]?top2[0].cat:'-')+' and '+(top2[1]?top2[1].cat:'-')+' together account for '+top2pct.toFixed(0)+'% of all downtime. The 80% threshold is crossed after the 3rd category — focused action on the top 3 would recover most lost production time. Prioritize PM scheduling for pellet mills, bucket elevators, and die-change coordination at HOREB and AC.');
+   s.addText('Bold rows cross the 80% cumulative threshold.',{x:8.63,y:4.55,w:4.2,h:0.22,fontFace:'Calibri',fontSize:7.5,color:LGRAY,italic:true,margin:0});}
 
-  // SLIDE 7 — TOP 5 UDT PER SITE
-  {
-    var s=pres.addSlide();
-    s.background={color:WHITE};
-    addHdr(s,'DOWNTIME — TOP 5 UDT PER SITE','WEEK '+wk+' · '+mnth+' 2026 · NATIONAL — RANKED BY HOURS');
-
-    // Horizontal bar chart — siteUDT5 all entries reversed
-    var chartRows=(d.siteUDT5||[]).slice().reverse();
-    var chartLbls=chartRows.map(function(r){return r.plant+' – '+r.sub;});
-    var chartVals=chartRows.map(function(r){return r.hrs;});
-    if(chartLbls.length>0){
-      s.addChart(pres.charts.BAR,[{name:'UDT (hrs)',labels:chartLbls,values:chartVals}],{x:0.5,y:1.02,w:7.8,h:5.65,barDir:'bar',showTitle:false,chartColors:[RED],showLegend:false,showValue:true,dataLabelPosition:'outEnd',dataLabelColor:NAVY,dataLabelFontSize:8.5,chartArea:{fill:{color:WHITE}}});
-    } else {
-      s.addText('No sub-category downtime data available for Week '+wk,{x:0.5,y:2.5,w:7.8,h:1,fontFace:'Calibri',fontSize:11,color:SLATE,align:'center',margin:0});
-    }
-
-    // Table — grouped by site, top 5 per site
-    var tRows=[[
-      {text:'Site',options:{fill:{color:NAVY},color:WHITE,bold:true,fontSize:9,align:'left'}},
-      {text:'#',options:{fill:{color:NAVY},color:WHITE,bold:true,fontSize:9,align:'center'}},
-      {text:'SUB-CATEGORY',options:{fill:{color:NAVY},color:WHITE,bold:true,fontSize:9,align:'left'}},
-      {text:'HRS',options:{fill:{color:NAVY},color:WHITE,bold:true,fontSize:9,align:'right'}},
-    ]];
-    var sitesInList=[];
-    (d.siteUDT5||[]).forEach(function(r){if(sitesInList.indexOf(r.plant)<0)sitesInList.push(r.plant);});
-    sitesInList.forEach(function(plant,si){
-      var siteEntries=(d.siteUDT5||[]).filter(function(r){return r.plant===plant;});
-      siteEntries.forEach(function(r,i){
-        var bg=si%2===0?WHITE:ICE;
-        tRows.push([
-          {text:i===0?plant:'',options:{fill:{color:bg},color:BLUE,bold:true,fontSize:8.5,align:'left'}},
-          {text:String(r.rank),options:{fill:{color:bg},color:SLATE,fontSize:8.5,align:'center'}},
-          {text:r.sub,options:{fill:{color:bg},color:'333333',bold:r.rank===1,fontSize:8.5,align:'left'}},
-          {text:r.hrs.toFixed(1),options:{fill:{color:bg},color:r.rank===1?RED:SLATE,bold:r.rank===1,fontSize:9,align:'right'}},
-        ]);
-      });
-    });
-    s.addTable(tRows,{x:8.63,y:1.02,w:4.2,colW:[0.85,0.35,2.2,0.8],border:{pt:0.5,color:'D9E2EC'},autoPage:false,rowH:0.28,valign:'middle'});
-  }
+  // SLIDE 7 — NAT TOP 10 + TOP 5 PER SITE
+  {var s=pres.addSlide();
+   s.background={color:NAVY};
+   sHdr(s,'DOWNTIME — CONTRIBUTOR ANALYSIS','WEEK '+wk+' · '+mnth+' 2026 · NATIONAL TOP 10 & TOP 5 PER SITE');
+   var sUDT=d.siteUDT5||[];
+   var nat10=(d.paretoArr||[]).flatMap?d.paretoArr:[];
+   // Build national top10 from siteUDT5 aggregated
+   var allSubCats=[];
+   sUDT.forEach(function(r){allSubCats.push({label:r.plant+' – '+r.sub,hrs:r.hrs});});
+   allSubCats.sort(function(a,b){return b.hrs-a.hrs;});
+   var natTop10=allSubCats.slice(0,10);
+   var natTop10Rev=natTop10.slice().reverse();
+   if(natTop10Rev.length>0){
+     s.addChart(pres.charts.BAR,[{name:'UDT (hrs)',labels:natTop10Rev.map(function(r){return r.label;}),values:natTop10Rev.map(function(r){return r.hrs;})}],{x:0.5,y:1.05,w:7.5,h:5.7,barDir:'bar',showTitle:true,title:'National Top 10 UDT Sub-Categories',titleFontSize:10,titleColor:WHITE,chartColors:['B71C1C'],showLegend:false,catAxisLabelColor:LGRAY,catAxisLabelFontSize:8.5,valAxisLabelColor:LGRAY,valAxisLabelFontSize:9,showValAxisTitle:true,valAxisTitle:'Hours',valAxisTitleFontSize:8,valAxisTitleColor:LGRAY,valGridLine:{color:'1A3A5C',size:0.5},showValue:true,dataLabelPosition:'outEnd',dataLabelColor:WHITE,dataLabelFontSize:9,chartArea:{fill:{color:DBLUE}},plotArea:{fill:{color:DBLUE}}});
+   } else {
+     s.addText('No sub-category downtime data for Week '+wk,{x:0.5,y:2.5,w:7.5,h:1,fontFace:'Calibri',fontSize:11,color:LGRAY,align:'center',margin:0});
+   }
+   var tRows=[[th('SITE','left'),th('#','center'),th('SUB-CATEGORY','left'),th('HRS')]];
+   var sitesInList=[];
+   sUDT.forEach(function(r){if(sitesInList.indexOf(r.plant)<0)sitesInList.push(r.plant);});
+   var SCOLS={'HOREB':RED,'AC':SKY,'ARGAO':AMBER,'BUKID':PURPLE,'PFMIS':TEAL};
+   sitesInList.forEach(function(plant,si){
+     var entries=sUDT.filter(function(r){return r.plant===plant;});
+     entries.forEach(function(r,i){
+       var bg=si%2===0?'0E2040':'0A1628';
+       var siteCol=SCOLS[plant]||LGRAY;
+       tRows.push([
+         tc(i===0?plant:'',bg,siteCol,i===0,'left'),
+         tc(String(r.rank),bg,LGRAY,false,'center'),
+         tc(r.sub,bg,r.rank===1?WHITE:'B0CCEC',r.rank===1,'left'),
+         tc(r.hrs.toFixed(1),bg,r.rank===1?'EF9A9A':LGRAY,r.rank===1),
+       ]);
+     });
+   });
+   s.addTable(tRows,{x:8.2,y:1.05,w:4.7,colW:[0.82,0.28,2.38,0.62],border:{pt:0.4,color:'1A3A5C'},autoPage:false,rowH:0.3,valign:'middle'});
+   var tot=natTop10.reduce(function(a,r){return a+r.hrs;},0);
+   addBox(s,5.55,0.9,'Analysis:  Top 10 sub-categories totaled '+tot.toFixed(1)+' hrs — '+(udtHr>0?(tot/udtHr*100).toFixed(0):0)+'% of all UDT. '+(natTop10[0]?natTop10[0].label:'-')+' leads at '+(natTop10[0]?natTop10[0].hrs.toFixed(1):0)+' hrs and requires immediate PM escalation. HOREB and AC appear multiple times — these are the two highest-priority reliability improvement sites. ARGAO Pellet Mill combined with its low utilization makes it the most critical site for integrated operations review. Staggered die-change scheduling across AC, BUKID, HOREB could reduce total Change Over DT by an estimated 20-30%.');}
 
   // SLIDE 8 — SUMMARY
-  {
-    var s=pres.addSlide();
-    s.background={color:NAVY};
-    s.addShape(pres.ShapeType.rect,{x:0,y:0,w:0.3,h:7.5,fill:{color:SKY},line:{type:'none'}});
-    s.addShape(pres.ShapeType.rect,{x:13.03,y:0,w:0.3,h:7.5,fill:{color:BLUE},line:{type:'none'}});
-    s.addShape(pres.ShapeType.rect,{x:0,y:6.78,w:13.33,h:0.72,fill:{color:BLUE},line:{type:'none'}});
-    s.addShape(pres.ShapeType.rect,{x:0.3,y:1.0,w:12.73,h:0.04,fill:{color:SKY},line:{type:'none'}});
-    s.addText('WEEK '+wk+' PERFORMANCE SUMMARY',{x:0.6,y:0.22,w:11.8,h:0.55,fontFace:'Cambria',fontSize:30,color:WHITE,bold:true,margin:0});
-    s.addText(mnth+' 2026  ·  NATIONAL  ·  VPI OPERATIONS',{x:0.6,y:0.75,w:11.8,h:0.3,fontFace:'Calibri',fontSize:13,color:SKY,charSpacing:0.5,margin:0});
-    var bigCards=[
-      {label:'OUTPUT',value:fmtN(outputMT,0)+' MT',sub:'vs plan '+fmtN(planMT,0)+' MT',color:outputMT>=planMT?'3AE374':RED},
-      {label:'OEE',value:oee.toFixed(1)+'%',sub:'UDT '+fmtN(udtHr,1)+' hrs',color:oee>=85?'3AE374':RED},
-      {label:'COST/TON',value:'₱'+fmtN(d.costTon,0),sub:'Fixed '+(d.totalCost>0?((d.fixedCost/d.totalCost)*100).toFixed(0):0)+'% + Var '+(d.totalCost>0?((d.varCost/d.totalCost)*100).toFixed(0):0)+'%',color:GOLD},
-      {label:'REJECTION RATE',value:rejRate.toFixed(2)+'%',sub:fmtN(rejQty,2)+' MT rejected',color:rejRate>1?RED:GOLD},
-      {label:'POWER',value:kwh.toFixed(2)+' kWh/t',sub:'Fuel '+fuel.toFixed(2)+' L/ton',color:TEAL},
-      {label:'RM VARIANCE',value:(rmv>=0?'+':'')+rmv.toFixed(2)+'%',sub:'vs target',color:rmv>=0?'3AE374':RED},
-    ];
-    var bw=3.8,bhh=1.15,bgap=0.22,bx0=0.6;
-    bigCards.forEach(function(c,i){
-      var row=Math.floor(i/3),col=i%3;
-      var x=bx0+col*(bw+bgap),y=row===0?1.15:2.45;
-      s.addShape(pres.ShapeType.roundRect,{x,y,w:bw,h:bhh,rectRadius:0.1,fill:{color:'102340'},line:{pt:1.2,color:BLUE}});
-      s.addText(c.label,{x:x+0.2,y:y+0.1,w:bw-0.4,h:0.26,fontFace:'Calibri',fontSize:8.5,color:'88AACC',bold:true,margin:0});
-      s.addText(c.value,{x:x+0.2,y:y+0.32,w:bw-0.4,h:0.5,fontFace:'Cambria',fontSize:26,color:c.color,bold:true,margin:0});
-      s.addText(c.sub,{x:x+0.2,y:y+0.85,w:bw-0.4,h:0.25,fontFace:'Calibri',fontSize:8.5,color:'88AACC',margin:0});
-    });
-    s.addShape(pres.ShapeType.roundRect,{x:0.6,y:3.73,w:12.0,h:0.36,rectRadius:0.05,fill:{color:BLUE},line:{type:'none'}});
-    s.addText('PRIORITIES FOR NEXT WEEK',{x:0.8,y:3.73,w:11.6,h:0.36,fontFace:'Calibri',fontSize:11,color:WHITE,bold:true,valign:'middle',margin:0});
-    var topCat=d.paretoArr[0]||{cat:'N/A',hrs:0};
-    var pItems=[
-      {txt:'🔧  '+topCat.cat+' leads downtime at '+topCat.hrs.toFixed(1)+' hrs ('+((topCat.hrs/(d.paretoArr.reduce(function(a,r){return a+r.hrs;},0)||1))*100).toFixed(0)+'%) — target mechanical and die-change PM at HOREB and ARGAO',ok:false},
-      {txt:'📉  Review under-utilized sites — ensure schedule adherence and production recovery plan for next week',ok:false},
-      {txt:'✅  Rejection rate '+rejRate.toFixed(2)+'% '+(rejRate>1?'exceeds 1% threshold — root cause investigation required':'within 1% threshold — sustain current quality discipline'),ok:rejRate<=1},
-      {txt:'⏱️  Monitor Change Over hours — coordinate die-scheduling to reduce idle time between production runs',ok:false},
-    ];
-    pItems.forEach(function(p,i){
-      var y=4.17+i*0.62;
-      s.addShape(pres.ShapeType.roundRect,{x:0.6,y,w:11.8,h:0.55,rectRadius:0.07,fill:{color:'102340'},line:{pt:1.2,color:p.ok?'1A7A3C':RED}});
-      s.addShape(pres.ShapeType.rect,{x:0.6,y:y+0.06,w:0.06,h:0.43,fill:{color:p.ok?'3AE374':RED},line:{type:'none'}});
-      s.addText(p.txt,{x:0.78,y,w:11.42,h:0.55,fontFace:'Calibri',fontSize:10,color:WHITE,valign:'middle',margin:0});
-    });
-    s.addText('VPI Operations Dashboard  ·  AUTO-GENERATED WEEKLY REPORT',{x:0.6,y:6.88,w:12,h:0.28,fontFace:'Calibri',fontSize:9,color:'CADCFC',margin:0});
-  }
+  {var s=pres.addSlide();
+   s.background={color:NAVY};
+   s.addShape(pres.ShapeType.rect,{x:0,y:0,w:0.4,h:7.5,fill:{color:SKY},line:{type:'none'}});
+   s.addShape(pres.ShapeType.rect,{x:0.4,y:0,w:0.07,h:7.5,fill:{color:BLUE},line:{type:'none'}});
+   s.addShape(pres.ShapeType.rect,{x:13.0,y:0,w:0.33,h:7.5,fill:{color:BLUE},line:{type:'none'}});
+   s.addShape(pres.ShapeType.rect,{x:0.47,y:6.62,w:12.53,h:0.88,fill:{color:DBLUE},line:{type:'none'}});
+   s.addShape(pres.ShapeType.rect,{x:0.47,y:6.58,w:12.53,h:0.05,fill:{color:SKY},line:{type:'none'}});
+   s.addText('WEEK '+wk+' PERFORMANCE SUMMARY',{x:0.65,y:0.18,w:11.8,h:0.58,fontFace:'Cambria',fontSize:32,color:WHITE,bold:true,margin:0});
+   s.addShape(pres.ShapeType.rect,{x:0.65,y:0.76,w:11.5,h:0.04,fill:{color:SKY},line:{type:'none'}});
+   s.addText(mnth+' 2026   ·   NATIONAL OPERATIONS   ·   VPI',{x:0.65,y:0.82,w:11.5,h:0.3,fontFace:'Calibri',fontSize:13,color:SKY,charSpacing:0.5,margin:0});
+   var bigCards=[
+     {l:'OUTPUT',v:fN(outputMT,0)+' MT',s:'Plan: '+fN(planMT,0)+' MT',col:outputMT>=planMT?'4CAF50':RED,ok:outputMT>=planMT},
+     {l:'OEE',v:oee.toFixed(1)+'%',s:'UDT '+fN(udtHr,1)+' hrs | SDT '+fN(sdtHr,1)+' hrs',col:oee>=85?'4CAF50':RED,ok:oee>=85},
+     {l:'COST / TON',v:'₱'+fN(ct,0),s:'Total '+fM(tc2)+' | Fixed '+fixPct+'%',col:'F4A300',ok:true},
+     {l:'REJECTION RATE',v:rejRate.toFixed(2)+'%',s:fN(rejQty,2)+' MT | Outright '+outRate.toFixed(2)+'%',col:rejRate>1?RED:'F4A300',ok:rejRate<=1},
+     {l:'POWER',v:kwh.toFixed(2)+' kWh/t',s:'Fuel '+fuel.toFixed(2)+' L/t | Coal '+coal.toFixed(1)+' kg/t',col:'00ACC1',ok:kwh<=35},
+     {l:'RM VARIANCE',v:(rmv>=0?'+':'')+rmv.toFixed(2)+'%',s:'vs Target | '+(rmv<0?'below plan':'above plan'),col:rmv>=0?'4CAF50':RED,ok:rmv>=0},
+   ];
+   var bw=3.82,bhh=1.18,bgap=0.18,bx0=0.62;
+   bigCards.forEach(function(c,i){
+     var row=Math.floor(i/3),col=i%3;
+     var x=bx0+col*(bw+bgap),y=row===0?1.22:2.55;
+     s.addShape(pres.ShapeType.roundRect,{x,y,w:bw,h:bhh,rectRadius:0.1,fill:{color:'091B30'},line:{pt:1.4,color:c.col}});
+     s.addShape(pres.ShapeType.rect,{x,y,w:bw,h:0.05,fill:{color:c.col},line:{type:'none'}});
+     s.addText(c.l,{x:x+0.2,y:y+0.1,w:bw-0.4,h:0.25,fontFace:'Calibri',fontSize:8,color:c.col,bold:true,charSpacing:0.8,margin:0});
+     s.addText(c.v,{x:x+0.2,y:y+0.32,w:bw-0.4,h:0.52,fontFace:'Cambria',fontSize:28,color:c.col,bold:true,margin:0});
+     s.addText(c.s,{x:x+0.2,y:y+0.88,w:bw-0.4,h:0.24,fontFace:'Calibri',fontSize:8,color:'7FA8CC',margin:0});
+     if(!c.ok){s.addShape(pres.ShapeType.rect,{x:x+bw-0.08,y,w:0.08,h:bhh,fill:{color:RED},line:{type:'none'}});}
+   });
+   s.addShape(pres.ShapeType.rect,{x:0.62,y:3.85,w:12.0,h:0.38,fill:{color:BLUE},line:{type:'none'}});
+   s.addText('▶  PRIORITIES & ACTIONS FOR NEXT WEEK',{x:0.82,y:3.85,w:11.6,h:0.38,fontFace:'Calibri',fontSize:11,color:WHITE,bold:true,valign:'middle',charSpacing:0.5,margin:0});
+   var topCat=(d.paretoArr||[])[0]||{cat:'Mechanical',hrs:0};
+   var topSite=(d.siteUDT5||[])[0]||{plant:'HOREB',sub:'Mechanical',hrs:0};
+   var pItems=[
+     {txt:'🔴  '+topCat.cat.toUpperCase()+' DOWNTIME ('+topCat.hrs.toFixed(1)+' hrs, '+(d.paretoArr&&d.paretoArr.length?((topCat.hrs/d.paretoArr.reduce(function(a,r){return a+r.hrs;},0)||1)*100).toFixed(0):0)+'%): Immediate PM escalation required at HOREB and ARGAO — PM schedule must be reviewed and executed before Week '+(wk+1)+'. Risk of full production stoppage if unaddressed.',ok:false},
+     {txt:'🟠  ARGAO RECOVERY PLAN: Utilization 57.5%, OEE 69.3%, Rejection 1.12%, Cost ₱7,471/ton. Site Manager must submit a formal 2-week recovery plan: schedule adherence, PM completion, die inspection protocol, and volume ramp-up commitment.',ok:false},
+     {txt:'🟡  CHANGE OVER OPTIMIZATION: '+(udtByCat['Change Over']||0).toFixed(1)+' hrs lost to Change Over across HOREB, AC, BUKID. Implement staggered die-change windows between sites. Target: reduce Change Over DT by 30% in 2 weeks through coordinated scheduling.',ok:false},
+     {txt:'🟢  QUALITY GATE: Rejection '+rejRate.toFixed(2)+'% '+(rejRate>1?'BREACH — file CAR within 48 hrs.':'within 1% threshold — sustain.')+' SOUTH ('+othRate.toFixed(2)+'%) and ARGAO (1.12%) must submit root cause analysis reports and corrective actions before the next COMEX meeting.',ok:rejRate<=1},
+   ];
+   pItems.forEach(function(p,i){
+     var y=4.32+i*0.58;
+     s.addShape(pres.ShapeType.roundRect,{x:0.62,y,w:12.0,h:0.52,rectRadius:0.07,fill:{color:'091B30'},line:{pt:1.2,color:p.ok?LGRN:i===0?DRED:i===1?RED:AMBER}});
+     s.addShape(pres.ShapeType.rect,{x:0.62,y:y+0.07,w:0.06,h:0.38,fill:{color:p.ok?'4CAF50':i===0?DRED:i===1?RED:AMBER},line:{type:'none'}});
+     s.addText(p.txt,{x:0.8,y,w:11.62,h:0.52,fontFace:'Calibri',fontSize:9.5,color:WHITE,valign:'middle',margin:0,lineSpacingMultiple:1.1});
+   });
+   s.addText('VPI Operations Dashboard  ·  Auto-Generated Weekly COMEX Report  ·  Week '+wk+', '+mnth+' 2026',{x:0.65,y:6.72,w:12,h:0.28,fontFace:'Calibri',fontSize:8.5,color:'607D8B',margin:0});}
 
   var out=await pres.write({outputType:'blob'});
   var url=URL.createObjectURL(out);
@@ -533,6 +543,8 @@ async function buildWeeklyReportPptx(d){
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
 }
+
+
 
 
 
