@@ -120,17 +120,42 @@ async function downloadWeeklyReport(){
       var p=gf(r,'Other Reject Rate, %'); return +(p>1?p:p*100).toFixed(3);
     });
 
-    // Cost data for all weeks
-    var costCache=DATA.costWeeklyTrend&&DATA.costWeeklyTrend['NATIONAL']||{};
-    var costTrend=allWeeks.filter(function(w){return costCache[w]&&costCache[w].total>0;}).map(function(w){
-      var d=costCache[w]; return {week:w, total:d.total, cost_ton:d.vol>0?+(d.total/d.vol).toFixed(2):0};
-    });
-    var fvTrend=allWeeks.filter(function(w){return costCache[w]&&costCache[w].total>0;}).map(function(w){
-      var d=costCache[w]; return {week:w, fixed_ton:d.vol>0?+(d.fixed/d.vol).toFixed(2):0, var_ton:d.vol>0?+(d.variable/d.vol).toFixed(2):0};
-    });
+    // Cost data — fetch current week if cache missing
+    if(!DATA.costWeeklyTrend) DATA.costWeeklyTrend={};
+    if(!DATA.costWeeklyTrend['NATIONAL']) DATA.costWeeklyTrend['NATIONAL']={};
+    var allSiteNames=['AC','PFMIS','HOREB','BUKID','ARGAO','HOREB MG','AC MG','NATIONAL'];
+    // Fetch current week cost for all sites if not cached
+    var sitesToFetch=allSiteNames.filter(function(s){return !(DATA.costWeeklyTrend[s]&&DATA.costWeeklyTrend[s][wk]);});
+    if(sitesToFetch.length>0){
+      await Promise.all(sitesToFetch.map(function(site){
+        return gasGet('pcdaily',{site:site,week:wk}).then(function(d){
+          if(!DATA.costWeeklyTrend[site]) DATA.costWeeklyTrend[site]={};
+          var rows=(d.rows||[]).filter(function(r){return (r.Plant||'').toUpperCase()===site.toUpperCase();});
+          var sum=function(f){return rows.reduce(function(a,r){return a+(r[f]||0);},0);};
+          DATA.costWeeklyTrend[site][wk]={vol:sum('TotalVolume'),total:sum('CostTotal'),fixed:sum('FixedTotal'),variable:sum('VarTotal')};
+        }).catch(function(){if(!DATA.costWeeklyTrend[site])DATA.costWeeklyTrend[site]={};DATA.costWeeklyTrend[site][wk]=null;});
+      }));
+    }
+    // Also fetch all-week National trend if not already loaded
+    var natCache=DATA.costWeeklyTrend['NATIONAL'];
+    var missingWeeks=allWeeks.filter(function(w){return !natCache[w];});
+    if(missingWeeks.length>0){
+      await Promise.all(missingWeeks.map(function(w){
+        return gasGet('pcdaily',{site:'NATIONAL',week:w}).then(function(d){
+          var rows=(d.rows||[]).filter(function(r){return (r.Plant||'').toUpperCase()==='NATIONAL';});
+          var sum=function(f){return rows.reduce(function(a,r){return a+(r[f]||0);},0);};
+          natCache[w]={vol:sum('TotalVolume'),total:sum('CostTotal'),fixed:sum('FixedTotal'),variable:sum('VarTotal')};
+        }).catch(function(){natCache[w]=null;});
+      }));
+    }
 
-    // Current week cost
-    var cD=DATA.costWeeklyTrend&&DATA.costWeeklyTrend['NATIONAL']&&DATA.costWeeklyTrend['NATIONAL'][wk];
+    var costTrend=allWeeks.filter(function(w){return natCache[w]&&natCache[w].total>0;}).map(function(w){
+      var c=natCache[w]; return {week:w,total:c.total,cost_ton:c.vol>0?+(c.total/c.vol).toFixed(2):0};
+    });
+    var fvTrend=allWeeks.filter(function(w){return natCache[w]&&natCache[w].total>0;}).map(function(w){
+      var c=natCache[w]; return {week:w,fixed_ton:c.vol>0?+(c.fixed/c.vol).toFixed(2):0,var_ton:c.vol>0?+(c.variable/c.vol).toFixed(2):0};
+    });
+    var cD=natCache[wk];
     var totalCost=cD?cD.total:0, costTon=cD&&cD.vol>0?+(cD.total/cD.vol).toFixed(2):0;
     var fixedCost=cD?cD.fixed:0, fixedTon=cD&&cD.vol>0?+(cD.fixed/cD.vol).toFixed(2):0;
     var varCost=cD?cD.variable:0, varTon=cD&&cD.vol>0?+(cD.variable/cD.vol).toFixed(2):0;
@@ -145,22 +170,35 @@ async function downloadWeeklyReport(){
       var plant=r.Plant||'';
       if(u>0){
         udtByCat[cat]=(udtByCat[cat]||0)+u;
-        if(sub&&plant) udtSubCats.push({label:plant+' – '+sub, hrs:u});
+        if(sub&&plant) udtSubCats.push({label:plant+' – '+sub,hrs:u});
       }
     });
     var paretoArr=Object.keys(udtByCat).map(function(k){return {cat:k,hrs:udtByCat[k]};}).filter(function(x){return x.hrs>0;}).sort(function(a,b){return b.hrs-a.hrs;});
-    udtSubCats.sort(function(a,b){return b.hrs-a.hrs;});
-    var top10=udtSubCats.slice(0,10).map(function(r,i){return {rank:i+1,label:r.label,hrs:r.hrs};});
 
-    // Site cost detail — use available week data
+    // Top 5 UDT per site (from downtime rows)
+    var udtBySite={};
+    dtRows.forEach(function(r){
+      var u=+(r['Unscheduled Downtime']||r.UDT_hrs||0);
+      var plant=(r.Plant||'').toUpperCase();
+      var sub=r['Sub-Category']||r.SubCategory||r.Category||'';
+      if(u>0&&plant&&sub){
+        if(!udtBySite[plant]) udtBySite[plant]=[];
+        udtBySite[plant].push({sub:sub,hrs:u});
+      }
+    });
+    var siteUDT5=[];
+    Object.keys(udtBySite).sort().forEach(function(plant){
+      var sorted=udtBySite[plant].sort(function(a,b){return b.hrs-a.hrs;}).slice(0,5);
+      sorted.forEach(function(r,i){siteUDT5.push({plant:plant,rank:i+1,sub:r.sub,hrs:r.hrs});});
+    });
+
+    // Site cost detail rows
     var siteCostRows=[];
-    var siteNames=['AC','PFMIS','HOREB','BUKID','ARGAO','HOREB MG','AC MG','NATIONAL'];
-    siteNames.forEach(function(plant){
-      var sc=DATA.costWeeklyTrend&&DATA.costWeeklyTrend[plant]&&DATA.costWeeklyTrend[plant][wk];
+    allSiteNames.forEach(function(plant){
+      var sc=DATA.costWeeklyTrend[plant]&&DATA.costWeeklyTrend[plant][wk];
       var siteOut=siteRows.find(function(r){return (r.Plant||'').toUpperCase()===plant.toUpperCase();});
       var vol=sc?sc.vol:(siteOut?gf(siteOut,'Total Plant Output,mt w/o toll'):0);
-      var total=sc?sc.total:0;
-      var fixed=sc?sc.fixed:0, variable=sc?sc.variable:0;
+      var total=sc?sc.total:0, fixed=sc?sc.fixed:0, variable=sc?sc.variable:0;
       siteCostRows.push({plant:plant,vol:Math.round(vol),total:+(total/1000).toFixed(1),fixed:+(fixed/1000).toFixed(1),variable:+(variable/1000).toFixed(1),cpt:vol>0?Math.round(total/vol):0});
     });
 
@@ -170,7 +208,7 @@ async function downloadWeeklyReport(){
       rLbl:rLbl, rQty:rQty, rRate:rRate, outRates:outRates, othRates:othRates,
       costTrend:costTrend, fvTrend:fvTrend,
       totalCost:totalCost, costTon:costTon, fixedCost:fixedCost, fixedTon:fixedTon, varCost:varCost, varTon:varTon,
-      paretoArr:paretoArr, top10:top10, udtByCat:udtByCat,
+      paretoArr:paretoArr, siteUDT5:siteUDT5, udtByCat:udtByCat,
       siteCostRows:siteCostRows
     });
   }catch(e){
@@ -313,7 +351,10 @@ async function buildWeeklyReportPptx(d){
     s.addShape(pres.ShapeType.roundRect,{x:0.5,y:2.45,w:12.33,h:0.58,rectRadius:0.05,fill:{color:ICE},line:{pt:0.5,color:'D0DCEC'}});
     s.addText([{text:'Analysis: ',options:{bold:true,color:NAVY}},{text:'Week '+wk+' rejection: '+rejRate.toFixed(2)+'% ('+fmtN(rejQty,2)+' MT). Outright: '+outRate.toFixed(2)+'%; Other: '+othRate.toFixed(2)+'%. '+(rejRate>1?'Exceeds 1% threshold — root cause action required.':'Within acceptable 1% threshold.'),options:{color:'333333'}}],{x:0.68,y:2.51,w:12.0,h:0.46,fontFace:'Calibri',fontSize:9,valign:'top',margin:0,lineSpacingMultiple:1.15});
     // Combo chart
-    s.addChart(pres.charts.BAR,[{name:'Reject Qty (mt)',labels:d.rLbl,values:d.rQty},{name:'Rejection Rate %',labels:d.rLbl,values:d.rRate}],{x:0.5,y:3.15,w:6.0,h:3.85,barDir:'col',showTitle:true,title:'Reject Qty (mt) & Rejection Rate %',titleFontSize:10,titleColor:NAVY,showLegend:true,legendPos:'b',legendFontSize:9,showValue:true,dataLabelFontSize:8,dataLabelColor:NAVY,dataLabelFormatCode:'0.00',chartColors:[SKY,RED],chartArea:{fill:{color:WHITE}}});
+    s.addChart([
+      {type:pres.charts.BAR,data:[{name:'Reject Qty (mt)',labels:d.rLbl,values:d.rQty}],options:{barDir:'col',chartColors:[SKY]}},
+      {type:pres.charts.LINE,data:[{name:'Rejection Rate %',labels:d.rLbl,values:d.rRate}],options:{chartColors:[RED],lineSize:2.5,lineDataSymbol:'circle',lineDataSymbolSize:6,secondaryValAxis:true,secondaryCatAxis:true}}
+    ],{x:0.5,y:3.15,w:6.0,h:3.85,showTitle:true,title:'Reject Qty (mt) & Rejection Rate %',titleFontSize:10,titleColor:NAVY,showLegend:true,legendPos:'b',legendFontSize:9,showValue:true,dataLabelFontSize:8,dataLabelColor:NAVY,dataLabelFormatCode:'0.00',catAxisLabelColor:SLATE,catAxisLabelFontSize:9,valAxes:[{showValAxisTitle:true,valAxisTitle:'Qty (mt)',valAxisTitleFontSize:8,valAxisTitleColor:SLATE,valGridLine:{color:'E2E8F0',size:0.5}},{showValAxisTitle:true,valAxisTitle:'Rate %',valAxisTitleFontSize:8,valAxisTitleColor:SLATE,valGridLine:{style:'none'}}],catAxes:[{catAxisLabelColor:SLATE},{catAxisHidden:true}],chartArea:{fill:{color:WHITE}}});
     s.addChart(pres.charts.LINE,[{name:'Outright Reject %',labels:d.rLbl,values:d.outRates},{name:'Other Reject %',labels:d.rLbl,values:d.othRates}],{x:6.83,y:3.15,w:6.0,h:3.85,showTitle:true,title:'Outright vs Other Reject % Trend',titleFontSize:10,titleColor:NAVY,chartColors:[AMBER,PURPLE],lineSize:2.5,lineDataSymbol:'circle',lineDataSymbolSize:6,showLegend:true,legendPos:'b',legendFontSize:9,showValue:true,dataLabelFontSize:8.5,dataLabelColor:NAVY,dataLabelFormatCode:'0.00"%"',chartArea:{fill:{color:WHITE}}});
   }
 
@@ -334,7 +375,14 @@ async function buildWeeklyReportPptx(d){
     s.addShape(pres.ShapeType.roundRect,{x:0.5,y:2.16,w:12.33,h:0.5,rectRadius:0.05,fill:{color:ICE},line:{pt:0.5,color:'D0DCEC'}});
     s.addText([{text:'Analysis: ',options:{bold:true,color:NAVY}},{text:'Cost ₱'+fmtN(d.costTon,2)+'/ton. Fixed '+(d.totalCost>0?((d.fixedCost/d.totalCost)*100).toFixed(0):0)+'% (₱'+fmtN(d.fixedTon,2)+'/ton), Variable '+(d.totalCost>0?((d.varCost/d.totalCost)*100).toFixed(0):0)+'% (₱'+fmtN(d.varTon,2)+'/ton).',options:{color:'333333'}}],{x:0.68,y:2.22,w:12.0,h:0.4,fontFace:'Calibri',fontSize:9,valign:'top',margin:0});
     var cLbl=d.costTrend.map(function(r){return 'W'+r.week;});
-    s.addChart(pres.charts.BAR,[{name:'Total Cost (₱)',labels:cLbl,values:d.costTrend.map(function(r){return r.total;})},{name:'₱/ton',labels:cLbl,values:d.costTrend.map(function(r){return r.cost_ton;})}],{x:0.5,y:2.78,w:7.8,h:3.5,barDir:'col',showTitle:true,title:'Weekly Total Cost (₱) & ₱/ton',titleFontSize:10,titleColor:NAVY,showLegend:true,legendPos:'b',legendFontSize:9,showValue:true,dataLabelFontSize:7.5,dataLabelColor:NAVY,chartColors:[SKY,RED],chartArea:{fill:{color:WHITE}}});
+    if(cLbl.length===0){
+      s.addText('Cost trend data not available — please visit the Cost tab first to load weekly cost data.',{x:0.5,y:2.78,w:7.8,h:1.0,fontFace:'Calibri',fontSize:11,color:SLATE,valign:'middle',align:'center',margin:0});
+    } else {
+      s.addChart([
+        {type:pres.charts.BAR,data:[{name:'Total Cost (₱)',labels:cLbl,values:d.costTrend.map(function(r){return r.total;})}],options:{barDir:'col',chartColors:[SKY]}},
+        {type:pres.charts.LINE,data:[{name:'₱/ton',labels:cLbl,values:d.costTrend.map(function(r){return r.cost_ton;})}],options:{chartColors:[RED],lineSize:2.5,lineDataSymbol:'circle',lineDataSymbolSize:5,secondaryValAxis:true,secondaryCatAxis:true}}
+      ],{x:0.5,y:2.78,w:7.8,h:3.5,showTitle:true,title:'Weekly Total Cost (₱) & ₱/ton',titleFontSize:10,titleColor:NAVY,showLegend:true,legendPos:'b',legendFontSize:9,showValue:true,dataLabelFontSize:7.5,dataLabelColor:NAVY,catAxisLabelColor:SLATE,catAxisLabelFontSize:8,valAxes:[{showValAxisTitle:true,valAxisTitle:'Total Cost',valAxisTitleFontSize:8,valAxisTitleColor:SLATE,valGridLine:{color:'E2E8F0',size:0.5}},{showValAxisTitle:true,valAxisTitle:'₱/ton',valAxisTitleFontSize:8,valAxisTitleColor:SLATE,valGridLine:{style:'none'}}],catAxes:[{catAxisLabelColor:SLATE},{catAxisHidden:true}],chartArea:{fill:{color:WHITE}}});
+    }
     var fLbl=d.fvTrend.map(function(r){return 'W'+r.week;});
     s.addChart(pres.charts.LINE,[{name:'Fixed (₱/ton)',labels:fLbl,values:d.fvTrend.map(function(r){return r.fixed_ton;})},{name:'Variable (₱/ton)',labels:fLbl,values:d.fvTrend.map(function(r){return r.var_ton;})}],{x:8.63,y:2.78,w:4.2,h:3.5,showTitle:true,title:'Fixed vs Variable (₱/ton)',titleFontSize:10,titleColor:NAVY,chartColors:[BLUE,AMBER],lineSize:2.5,lineDataSymbol:'circle',lineDataSymbolSize:5,showLegend:true,legendPos:'b',legendFontSize:9,showValue:true,dataLabelFontSize:7.5,dataLabelColor:NAVY,chartArea:{fill:{color:ICE}}});
   }
@@ -380,23 +428,54 @@ async function buildWeeklyReportPptx(d){
     });
     var pHrs=d.paretoArr.map(function(r){return r.hrs;}),pTotal=pHrs.reduce(function(a,b){return a+b;},0)||1;
     var cum=0,pCum=pHrs.map(function(h){cum+=h;return +((cum/pTotal)*100).toFixed(1);});
-    s.addChart(pres.charts.BAR,[{name:'UDT (hrs)',labels:d.paretoArr.map(function(r){return r.cat;}),values:pHrs},{name:'Cumulative %',labels:d.paretoArr.map(function(r){return r.cat;}),values:pCum}],{x:0.5,y:1.85,w:7.8,h:3.5,barDir:'col',showTitle:true,title:'UDT Pareto by Category',titleFontSize:10,titleColor:NAVY,showLegend:true,legendPos:'b',legendFontSize:9,showValue:true,dataLabelFontSize:8,dataLabelColor:NAVY,chartColors:[RED,NAVY],chartArea:{fill:{color:WHITE}}});
+    s.addChart([
+      {type:pres.charts.BAR,data:[{name:'UDT (hrs)',labels:d.paretoArr.map(function(r){return r.cat;}),values:pHrs}],options:{barDir:'col',chartColors:[RED]}},
+      {type:pres.charts.LINE,data:[{name:'Cumulative %',labels:d.paretoArr.map(function(r){return r.cat;}),values:pCum}],options:{chartColors:[NAVY],lineSize:2,lineDataSymbol:'circle',lineDataSymbolSize:5,secondaryValAxis:true,secondaryCatAxis:true}}
+    ],{x:0.5,y:1.85,w:7.8,h:3.5,showTitle:true,title:'UDT Pareto by Category',titleFontSize:10,titleColor:NAVY,showLegend:true,legendPos:'b',legendFontSize:9,showValue:true,dataLabelFontSize:8,dataLabelColor:NAVY,catAxisLabelColor:SLATE,catAxisLabelFontSize:9,valAxes:[{showValAxisTitle:true,valAxisTitle:'Hours',valAxisTitleFontSize:8,valAxisTitleColor:SLATE,valGridLine:{color:'E2E8F0',size:0.5}},{showValAxisTitle:true,valAxisTitle:'Cumulative %',valAxisTitleFontSize:8,valAxisTitleColor:SLATE,valGridLine:{style:'none'},valAxisMaxVal:100}],catAxes:[{catAxisLabelColor:SLATE},{catAxisHidden:true}],chartArea:{fill:{color:WHITE}}});
     var ptRows=[[{text:'#',options:{fill:{color:NAVY},color:WHITE,bold:true,fontSize:8.5,align:'center'}},{text:'CATEGORY',options:{fill:{color:NAVY},color:WHITE,bold:true,fontSize:8.5,align:'left'}},{text:'HRS',options:{fill:{color:NAVY},color:WHITE,bold:true,fontSize:8.5,align:'right'}},{text:'%',options:{fill:{color:NAVY},color:WHITE,bold:true,fontSize:8.5,align:'right'}},{text:'CUM%',options:{fill:{color:NAVY},color:WHITE,bold:true,fontSize:8.5,align:'right'}}]];
     var cumP=0;
     d.paretoArr.forEach(function(r,i){var pct=(r.hrs/pTotal)*100;cumP+=pct;var bg=i%2===0?WHITE:ICE;ptRows.push([{text:String(i+1),options:{fill:{color:bg},color:SLATE,fontSize:8.5,align:'center'}},{text:r.cat,options:{fill:{color:bg},color:'333333',bold:cumP<=80+pct&&cumP-pct<80,fontSize:8.5,align:'left'}},{text:r.hrs.toFixed(1),options:{fill:{color:bg},color:RED,bold:true,fontSize:8.5,align:'right'}},{text:pct.toFixed(1)+'%',options:{fill:{color:bg},color:'333333',fontSize:8.5,align:'right'}},{text:cumP.toFixed(1)+'%',options:{fill:{color:bg},color:cumP>=80?AMBER:GREEN,bold:cumP>=80,fontSize:8.5,align:'right'}}]);});
     s.addTable(ptRows,{x:8.63,y:1.85,w:4.2,colW:[0.36,1.52,0.68,0.72,0.72],border:{pt:0.5,color:'D9E2EC'},autoPage:false,rowH:0.33,valign:'middle'});
   }
 
-  // SLIDE 7 — TOP 10 UDT SUB-CATEGORY
+  // SLIDE 7 — TOP 5 UDT PER SITE
   {
     var s=pres.addSlide();
     s.background={color:WHITE};
-    addHdr(s,'DOWNTIME — TOP 10 SUB-CATEGORY CONTRIBUTORS','WEEK '+wk+' · '+mnth+' 2026 · NATIONAL — RANKED BY HOURS');
-    var top10Rev=[].concat(d.top10).reverse();
-    s.addChart(pres.charts.BAR,[{name:'UDT (hrs)',labels:top10Rev.map(function(r){return r.label;}),values:top10Rev.map(function(r){return r.hrs;})}],{x:0.5,y:1.02,w:7.8,h:5.65,barDir:'bar',showTitle:false,chartColors:[RED],showLegend:false,showValue:true,dataLabelPosition:'outEnd',dataLabelColor:NAVY,dataLabelFontSize:9,chartArea:{fill:{color:WHITE}}});
-    var tRows=[[{text:'#',options:{fill:{color:NAVY},color:WHITE,bold:true,fontSize:9,align:'center'}},{text:'PLANT – SUB-CATEGORY',options:{fill:{color:NAVY},color:WHITE,bold:true,fontSize:9,align:'left'}},{text:'HRS',options:{fill:{color:NAVY},color:WHITE,bold:true,fontSize:9,align:'right'}}]];
-    d.top10.forEach(function(r,i){var bg=i%2===0?WHITE:ICE;tRows.push([{text:String(r.rank),options:{fill:{color:bg},color:SLATE,fontSize:9,align:'center'}},{text:r.label,options:{fill:{color:bg},color:'333333',bold:i<3,fontSize:8.5,align:'left'}},{text:r.hrs.toFixed(1),options:{fill:{color:bg},color:i<3?RED:SLATE,bold:i<3,fontSize:9,align:'right'}}]);});
-    s.addTable(tRows,{x:8.63,y:1.02,w:4.2,colW:[0.4,3.0,0.8],border:{pt:0.5,color:'D9E2EC'},autoPage:false,rowH:0.35,valign:'middle'});
+    addHdr(s,'DOWNTIME — TOP 5 UDT PER SITE','WEEK '+wk+' · '+mnth+' 2026 · NATIONAL — RANKED BY HOURS');
+
+    // Horizontal bar chart — siteUDT5 all entries reversed
+    var chartRows=(d.siteUDT5||[]).slice().reverse();
+    var chartLbls=chartRows.map(function(r){return r.plant+' – '+r.sub;});
+    var chartVals=chartRows.map(function(r){return r.hrs;});
+    if(chartLbls.length>0){
+      s.addChart(pres.charts.BAR,[{name:'UDT (hrs)',labels:chartLbls,values:chartVals}],{x:0.5,y:1.02,w:7.8,h:5.65,barDir:'bar',showTitle:false,chartColors:[RED],showLegend:false,showValue:true,dataLabelPosition:'outEnd',dataLabelColor:NAVY,dataLabelFontSize:8.5,chartArea:{fill:{color:WHITE}}});
+    } else {
+      s.addText('No sub-category downtime data available for Week '+wk,{x:0.5,y:2.5,w:7.8,h:1,fontFace:'Calibri',fontSize:11,color:SLATE,align:'center',margin:0});
+    }
+
+    // Table — grouped by site, top 5 per site
+    var tRows=[[
+      {text:'Site',options:{fill:{color:NAVY},color:WHITE,bold:true,fontSize:9,align:'left'}},
+      {text:'#',options:{fill:{color:NAVY},color:WHITE,bold:true,fontSize:9,align:'center'}},
+      {text:'SUB-CATEGORY',options:{fill:{color:NAVY},color:WHITE,bold:true,fontSize:9,align:'left'}},
+      {text:'HRS',options:{fill:{color:NAVY},color:WHITE,bold:true,fontSize:9,align:'right'}},
+    ]];
+    var sitesInList=[];
+    (d.siteUDT5||[]).forEach(function(r){if(sitesInList.indexOf(r.plant)<0)sitesInList.push(r.plant);});
+    sitesInList.forEach(function(plant,si){
+      var siteEntries=(d.siteUDT5||[]).filter(function(r){return r.plant===plant;});
+      siteEntries.forEach(function(r,i){
+        var bg=si%2===0?WHITE:ICE;
+        tRows.push([
+          {text:i===0?plant:'',options:{fill:{color:bg},color:BLUE,bold:true,fontSize:8.5,align:'left'}},
+          {text:String(r.rank),options:{fill:{color:bg},color:SLATE,fontSize:8.5,align:'center'}},
+          {text:r.sub,options:{fill:{color:bg},color:'333333',bold:r.rank===1,fontSize:8.5,align:'left'}},
+          {text:r.hrs.toFixed(1),options:{fill:{color:bg},color:r.rank===1?RED:SLATE,bold:r.rank===1,fontSize:9,align:'right'}},
+        ]);
+      });
+    });
+    s.addTable(tRows,{x:8.63,y:1.02,w:4.2,colW:[0.85,0.35,2.2,0.8],border:{pt:0.5,color:'D9E2EC'},autoPage:false,rowH:0.28,valign:'middle'});
   }
 
   // SLIDE 8 — SUMMARY
