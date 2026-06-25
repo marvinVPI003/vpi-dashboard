@@ -838,8 +838,8 @@ async function buildMonthlyReportPptx(d){
  // Rejection trend + outright/other (left)
  s.addChart(pres.charts.LINE,[
    {name:'Total Reject %',labels:lbls,values:rejArr},
-   {name:'Outright %',labels:lbls,values:MON.map(m=>D.rej_monthly[m]?D.rej_monthly[m].outright:null)},
-   {name:'Other %',labels:lbls,values:MON.map(m=>D.rej_monthly[m]?D.rej_monthly[m].other:null)},
+   {name:'Outright %',labels:lbls,values:MON.map(m=>REJ[m]?REJ[m].outright:null)},
+   {name:'Other %',labels:lbls,values:MON.map(m=>REJ[m]?REJ[m].other:null)},
  ],{x:0.5,y:2.12,w:6.0,h:3.32,showTitle:true,title:'National Rejection Rate % — Jan to Jun 2026',titleFontSize:10,titleColor:WHITE,
    chartColors:[RED,AMBER,TEAL],lineSize:2.5,lineDataSymbol:'circle',lineDataSymbolSize:6,
    showLegend:true,legendPos:'b',legendFontSize:8,legendFontColor:LGRAY,
@@ -848,7 +848,7 @@ async function buildMonthlyReportPptx(d){
    valGridLine:{color:'1A3A5C',size:0.5},chartArea:{fill:{color:DBLUE}},plotArea:{fill:{color:DBLUE}}});
 
  // Per-site rejection bar (May)
- var sitesWithRej=D.may_sites.filter(function(r){return r.name!=='CCPC'&&r.name!=='HOREB MG'&&r.name!=='AC MG';});
+ var sitesWithRej=mayMonthSites.filter(function(r){return r.name!=='CCPC'&&r.name!=='HOREB MG'&&r.name!=='AC MG';});
  var siteRejData={'AC':0.35,'PFMIS':0,'HOREB':0.54,'BUKID':0.48,'ARGAO':1.12,'SOUTH':2.32,'CCPC':0.85};
  s.addChart(pres.charts.BAR,[{name:'Rejection Rate % (May)',labels:['AC','PFMIS','HOREB','BUKID','ARGAO','SOUTH','CCPC'],values:[0.35,0,0.54,0.48,1.12,2.32,0.85]}],{
    x:6.83,y:2.12,w:6.0,h:3.32,barDir:'col',showTitle:true,title:'Per-Plant Rejection Rate % — May 2026',titleFontSize:10,titleColor:WHITE,
@@ -898,7 +898,7 @@ async function buildMonthlyReportPptx(d){
  addBg(s);
  sHdr(s,'PRODUCTION COST — PLANT DETAIL','MAY 2026 · ALL AMOUNTS IN PESOS (₱)','MAY 2026');
 
- var PC=D.prodcost_table;
+ var PC=PC;
  var hRow=[
    th('PLANT','left'),th('Volume kg'),th('Rental/Amor'),th('Spares'),th('Mfg Direct'),
    th('Diesel'),th('Elec.Mach.'),th('Agency MP'),th('Other'),th('3rd Party'),
@@ -959,7 +959,7 @@ async function buildMonthlyReportPptx(d){
  });
 
  // Pareto combo
- var pArr=D.udt_pareto||[];
+ var pArr=pArr||[];
  var pHrs=pArr.map(function(r){return r.hrs;});
  var pTotal=pHrs.reduce(function(a,b){return a+b;},0)||1;
  var cum=0, pCum=pHrs.map(function(h){cum+=h;return +((cum/pTotal)*100).toFixed(1);});
@@ -994,7 +994,7 @@ async function buildMonthlyReportPptx(d){
  sHdr(s,'DOWNTIME — CONTRIBUTOR ANALYSIS','MAY 2026 · NATIONAL TOP 10 & TOP 5 PER SITE — SUB-CATEGORY DETAIL','MAY 2026');
 
  // National Top 10 horizontal bar (left)
- var nat10Rev=[...D.top10_udt].reverse();
+ var nat10Rev=[...TOP10].reverse();
  s.addChart(pres.charts.BAR,[{name:'UDT (hrs)',labels:nat10Rev.map(function(r){return r.label;}),values:nat10Rev.map(function(r){return r.hrs;})}],{
    x:0.5,y:1.05,w:7.5,h:5.68,barDir:'bar',showTitle:true,title:'National Top 10 UDT Sub-Categories — MAY 2026',titleFontSize:10,titleColor:WHITE,
    chartColors:['B71C1C'],showLegend:false,
@@ -1007,7 +1007,7 @@ async function buildMonthlyReportPptx(d){
  var SITES=['AC','HOREB','ARGAO','PFMIS','BUKID'];
  var tRows=[[th('SITE','left'),th('#','center'),th('SUB-CATEGORY','left'),th('HRS')]];
  SITES.forEach(function(site,si){
-   var entries=(D.top5_per_site[site]||[]);
+   var entries=(TOP5[site]||[]);
    entries.forEach(function(r,i){
      var bg=si%2===0?'0E2040':'0A1628';
      var sc=SITE_COLORS[site]||LGRAY;
@@ -1016,8 +1016,8 @@ async function buildMonthlyReportPptx(d){
  });
  s.addTable(tRows,{x:8.25,y:1.05,w:4.7,colW:[0.7,0.3,2.95,0.55],border:{pt:0.4,color:'1A3A5C'},autoPage:false,rowH:0.26,valign:'middle'});
 
- var tot=D.top10_udt.reduce(function(a,r){return a+r.hrs;},0);
- addBox(s,5.55,0.9,'Analysis:  The top 10 sub-category contributors totaled '+tot.toFixed(1)+' hrs in MAY — representing the majority of all national UDT. HOREB Mechanical (Bucket Elevator) leads at '+D.top10_udt[0].hrs.toFixed(1)+' hrs — this single issue contributes more downtime than the entire output lost to most other categories combined, and PM is critically overdue. ARGAO and BUKID each appear multiple times in the top 10, confirming these two sites require intensive reliability improvement programs. Site-level analysis shows HOREB and ARGAO each have 2–3 recurring issues (Mechanical + Change Die + Change Over) that compound into significant weekly losses. BUKID Mechanical (Pellet Mill) at '+D.top10_udt[2].hrs.toFixed(1)+' hrs is the third-highest contributor — a pellet mill roll replacement should be scheduled in planned downtime immediately. Staggered die-change windows across AC, HOREB, and BUKID could reduce national Change Die DT by an estimated 25–35%.');
+ var tot=TOP10.reduce(function(a,r){return a+r.hrs;},0);
+ addBox(s,5.55,0.9,'Analysis:  The top 10 sub-category contributors totaled '+tot.toFixed(1)+' hrs in MAY — representing the majority of all national UDT. HOREB Mechanical (Bucket Elevator) leads at '+TOP10[0].hrs.toFixed(1)+' hrs — this single issue contributes more downtime than the entire output lost to most other categories combined, and PM is critically overdue. ARGAO and BUKID each appear multiple times in the top 10, confirming these two sites require intensive reliability improvement programs. Site-level analysis shows HOREB and ARGAO each have 2–3 recurring issues (Mechanical + Change Die + Change Over) that compound into significant weekly losses. BUKID Mechanical (Pellet Mill) at '+TOP10[2].hrs.toFixed(1)+' hrs is the third-highest contributor — a pellet mill roll replacement should be scheduled in planned downtime immediately. Staggered die-change windows across AC, HOREB, and BUKID could reduce national Change Die DT by an estimated 25–35%.');
  s.addText('VPI Operations  ·  Downtime Contributor Analysis — MAY 2026',{x:0.5,y:7.22,w:12.33,h:0.22,fontFace:'Calibri',fontSize:8.5,color:'607D8B',margin:0});}
 
 // ── SLIDE 9 — PRIORITIES & ACTION PLAN ───────────────────
