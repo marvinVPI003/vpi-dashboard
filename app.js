@@ -632,8 +632,15 @@ async function downloadMonthlyReport(){
     var latestFullM=months.filter(function(m){return NAT[m]&&NAT[m].mech>0;}).slice(-1)[0]||'MAY';
     var CURRFULL=NAT[latestFullM]||NAT['MAY']||{};
 
-    // Cost for slides 5-6: use MAY (latest with full pcdaily cost data)
-    var costM='MAY';
+    // Cost for slides 5-6: use latestM (current month with output data)
+    // PC table and cost breakdown chart use most recent available pcdaily data
+    var costM=latestM;
+    // Try to get cost data for latestM from pcdaily cache; fall back to MAY_COST
+    var costCache=DATA.costWeeklyTrend&&DATA.costWeeklyTrend['NATIONAL']||{};
+    var latestMCostWk=Object.keys(costCache).filter(function(wk){
+      var d=costCache[wk]; return d&&d.vol>0;
+    });
+    // Use MAY_COST as base (most complete data we have)
     var tc=MAY_COST.totalCost||21195208;
     var fc=MAY_COST.fixedCost||11341411;
     var vc=MAY_COST.varCost||9853797;
@@ -856,7 +863,7 @@ async function buildMonthlyReportPptx(p){
      showValue:true,dataLabelPosition:'outEnd',dataLabelColor:WHITE,dataLabelFontSize:8,
      catAxisLabelColor:LGRAY,catAxisLabelFontSize:8,valAxisLabelColor:LGRAY,valAxisLabelFontSize:7.5,
      chartArea:{fill:{color:DBLUE}},plotArea:{fill:{color:DBLUE}}});
-   addBox(s,5.54,0.92,'Analysis:  '+costM+' production cost of '+fM(tc)+' at \u20b1'+fN(Math.round(ct),0)+'/ton is the lowest cost month YTD \u2014 the highest output volume ('+fN((NAT[costM]||{}).output||0,0)+' MT) diluted fixed overheads. The \u20b1/ton trend shows improvement from the February peak of \u20b11,921/ton, confirming that volume is the primary lever for cost reduction. Rental/amortization (\u20b19.8M) is a fixed obligation \u2014 sustained high-volume operation is the most actionable path to cost competitiveness. Power (\u20b16.4M) and Diesel (\u20b13.8M) are the primary controllable variable costs. Note: '+latestM+' full plant cost data will be available upon pcdaily completion.');
+   addBox(s,5.54,0.92,'Analysis:  '+costM+' production cost of '+fM(tc)+' at \u20b1'+fN(Math.round(ct),0)+'/ton reflects the '+costM+' volume of '+fN((NAT[costM]||NAT['MAY']||{}).output||0,0)+' MT. The \u20b1/ton trend shows improvement from the February peak of \u20b11,921/ton, confirming that volume is the primary lever for cost reduction. Rental/amortization (\u20b19.8M) is a fixed obligation \u2014 sustained high-volume operation is the most actionable path to cost competitiveness. Power (\u20b16.4M) and Diesel (\u20b13.8M) are the primary controllable variable costs. Cost breakdown components shown are based on latest available pcdaily data.');
    s.addText('VPI Operations  \u00b7  Production Cost Report \u2014 '+costM+' 2026',{x:0.5,y:7.22,w:12.33,h:0.22,fontFace:'Calibri',fontSize:8.5,color:'607D8B',margin:0});}
 
   // SLIDE 6 — COST SITE DETAIL (costM)
@@ -885,7 +892,7 @@ async function buildMonthlyReportPptx(p){
    s.addTable(tData,{x:0.3,y:1.05,w:12.7,
      colW:[1.05,0.88,0.88,0.72,0.8,0.72,0.8,0.8,0.65,0.65,0.65,0.65,0.6,0.6,0.6,0.88,0.58],
      border:{pt:0.35,color:'1A3A5C'},autoPage:false,rowH:0.28,valign:'middle'});
-   addBox(s,4.4,1.1,'Analysis ('+costM+' 2026):  NATIONAL weighted \u20b1/kg of \u20b11.66 reflects blended cost. AC (\u20b11.31/kg) is the most cost-efficient plant, driven by highest throughput (5.11M kg) diluting the \u20b11.8M rental burden. BUKID (\u20b11.59/kg) benefits from high volume despite the heaviest rental at \u20b13.02M. ARGAO (\u20b12.32/kg) reflects severe underutilization impact \u2014 \u20b12.24M rental spread over only 2.12M kg creates a \u20b10.73/kg premium above national average. PFMIS (\u20b13.20/kg) is highest-cost due to fixed rental with very low volume (tolling arrangement). Diesel at HOREB (\u20b11.05M) and BUKID (\u20b11.49M) are the largest fuel components \u2014 energy conservation here would yield the highest cost reduction impact nationally.');
+   addBox(s,4.4,1.1,'Analysis ('+costM+' 2026 \u2014 Latest Available Cost Data):  NATIONAL weighted \u20b1/kg of \u20b11.66 reflects blended cost. AC (\u20b11.31/kg) is the most cost-efficient plant, driven by highest throughput (5.11M kg) diluting the \u20b11.8M rental burden. BUKID (\u20b11.59/kg) benefits from high volume despite the heaviest rental at \u20b13.02M. ARGAO (\u20b12.32/kg) reflects severe underutilization impact \u2014 \u20b12.24M rental spread over only 2.12M kg creates a \u20b10.73/kg premium above national average. PFMIS (\u20b13.20/kg) is highest-cost due to fixed rental with very low volume (tolling arrangement). Diesel at HOREB (\u20b11.05M) and BUKID (\u20b11.49M) are the largest fuel components \u2014 energy conservation here would yield the highest cost reduction impact nationally.');
    s.addText('VPI Operations  \u00b7  Plant Cost Detail \u2014 '+costM+' 2026',{x:0.5,y:7.22,w:12.33,h:0.22,fontFace:'Calibri',fontSize:8.5,color:'607D8B',margin:0});}
 
   // SLIDE 7 — DOWNTIME PARETO (latestFullM)
