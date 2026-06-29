@@ -550,6 +550,7 @@ async function buildWeeklyReportPptx(d){
 
 
 
+
 // ── MONTHLY REPORT ────────────────────────────────────────
 async function downloadMonthlyReport(){
   var btn=document.getElementById('monthly-report-btn');
@@ -557,17 +558,19 @@ async function downloadMonthlyReport(){
   try{
     if(typeof PptxGenJS==='undefined') throw new Error('PptxGenJS not loaded');
     var monthlyRaw=DATA.monthly||await gasGet('monthly');
-    var rows=monthlyRaw.rows||[];
+    var allRows=monthlyRaw.rows||[];
     var MONTH_ORDER=['JANUARY','FEBRUARY','MARCH','APRIL','MAY','JUNE','JULY','AUGUST','SEPTEMBER','OCTOBER','NOVEMBER','DECEMBER'];
     var MN_S={JANUARY:'Jan',FEBRUARY:'Feb',MARCH:'Mar',APRIL:'Apr',MAY:'May',JUNE:'Jun',JULY:'Jul',AUGUST:'Aug',SEPTEMBER:'Sep',OCTOBER:'Oct',NOVEMBER:'Nov',DECEMBER:'Dec'};
+
+    // Determine months available from data
     var months=(monthlyRaw.months||[]).map(function(m){return String(m).trim().toUpperCase();}).filter(function(m){return MONTH_ORDER.indexOf(m)>=0;});
     if(!months.length) months=['JANUARY','FEBRUARY','MARCH','APRIL','MAY','JUNE'];
 
-    // Build per-month national summary
+    // Build per-month national summary from live data
     function pv(v){return v?(Math.abs(v)<2?+(v*100).toFixed(2):+v):0;}
     var NAT={};
     months.forEach(function(m){
-      var r=rows.find(function(x){return (x.Plant||'').toUpperCase()==='NATIONAL'&&String(x.MONTH||x.Month||'').trim().toUpperCase()===m;});
+      var r=allRows.find(function(x){return (x.Plant||'').toUpperCase()==='NATIONAL'&&String(x.MONTH||x.Month||'').trim().toUpperCase()===m;});
       if(!r)return;
       NAT[m]={
         output:+(r['Total Plant Output,mt']||r['Total Plant Output,mt w/o toll']||0),
@@ -590,15 +593,16 @@ async function downloadMonthlyReport(){
       };
     });
 
-    // Static embedded data from MAY 2026 actuals
+    // Static embedded data
     var PC=[{"plant": "AC", "vol_kg": 5114800, "rental": 1803771, "spares": 365812, "mfgdirect": 381637, "diesel": 808298, "elec": 2192438, "agency": 834228, "other": 310622, "third": 0, "cess": 80850, "sp": 183012, "ins": 10116, "water": 12524, "thread": 24120, "total": 6696806, "ppkg": 1.31}, {"plant": "PFMIS", "vol_kg": 613725, "rental": 1470000, "spares": 6885, "mfgdirect": 64966, "diesel": 193818, "elec": 68320, "agency": 154382, "other": 3969, "third": 0, "cess": 0, "sp": 0, "ins": 2666, "water": 0, "thread": 1303, "total": 1962339, "ppkg": 3.2}, {"plant": "HOREB", "vol_kg": 3173600, "rental": 1264717, "spares": 378745, "mfgdirect": 712146, "diesel": 1050754, "elec": 1156883, "agency": 535912, "other": 164993, "third": 62946, "cess": 0, "sp": 52887, "ins": 24560, "water": 3000, "thread": 21600, "total": 5264149, "ppkg": 1.66}, {"plant": "BUKID", "vol_kg": 5343225, "rental": 3024000, "spares": 277182, "mfgdirect": 259212, "diesel": 1485254, "elec": 1878664, "agency": 1009350, "other": 563911, "third": 235196, "cess": 0, "sp": 220278, "ins": 8118, "water": 76381, "thread": 23937, "total": 8497572, "ppkg": 1.59}, {"plant": "ARGAO", "vol_kg": 2122150, "rental": 2240000, "spares": 250871, "mfgdirect": 137803, "diesel": 290881, "elec": 1105736, "agency": 820430, "other": 74887, "third": 43680, "cess": 0, "sp": 17538, "ins": 0, "water": 13669, "thread": 0, "total": 4920608, "ppkg": 2.32}, {"plant": "HOREB MG", "vol_kg": 126975, "rental": 0, "spares": 0, "mfgdirect": 0, "diesel": 0, "elec": 7329, "agency": 117289, "other": 0, "third": 0, "cess": 0, "sp": 0, "ins": 0, "water": 0, "thread": 0, "total": 124618, "ppkg": 0.98}, {"plant": "AC MG", "vol_kg": 52250, "rental": 0, "spares": 0, "mfgdirect": 0, "diesel": 0, "elec": 13565, "agency": 35394, "other": 0, "third": 0, "cess": 0, "sp": 0, "ins": 0, "water": 0, "thread": 0, "total": 48959, "ppkg": 0.94}, {"plant": "NATIONAL", "vol_kg": 16546725, "rental": 9802488, "spares": 1279494, "mfgdirect": 1555764, "diesel": 3829004, "elec": 6422934, "agency": 3506984, "other": 1118382, "third": 341823, "cess": 80850, "sp": 473716, "ins": 45459, "water": 105574, "thread": 70960, "total": 27515051, "ppkg": 1.66}];
     var TOP10=[{"rank": 1, "label": "HOREB \u2013 Mechanical (Bucket Elevator)", "hrs": 22.4}, {"rank": 2, "label": "ARGAO \u2013 Change Over (Die Change)", "hrs": 18.6}, {"rank": 3, "label": "BUKID \u2013 Mechanical (Pellet Mill)", "hrs": 16.2}, {"rank": 4, "label": "AC \u2013 Change Over (Die 2.5\u21924.0mm)", "hrs": 14.8}, {"rank": 5, "label": "HOREB \u2013 Change Die (Ring Die)", "hrs": 12.9}, {"rank": 6, "label": "ARGAO \u2013 Warehouse (Ingredient Delay)", "hrs": 11.7}, {"rank": 7, "label": "BUKID \u2013 Change Die (Ring Die)", "hrs": 10.4}, {"rank": 8, "label": "AC \u2013 Mechanical (Cooler Fan)", "hrs": 8.8}, {"rank": 9, "label": "HOREB \u2013 Change Over (Die Change)", "hrs": 7.6}, {"rank": 10, "label": "PFMIS \u2013 Electrical (MCC Fault)", "hrs": 6.2}];
     var TOP5={"AC": [{"rank": 1, "sub": "Change Over (Die 2.5\u21924.0mm)", "hrs": 14.8}, {"rank": 2, "sub": "Mechanical (Cooler Fan)", "hrs": 8.8}, {"rank": 3, "sub": "Warehouse (Ingredient)", "hrs": 6.4}, {"rank": 4, "sub": "Change Die (Ring Die)", "hrs": 4.2}, {"rank": 5, "sub": "Process (Pellet Quality)", "hrs": 2.8}], "HOREB": [{"rank": 1, "sub": "Mechanical (Bucket Elevator)", "hrs": 22.4}, {"rank": 2, "sub": "Change Die (Ring Die)", "hrs": 12.9}, {"rank": 3, "sub": "Change Over (Die Change)", "hrs": 7.6}, {"rank": 4, "sub": "Process (Cooling)", "hrs": 4.1}, {"rank": 5, "sub": "Electrical (Panel)", "hrs": 2.2}], "ARGAO": [{"rank": 1, "sub": "Change Over (Die Change)", "hrs": 18.6}, {"rank": 2, "sub": "Warehouse (Ingredient Delay)", "hrs": 11.7}, {"rank": 3, "sub": "Mechanical (Pellet Mill)", "hrs": 8.3}, {"rank": 4, "sub": "Process (Pellet Temp)", "hrs": 5.6}, {"rank": 5, "sub": "Change Die (Ring Die)", "hrs": 3.9}], "PFMIS": [{"rank": 1, "sub": "Electrical (MCC Fault)", "hrs": 6.2}, {"rank": 2, "sub": "Mechanical (Feeder)", "hrs": 4.1}, {"rank": 3, "sub": "Change Over (Die)", "hrs": 3.8}, {"rank": 4, "sub": "Warehouse (Delay)", "hrs": 2.1}, {"rank": 5, "sub": "Process", "hrs": 1.4}], "BUKID": [{"rank": 1, "sub": "Mechanical (Pellet Mill)", "hrs": 16.2}, {"rank": 2, "sub": "Change Die (Ring Die)", "hrs": 10.4}, {"rank": 3, "sub": "Change Over (Die)", "hrs": 8.2}, {"rank": 4, "sub": "Process (Quality)", "hrs": 4.8}, {"rank": 5, "sub": "Warehouse", "hrs": 3.2}]};
     var REJ={"JANUARY": {"rate": 0.68, "qty": 85.4, "outright": 0.28, "other": 0.4}, "FEBRUARY": {"rate": 0.54, "qty": 61.2, "outright": 0.2, "other": 0.34}, "MARCH": {"rate": 0.72, "qty": 121.4, "outright": 0.31, "other": 0.41}, "APRIL": {"rate": 0.58, "qty": 72.8, "outright": 0.22, "other": 0.36}, "MAY": {"rate": 0.65, "qty": 98.6, "outright": 0.25, "other": 0.4}, "JUNE": {"rate": 0.71, "qty": 58.1, "outright": 0.28, "other": 0.43}};
     var COST_TREND={"JANUARY": 1842, "FEBRUARY": 1921, "MARCH": 1756, "APRIL": 1889, "MAY": 1676, "JUNE": 1803};
     var MAY_COST={"totalCost": 21195207.549877085, "costTon": 1676.38, "fixedCost": 11341410.662128206, "varCost": 9853796.88774888};
+    var JUN_REJ_SITES=[{"name": "AC", "rej": 0.38}, {"name": "PFMIS", "rej": 0}, {"name": "HOREB", "rej": 0.61}, {"name": "BUKID", "rej": 0.52}, {"name": "ARGAO", "rej": 1.18}, {"name": "SOUTH", "rej": 2.45}, {"name": "CCPC", "rej": 0.9}];
 
-    // Derived arrays
+    // Derived arrays (all months)
     var lbls=months.map(function(m){return MN_S[m]||m.slice(0,3);});
     var outArr=months.map(function(m){return NAT[m]?NAT[m].output:null;});
     var oeeArr=months.map(function(m){return NAT[m]?NAT[m].oee:null;});
@@ -614,31 +618,38 @@ async function downloadMonthlyReport(){
 
     function arrAvg(a){var v=a.filter(function(x){return x;});return v.length?v.reduce(function(s,x){return s+x;},0)/v.length:0;}
     var ytdOut=outArr.reduce(function(a,v){return a+(v||0);},0);
-    var avgOEE=arrAvg(oeeArr), avgCU=arrAvg(cuArr), avgKwh=arrAvg(kwhArr);
-    var avgFuel=arrAvg(fuelArr), avgCoal=arrAvg(coalArr.filter(function(v){return v&&v>0;}));
+    var avgOEE=arrAvg(oeeArr),avgCU=arrAvg(cuArr),avgKwh=arrAvg(kwhArr);
+    var avgFuel=arrAvg(fuelArr),avgCoal=arrAvg(coalArr.filter(function(v){return v&&v>0;}));
     var avgRej=arrAvg(rejArr);
     var maxRej=rejArr.filter(function(v){return v;}).reduce(function(a,v){return Math.max(a,v);},0);
     var minRej=rejArr.filter(function(v){return v;}).reduce(function(a,v){return Math.min(a,v);},99);
 
-    // Latest full month with data
-    var latestM=months.filter(function(m){return NAT[m]&&NAT[m].output>0;}).slice(-1)[0]||'MAY';
-    var MAYN=NAT[latestM]||NAT['MAY']||{};
+    // latestM = latest month with output data (for slides 1-4, 9)
+    var latestM=months.filter(function(m){return NAT[m]&&NAT[m].output>0;}).slice(-1)[0]||'JUNE';
+    var CURR=NAT[latestM]||{};
 
-    // Cost for latest month
+    // latestFullM = latest month with full downtime category breakdown (for slides 7-8)
+    var latestFullM=months.filter(function(m){return NAT[m]&&NAT[m].mech>0;}).slice(-1)[0]||'MAY';
+    var CURRFULL=NAT[latestFullM]||NAT['MAY']||{};
+
+    // Cost for slides 5-6: use MAY (latest with full pcdaily cost data)
+    var costM='MAY';
     var tc=MAY_COST.totalCost||21195208;
     var fc=MAY_COST.fixedCost||11341411;
     var vc=MAY_COST.varCost||9853797;
     var ct=MAY_COST.costTon||1676;
     var fixPct=tc>0?Math.round(fc/tc*100):54;
     var varPct=100-fixPct;
-    var mayRmv=MAYN.rmVar||0;
 
-    // UDT pareto from latest month
+    // RM Variance from latest month
+    var mayRmv=CURR.rmVar||0;
+
+    // UDT pareto from latestFullM
     var udtCats=[
-      {cat:'Mechanical',hrs:MAYN.mech||0},{cat:'Warehouse',hrs:MAYN.warehouse||0},
-      {cat:'Change Die',hrs:MAYN.changeDie||0},{cat:'Change Over',hrs:MAYN.changeOver||0},
-      {cat:'Process',hrs:MAYN.process||0},{cat:'Electrical',hrs:MAYN.electrical||0},
-      {cat:'Change Screen',hrs:MAYN.changeScreen||0},{cat:'Raw Materials',hrs:MAYN.rawMat||0},
+      {cat:'Mechanical',hrs:CURRFULL.mech||0},{cat:'Warehouse',hrs:CURRFULL.warehouse||0},
+      {cat:'Change Die',hrs:CURRFULL.changeDie||0},{cat:'Change Over',hrs:CURRFULL.changeOver||0},
+      {cat:'Process',hrs:CURRFULL.process||0},{cat:'Electrical',hrs:CURRFULL.electrical||0},
+      {cat:'Change Screen',hrs:CURRFULL.changeScreen||0},{cat:'Raw Materials',hrs:CURRFULL.rawMat||0},
     ].filter(function(u){return u.hrs>0;}).sort(function(a,b){return b.hrs-a.hrs;});
     var udtHrs=udtCats.map(function(r){return r.hrs;});
     var udtTotal=udtHrs.reduce(function(a,b){return a+b;},0)||1;
@@ -647,8 +658,18 @@ async function downloadMonthlyReport(){
     var top2pct=top2cats.reduce(function(a,r){return a+r.hrs;},0)/udtTotal*100;
     var tot10=TOP10.reduce(function(a,r){return a+r.hrs;},0);
 
+    // Per-plant rejection for latest month bar chart
+    var rejSites=JUN_REJ_SITES;
+    if(latestM!=='JUNE'){
+      rejSites=[
+        {name:'AC',rej:0.35},{name:'PFMIS',rej:0},{name:'HOREB',rej:0.54},
+        {name:'BUKID',rej:0.48},{name:'ARGAO',rej:1.12},{name:'SOUTH',rej:2.32},{name:'CCPC',rej:0.85}
+      ];
+    }
+
     await buildMonthlyReportPptx({
-      months:months,lbls:lbls,NAT:NAT,MAYN:MAYN,latestM:latestM,
+      months:months,lbls:lbls,NAT:NAT,CURR:CURR,CURRFULL:CURRFULL,
+      latestM:latestM,latestFullM:latestFullM,costM:costM,
       outArr:outArr,oeeArr:oeeArr,cuArr:cuArr,kwhArr:kwhArr,fuelArr:fuelArr,
       coalArr:coalArr,costArr:costArr,rejArr:rejArr,outRejArr:outRejArr,othRejArr:othRejArr,
       rmVarArr:rmVarArr,ytdOut:ytdOut,avgOEE:avgOEE,avgCU:avgCU,avgKwh:avgKwh,
@@ -656,36 +677,33 @@ async function downloadMonthlyReport(){
       tc:tc,fc:fc,vc:vc,ct:ct,fixPct:fixPct,varPct:varPct,mayRmv:mayRmv,
       udtCats:udtCats,udtHrs:udtHrs,udtTotal:udtTotal,udtCum:udtCum,
       top2cats:top2cats,top2pct:top2pct,tot10:tot10,
-      PC:PC,TOP10:TOP10,TOP5:TOP5,REJ:REJ,
+      rejSites:rejSites,PC:PC,TOP10:TOP10,TOP5:TOP5,REJ:REJ,
     });
   }catch(e){alert('Error: '+e.message);console.error(e);}
   finally{btn.innerHTML=orig;btn.disabled=false;}
 }
 
 async function buildMonthlyReportPptx(p){
-  // Unpack all parameters — every variable explicitly named, no ambiguity
-  var months=p.months, lbls=p.lbls, NAT=p.NAT, MAYN=p.MAYN, latestM=p.latestM;
-  var outArr=p.outArr, oeeArr=p.oeeArr, cuArr=p.cuArr;
-  var kwhArr=p.kwhArr, fuelArr=p.fuelArr, coalArr=p.coalArr;
-  var costArr=p.costArr, rejArr=p.rejArr, outRejArr=p.outRejArr, othRejArr=p.othRejArr;
+  var months=p.months,lbls=p.lbls,NAT=p.NAT,CURR=p.CURR,CURRFULL=p.CURRFULL;
+  var latestM=p.latestM,latestFullM=p.latestFullM,costM=p.costM;
+  var outArr=p.outArr,oeeArr=p.oeeArr,cuArr=p.cuArr;
+  var kwhArr=p.kwhArr,fuelArr=p.fuelArr,coalArr=p.coalArr;
+  var costArr=p.costArr,rejArr=p.rejArr,outRejArr=p.outRejArr,othRejArr=p.othRejArr;
   var rmVarArr=p.rmVarArr;
-  var ytdOut=p.ytdOut, avgOEE=p.avgOEE, avgCU=p.avgCU;
-  var avgKwh=p.avgKwh, avgFuel=p.avgFuel, avgCoal=p.avgCoal;
-  var avgRej=p.avgRej, maxRej=p.maxRej, minRej=p.minRej;
-  var tc=p.tc, fc=p.fc, vc=p.vc, ct=p.ct, fixPct=p.fixPct, varPct=p.varPct, mayRmv=p.mayRmv;
-  var udtCats=p.udtCats, udtHrs=p.udtHrs, udtTotal=p.udtTotal, udtCum=p.udtCum;
-  var top2cats=p.top2cats, top2pct=p.top2pct, tot10=p.tot10;
-  var PC=p.PC, TOP10=p.TOP10, TOP5=p.TOP5, REJ=p.REJ;
+  var ytdOut=p.ytdOut,avgOEE=p.avgOEE,avgCU=p.avgCU;
+  var avgKwh=p.avgKwh,avgFuel=p.avgFuel,avgCoal=p.avgCoal;
+  var avgRej=p.avgRej,maxRej=p.maxRej,minRej=p.minRej;
+  var tc=p.tc,fc=p.fc,vc=p.vc,ct=p.ct,fixPct=p.fixPct,varPct=p.varPct,mayRmv=p.mayRmv;
+  var udtCats=p.udtCats,udtHrs=p.udtHrs,udtTotal=p.udtTotal,udtCum=p.udtCum;
+  var top2cats=p.top2cats,top2pct=p.top2pct,tot10=p.tot10;
+  var rejSites=p.rejSites,PC=p.PC,TOP10=p.TOP10,TOP5=p.TOP5,REJ=p.REJ;
 
   var pres=new PptxGenJS();
   pres.layout='LAYOUT_WIDE';
-
-  // Palette
   var NAVY='0A1628',BLUE='1B4F8C',DBLUE='0D2545',SKY='2979C8',WHITE='FFFFFF';
   var RED='B71C1C',LRED='EF9A9A',GREEN='1B5E20',LGRN='4CAF50';
   var AMBER='C06000',GOLD='F4A300',TEAL='00838F',CYAN='00BCD4',LGRAY='90A4AE';
 
-  // Helpers
   function fN(v,dec){dec=dec||0;if(v===null||v===undefined)return'\u2014';return Number(v).toLocaleString('en-PH',{minimumFractionDigits:dec,maximumFractionDigits:dec});}
   function fM(v){if(!v||v===0)return'\u20b10';if(v>=1000000)return'\u20b1'+(v/1000000).toFixed(2)+'M';if(v>=1000)return'\u20b1'+(v/1000).toFixed(1)+'K';return'\u20b1'+fN(v);}
   function addBg(s){
@@ -713,11 +731,10 @@ async function buildMonthlyReportPptx(p){
   }
   function th(txt,align){return {text:txt,options:{fill:{color:NAVY},color:WHITE,bold:true,fontSize:7.5,align:align||'right',valign:'middle'}};}
   function td(txt,bg,col,bold,align){return {text:String(txt||'\u2014'),options:{fill:{color:bg||DBLUE},color:col||WHITE,bold:!!bold,fontSize:7.5,align:align||'right',valign:'middle'}};}
+  var KW=2.95,KG=0.17;
+  var mnthRange=months[0].slice(0,3)+'\u2013'+months[months.length-1].slice(0,3)+' 2026';
 
-  // Convenience
-  var KW=2.95, KG=0.17;
-
-  // ── SLIDE 1 — TITLE ────────────────────────────────────
+  // SLIDE 1 — TITLE
   {var s=pres.addSlide();
    s.background={color:NAVY};
    s.addShape(pres.ShapeType.rect,{x:0,y:0,w:13.33,h:0.08,fill:{color:SKY},line:{type:'none'}});
@@ -729,10 +746,10 @@ async function buildMonthlyReportPptx(p){
    s.addText('MONTHLY OPERATIONS',{x:0.8,y:1.15,w:11.5,h:0.85,fontFace:'Cambria',fontSize:48,color:WHITE,bold:true,margin:0});
    s.addText('PERFORMANCE REPORT',{x:0.8,y:2.0,w:11.5,h:0.85,fontFace:'Cambria',fontSize:48,color:SKY,bold:true,margin:0});
    s.addShape(pres.ShapeType.rect,{x:0.8,y:2.95,w:9.5,h:0.05,fill:{color:SKY},line:{type:'none'}});
-   s.addText('January \u2013 June 2026  \u00b7  National Operations  \u00b7  YTD Review',{x:0.8,y:3.12,w:11.5,h:0.4,fontFace:'Calibri',fontSize:16,color:'B0CCEC',margin:0});
+   s.addText('January \u2013 '+latestM.charAt(0)+latestM.slice(1).toLowerCase()+' 2026  \u00b7  National Operations  \u00b7  YTD Review',{x:0.8,y:3.12,w:11.5,h:0.4,fontFace:'Calibri',fontSize:16,color:'B0CCEC',margin:0});
    [{v:fN(Math.round(ytdOut),0)+' MT',l:'YTD TOTAL OUTPUT',c:LGRN},
-    {v:avgCU.toFixed(1)+'%',l:'AVG CAP. UTILIZATION',c:Number(avgCU.toFixed(1))>=80?LGRN:AMBER},
-    {v:avgOEE.toFixed(1)+'%',l:'AVG OEE (JAN\u2013JUN)',c:Number(avgOEE.toFixed(1))>=85?LGRN:AMBER},
+    {v:avgCU.toFixed(1)+'%',l:'AVG CAP. UTILIZATION',c:avgCU>=80?LGRN:AMBER},
+    {v:avgOEE.toFixed(1)+'%',l:'AVG OEE ('+mnthRange+')',c:avgOEE>=85?LGRN:AMBER},
    ].forEach(function(h,i){
      var x=0.8+i*4.1;
      s.addShape(pres.ShapeType.roundRect,{x:x,y:3.82,w:3.7,h:1.32,rectRadius:0.1,fill:{color:DBLUE},line:{pt:1.5,color:h.c}});
@@ -743,42 +760,38 @@ async function buildMonthlyReportPptx(p){
    s.addText('Prepared for Management Review  \u00b7  COMEX Reporting',{x:0.8,y:5.35,w:11.5,h:0.32,fontFace:'Calibri',fontSize:12,color:SKY,italic:true,margin:0});
    s.addText('VPI Operations Dashboard  \u00b7  Auto-Generated Report',{x:0.8,y:7.22,w:11.5,h:0.22,fontFace:'Calibri',fontSize:9,color:'607D8B',margin:0});}
 
-  // ── SLIDE 2 — PRODUCTION PERFORMANCE ───────────────────
+  // SLIDE 2 — PRODUCTION PERFORMANCE (latestM)
   {var s=pres.addSlide(); addBg(s);
-   sHdr(s,'PRODUCTION PERFORMANCE','OUTPUT \u00b7 CAPACITY UTILIZATION \u00b7 OEE \u2014 JAN TO JUN 2026','JAN\u2013JUN 2026');
-   kBox(s,0.5,0.98,KW,1.0,'YTD OUTPUT (JAN\u2013JUN)',fN(Math.round(ytdOut),0)+' MT',LGRN);
-   kBox(s,0.5+KW+KG,0.98,KW,1.0,'LATEST MONTH OUTPUT',fN(MAYN.output,0)+' MT',SKY);
+   sHdr(s,'PRODUCTION PERFORMANCE','OUTPUT \u00b7 CAPACITY UTILIZATION \u00b7 OEE \u2014 '+mnthRange,''+mnthRange);
+   kBox(s,0.5,0.98,KW,1.0,'YTD OUTPUT',fN(Math.round(ytdOut),0)+' MT',LGRN);
+   kBox(s,0.5+KW+KG,0.98,KW,1.0,latestM+' OUTPUT',fN(CURR.output,0)+' MT',SKY);
    kBox(s,0.5+2*(KW+KG),0.98,KW,1.0,'AVG CAP. UTILIZATION',avgCU.toFixed(1)+'%',avgCU>=80?LGRN:AMBER);
    kBox(s,0.5+3*(KW+KG),0.98,KW,1.0,'AVG OEE',avgOEE.toFixed(1)+'%',avgOEE>=85?LGRN:AMBER);
    s.addChart(pres.charts.BAR,[{name:'Output (MT)',labels:lbls,values:outArr}],{
      x:0.5,y:2.12,w:6.0,h:3.32,barDir:'col',showTitle:true,title:'Monthly National Output (MT)',titleFontSize:10,titleColor:WHITE,
-     chartColors:['1B4F8C','1B4F8C','1B4F8C','1B4F8C','2979C8','607D8B'],
+     chartColors:['1B4F8C','1B4F8C','1B4F8C','1B4F8C','1B4F8C','607D8B'],
      showValue:true,dataLabelPosition:'outEnd',dataLabelColor:WHITE,dataLabelFontSize:9,
-     catAxisLabelColor:LGRAY,catAxisLabelFontSize:10,valAxisLabelColor:LGRAY,valAxisLabelFontSize:8,
+     catAxisLabelColor:LGRAY,catAxisLabelFontSize:10,valAxisLabelColor:LGRAY,
      valGridLine:{color:'1A3A5C',size:0.5},chartArea:{fill:{color:DBLUE}},plotArea:{fill:{color:DBLUE}}});
-   s.addChart(pres.charts.LINE,[
-     {name:'OEE %',labels:lbls,values:oeeArr},
-     {name:'Cap Util %',labels:lbls,values:cuArr},
-   ],{x:6.83,y:2.12,w:6.0,h:3.32,showTitle:true,title:'OEE & Capacity Utilization %',titleFontSize:10,titleColor:WHITE,
+   s.addChart(pres.charts.LINE,[{name:'OEE %',labels:lbls,values:oeeArr},{name:'Cap Util %',labels:lbls,values:cuArr}],{
+     x:6.83,y:2.12,w:6.0,h:3.32,showTitle:true,title:'OEE & Capacity Utilization %',titleFontSize:10,titleColor:WHITE,
      chartColors:[LGRN,SKY],lineSize:2.5,lineDataSymbol:'circle',lineDataSymbolSize:5,
      showLegend:true,legendPos:'b',legendFontSize:8,legendFontColor:LGRAY,
      showValue:true,dataLabelFontSize:8,dataLabelColor:WHITE,dataLabelFormatCode:'0.0"%"',
      catAxisLabelColor:LGRAY,catAxisLabelFontSize:9,valAxisLabelColor:LGRAY,
      valGridLine:{color:'1A3A5C',size:0.5},chartArea:{fill:{color:DBLUE}},plotArea:{fill:{color:DBLUE}}});
-   addBox(s,5.54,0.92,'Analysis:  YTD national output of '+fN(Math.round(ytdOut),0)+' MT across 7 plants through June 2026. '+latestM+' was the strongest full month at '+fN(MAYN.output,0)+' MT, buoyed by full utilization at AC (93%) and HOREB (90%). Average OEE of '+avgOEE.toFixed(1)+'% reflects sound operational efficiency across most plants, though ARGAO (57.5%) and CCPC (14%) continue to underperform. February and April recorded lower output due to scheduled maintenance windows. AC and BUKID remain the primary volume backbone, together contributing over 58% of YTD output. Sustained improvement at ARGAO and SOUTH is the single biggest lever to raise national output in H2 2026.');
-   s.addText('VPI Operations  \u00b7  Jan\u2013Jun 2026 Production Report',{x:0.5,y:7.22,w:12.33,h:0.22,fontFace:'Calibri',fontSize:8.5,color:'607D8B',margin:0});}
+   addBox(s,5.54,0.92,'Analysis:  YTD national output of '+fN(Math.round(ytdOut),0)+' MT across 7 plants through '+latestM+' 2026. MAY was the strongest month at '+fN((NAT['MAY']||{}).output||0,0)+' MT. '+latestM+' output of '+fN(CURR.output,0)+' MT reflects '+latestM+' utilization at '+CURR.capUtil.toFixed(1)+'% with OEE of '+CURR.oee.toFixed(1)+'%. AC and BUKID remain the primary volume backbone. Sustained improvement at ARGAO and SOUTH is the single biggest lever to raise national output in H2 2026.');
+   s.addText('VPI Operations  \u00b7  '+mnthRange+' Production Report',{x:0.5,y:7.22,w:12.33,h:0.22,fontFace:'Calibri',fontSize:8.5,color:'607D8B',margin:0});}
 
-  // ── SLIDE 3 — ENERGY & EFFICIENCY ──────────────────────
+  // SLIDE 3 — ENERGY & EFFICIENCY (latestM trends)
   {var s=pres.addSlide(); addBg(s);
-   sHdr(s,'ENERGY & MATERIAL EFFICIENCY','POWER \u00b7 FUEL \u00b7 COAL \u00b7 RM VARIANCE \u2014 JAN TO JUN 2026','JAN\u2013JUN 2026');
-   kBox(s,0.5,0.98,KW,1.0,'AVG POWER (JAN\u2013JUN)',avgKwh.toFixed(2)+' kWh/ton',avgKwh<=35?LGRN:AMBER);
-   kBox(s,0.5+KW+KG,0.98,KW,1.0,'AVG FUEL (JAN\u2013JUN)',avgFuel.toFixed(2)+' L/ton',avgFuel<=3.5?LGRN:AMBER);
-   kBox(s,0.5+2*(KW+KG),0.98,KW,1.0,'AVG COAL (JAN\u2013JUN)',avgCoal>0?avgCoal.toFixed(2)+' kg/ton':'N/A',LGRAY);
-   kBox(s,0.5+3*(KW+KG),0.98,KW,1.0,'MAY RM VARIANCE',(mayRmv>=0?'+':'')+mayRmv.toFixed(2)+'%',mayRmv>=0?LGRN:AMBER);
-   s.addChart(pres.charts.LINE,[
-     {name:'kWh/ton',labels:lbls,values:kwhArr},
-     {name:'Fuel L/ton',labels:lbls,values:fuelArr},
-   ],{x:0.5,y:2.12,w:6.0,h:3.32,showTitle:true,title:'Power (kWh/ton) & Fuel (L/ton) Trend',titleFontSize:10,titleColor:WHITE,
+   sHdr(s,'ENERGY & MATERIAL EFFICIENCY','POWER \u00b7 FUEL \u00b7 COAL \u00b7 RM VARIANCE \u2014 '+mnthRange,''+mnthRange);
+   kBox(s,0.5,0.98,KW,1.0,'AVG POWER',avgKwh.toFixed(2)+' kWh/ton',avgKwh<=35?LGRN:AMBER);
+   kBox(s,0.5+KW+KG,0.98,KW,1.0,'AVG FUEL',avgFuel.toFixed(2)+' L/ton',avgFuel<=3.5?LGRN:AMBER);
+   kBox(s,0.5+2*(KW+KG),0.98,KW,1.0,'AVG COAL',avgCoal>0?avgCoal.toFixed(2)+' kg/ton':'N/A',LGRAY);
+   kBox(s,0.5+3*(KW+KG),0.98,KW,1.0,latestM+' RM VARIANCE',(mayRmv>=0?'+':'')+mayRmv.toFixed(2)+'%',mayRmv>=0?LGRN:AMBER);
+   s.addChart(pres.charts.LINE,[{name:'kWh/ton',labels:lbls,values:kwhArr},{name:'Fuel L/ton',labels:lbls,values:fuelArr}],{
+     x:0.5,y:2.12,w:6.0,h:3.32,showTitle:true,title:'Power (kWh/ton) & Fuel (L/ton) Trend',titleFontSize:10,titleColor:WHITE,
      chartColors:[CYAN,AMBER],lineSize:2.5,lineDataSymbol:'circle',lineDataSymbolSize:5,
      showLegend:true,legendPos:'b',legendFontSize:8,legendFontColor:LGRAY,
      showValue:true,dataLabelFontSize:8,dataLabelColor:WHITE,dataLabelFormatCode:'0.00',
@@ -795,60 +808,60 @@ async function buildMonthlyReportPptx(p){
      showLegend:false,showValue:true,dataLabelFontSize:8.5,dataLabelColor:WHITE,dataLabelFormatCode:'0.00"%"',
      catAxisLabelColor:LGRAY,catAxisLabelFontSize:9,valAxisLabelColor:LGRAY,
      valGridLine:{color:'1A3A5C',size:0.5},chartArea:{fill:{color:DBLUE}},plotArea:{fill:{color:DBLUE}}});
-   addBox(s,5.54,0.92,'Analysis:  Average power intensity of '+avgKwh.toFixed(2)+' kWh/ton tracks within the 35 kWh/ton limit for all months, reflecting consistent energy discipline. Fuel intensity at '+avgFuel.toFixed(2)+' L/ton average is within the 3.5 L/ton limit. Coal usage is applicable only to HOREB and ARGAO pelleting lines; the national average is suppressed by non-coal plants. RM Variance has been consistently negative across all months, indicating material yield below spec. Tighter incoming quality checks and supplier performance reviews are recommended for H2 2026.');
+   addBox(s,5.54,0.92,'Analysis:  Average power intensity of '+avgKwh.toFixed(2)+' kWh/ton tracks within the 35 kWh/ton limit for all months. Fuel at '+avgFuel.toFixed(2)+' L/ton average is within the 3.5 L/ton target. Coal usage is applicable to HOREB and ARGAO pelleting lines only. RM Variance has been consistently negative across all months, indicating material yield below spec. '+latestM+' RM Variance of '+(mayRmv>=0?'+':'')+mayRmv.toFixed(2)+'% requires continued attention. Tighter incoming quality checks and supplier performance reviews are recommended for H2 2026.');
    s.addText('VPI Operations  \u00b7  Energy & Efficiency Report',{x:0.5,y:7.22,w:12.33,h:0.22,fontFace:'Calibri',fontSize:8.5,color:'607D8B',margin:0});}
 
-  // ── SLIDE 4 — REJECTION RATE ────────────────────────────
+  // SLIDE 4 — REJECTION RATE (latestM)
   {var s=pres.addSlide(); addBg(s);
-   sHdr(s,'REJECTION RATE ANALYSIS','NATIONAL QUALITY PERFORMANCE \u2014 JAN TO JUN 2026','JAN\u2013JUN 2026');
+   sHdr(s,'REJECTION RATE ANALYSIS','NATIONAL QUALITY PERFORMANCE \u2014 '+mnthRange,''+mnthRange);
    kBox(s,0.5,0.98,KW,1.0,'AVG REJECTION RATE',avgRej.toFixed(2)+'%',RED);
    kBox(s,0.5+KW+KG,0.98,KW,1.0,'LOWEST (BEST MONTH)',minRej.toFixed(2)+'%',LGRN);
    kBox(s,0.5+2*(KW+KG),0.98,KW,1.0,'HIGHEST MONTH',maxRej.toFixed(2)+'%',AMBER);
-   kBox(s,0.5+3*(KW+KG),0.98,KW,1.0,'1% THRESHOLD STATUS',avgRej<=1?'WITHIN LIMIT':'BREACHED',avgRej<=1?LGRN:RED);
+   kBox(s,0.5+3*(KW+KG),0.98,KW,1.0,'1% THRESHOLD',avgRej<=1?'WITHIN LIMIT':'BREACHED',avgRej<=1?LGRN:RED);
    s.addChart(pres.charts.LINE,[
      {name:'Total Reject %',labels:lbls,values:rejArr},
      {name:'Outright %',labels:lbls,values:outRejArr},
      {name:'Other %',labels:lbls,values:othRejArr},
-   ],{x:0.5,y:2.12,w:6.0,h:3.32,showTitle:true,title:'National Rejection Rate % \u2014 Jan to Jun 2026',titleFontSize:10,titleColor:WHITE,
+   ],{x:0.5,y:2.12,w:6.0,h:3.32,showTitle:true,title:'National Rejection Rate % \u2014 '+mnthRange,titleFontSize:10,titleColor:WHITE,
      chartColors:[RED,AMBER,TEAL],lineSize:2.5,lineDataSymbol:'circle',lineDataSymbolSize:6,
      showLegend:true,legendPos:'b',legendFontSize:8,legendFontColor:LGRAY,
      showValue:true,dataLabelFontSize:8.5,dataLabelColor:WHITE,dataLabelFormatCode:'0.00"%"',
      catAxisLabelColor:LGRAY,catAxisLabelFontSize:9,valAxisLabelColor:LGRAY,
      valGridLine:{color:'1A3A5C',size:0.5},chartArea:{fill:{color:DBLUE}},plotArea:{fill:{color:DBLUE}}});
-   s.addChart(pres.charts.BAR,[{name:'Rejection Rate % (May)',labels:['AC','PFMIS','HOREB','BUKID','ARGAO','SOUTH','CCPC'],values:[0.35,0,0.54,0.48,1.12,2.32,0.85]}],{
-     x:6.83,y:2.12,w:6.0,h:3.32,barDir:'col',showTitle:true,title:'Per-Plant Rejection Rate % \u2014 May 2026',titleFontSize:10,titleColor:WHITE,
+   s.addChart(pres.charts.BAR,[{name:'Rejection Rate % ('+latestM+')',labels:rejSites.map(function(r){return r.name;}),values:rejSites.map(function(r){return r.rej;})}],{
+     x:6.83,y:2.12,w:6.0,h:3.32,barDir:'col',showTitle:true,title:'Per-Plant Rejection Rate % \u2014 '+latestM+' 2026',titleFontSize:10,titleColor:WHITE,
      chartColors:['2E7D32','607D8B','2E7D32','2E7D32','B71C1C','B71C1C','C06000'],
      showValue:true,dataLabelPosition:'outEnd',dataLabelColor:WHITE,dataLabelFontSize:9,dataLabelFormatCode:'0.00"%"',
      catAxisLabelColor:LGRAY,catAxisLabelFontSize:9,valAxisLabelColor:LGRAY,
      valGridLine:{color:'1A3A5C',size:0.5},chartArea:{fill:{color:DBLUE}},plotArea:{fill:{color:DBLUE}}});
-   addBox(s,5.54,0.92,'Analysis:  National rejection rate has remained within the 1% threshold throughout January\u2013June 2026, averaging '+avgRej.toFixed(2)+'%. February recorded the best rate at '+minRej.toFixed(2)+'%. SOUTH (2.32%) and ARGAO (1.12%) are chronic above-threshold contributors in May and require mandatory die-inspection protocols and root cause reports. AC, HOREB, BUKID, and PFMIS all perform below 0.6% \u2014 quality-reliable plants for high-value customer orders. Proactive remill scheduling is essential to minimize throughput impact from recoverable rejects.');
+   addBox(s,5.54,0.92,'Analysis:  National rejection rate has remained within the 1% threshold throughout '+mnthRange+', averaging '+avgRej.toFixed(2)+'%. SOUTH and ARGAO are above-threshold contributors in '+latestM+' and require mandatory die-inspection protocols and root cause reports. AC, HOREB, BUKID, and PFMIS all perform below 0.6% \u2014 the quality-reliable plants for high-value customer orders. Proactive remill scheduling is essential to minimize throughput impact from recoverable rejects.');
    s.addText('VPI Operations  \u00b7  Quality Performance Report',{x:0.5,y:7.22,w:12.33,h:0.22,fontFace:'Calibri',fontSize:8.5,color:'607D8B',margin:0});}
 
-  // ── SLIDE 5 — PRODUCTION COST ───────────────────────────
+  // SLIDE 5 — PRODUCTION COST (costM = latest with full cost data)
   {var s=pres.addSlide(); addBg(s);
-   sHdr(s,'PRODUCTION COST PERFORMANCE','COST TREND \u00b7 COST PER TON \u00b7 FIXED vs VARIABLE \u2014 MAY 2026','MAY 2026');
-   var cKW=3.88, cKG=0.18;
-   kBox(s,0.5,0.98,cKW,1.0,'MAY TOTAL COST',fM(tc),RED);
+   sHdr(s,'PRODUCTION COST PERFORMANCE','COST TREND \u00b7 COST PER TON \u00b7 FIXED vs VARIABLE \u2014 '+costM+' 2026',costM+' 2026');
+   var cKW=3.88,cKG=0.18;
+   kBox(s,0.5,0.98,cKW,1.0,costM+' TOTAL COST',fM(tc),RED);
    kBox(s,0.5+cKW+cKG,0.98,cKW,1.0,'COST PER TON','\u20b1'+fN(Math.round(ct),0),SKY);
    kBox(s,0.5+2*(cKW+cKG),0.98,cKW,1.0,'FIXED vs VARIABLE',fixPct+'% / '+varPct+'%',AMBER);
    s.addChart(pres.charts.LINE,[{name:'\u20b1/ton',labels:lbls,values:costArr}],{
-     x:0.5,y:2.12,w:7.8,h:3.32,showTitle:true,title:'Production Cost per Ton Trend (\u20b1/ton) \u2014 Jan to Jun 2026',titleFontSize:10,titleColor:WHITE,
+     x:0.5,y:2.12,w:7.8,h:3.32,showTitle:true,title:'Production Cost per Ton Trend (\u20b1/ton) \u2014 '+mnthRange,titleFontSize:10,titleColor:WHITE,
      chartColors:[GOLD],lineSize:3.5,lineDataSymbol:'circle',lineDataSymbolSize:8,
      showLegend:false,showValue:true,dataLabelFontSize:10,dataLabelColor:WHITE,dataLabelFormatCode:'"\u20b1"#,##0',
      catAxisLabelColor:LGRAY,catAxisLabelFontSize:10,valAxisLabelColor:LGRAY,
      valGridLine:{color:'1A3A5C',size:0.5},chartArea:{fill:{color:DBLUE}},plotArea:{fill:{color:DBLUE}}});
    s.addChart(pres.charts.BAR,[{name:'Cost Component',labels:['Rental/Amor','Power','Agency MP','Spareparts','Diesel','Other'],values:[9802488,6422934,3506984,1279494,3829004,2673147]}],{
-     x:8.63,y:2.12,w:4.2,h:3.32,barDir:'bar',showTitle:true,title:'MAY Cost Breakdown (\u20b1)',titleFontSize:10,titleColor:WHITE,
+     x:8.63,y:2.12,w:4.2,h:3.32,barDir:'bar',showTitle:true,title:costM+' Cost Breakdown (\u20b1)',titleFontSize:10,titleColor:WHITE,
      chartColors:['B71C1C','2979C8','C06000','1B5E20','F4A300','607D8B'],
      showValue:true,dataLabelPosition:'outEnd',dataLabelColor:WHITE,dataLabelFontSize:8,
      catAxisLabelColor:LGRAY,catAxisLabelFontSize:8,valAxisLabelColor:LGRAY,valAxisLabelFontSize:7.5,
      chartArea:{fill:{color:DBLUE}},plotArea:{fill:{color:DBLUE}}});
-   addBox(s,5.54,0.92,'Analysis:  MAY production cost of '+fM(tc)+' at \u20b1'+fN(Math.round(ct),0)+'/ton is the lowest cost month YTD \u2014 supported by the highest output volume ('+fN(MAYN.output,0)+' MT) which diluted fixed overheads. The \u20b1/ton trend shows improvement from the February peak of \u20b11,921/ton, confirming that volume is the primary lever for cost reduction. Rental/amortization (\u20b19.8M, largest component) is a fixed obligation \u2014 making sustained volume utilization the most actionable path to cost competitiveness. Power (\u20b16.4M) and Diesel (\u20b13.8M) are the primary controllable variable costs; energy conservation programs at HOREB and BUKID would have the highest ROI. Agency manpower (\u20b13.5M) should be reviewed at sites operating below 70% utilization.');
-   s.addText('VPI Operations  \u00b7  Production Cost Report',{x:0.5,y:7.22,w:12.33,h:0.22,fontFace:'Calibri',fontSize:8.5,color:'607D8B',margin:0});}
+   addBox(s,5.54,0.92,'Analysis:  '+costM+' production cost of '+fM(tc)+' at \u20b1'+fN(Math.round(ct),0)+'/ton is the lowest cost month YTD \u2014 the highest output volume ('+fN((NAT[costM]||{}).output||0,0)+' MT) diluted fixed overheads. The \u20b1/ton trend shows improvement from the February peak of \u20b11,921/ton, confirming that volume is the primary lever for cost reduction. Rental/amortization (\u20b19.8M) is a fixed obligation \u2014 sustained high-volume operation is the most actionable path to cost competitiveness. Power (\u20b16.4M) and Diesel (\u20b13.8M) are the primary controllable variable costs. Note: '+latestM+' full plant cost data will be available upon pcdaily completion.');
+   s.addText('VPI Operations  \u00b7  Production Cost Report \u2014 '+costM+' 2026',{x:0.5,y:7.22,w:12.33,h:0.22,fontFace:'Calibri',fontSize:8.5,color:'607D8B',margin:0});}
 
-  // ── SLIDE 6 — COST SITE DETAIL TABLE ───────────────────
+  // SLIDE 6 — COST SITE DETAIL (costM)
   {var s=pres.addSlide(); addBg(s);
-   sHdr(s,'PRODUCTION COST \u2014 PLANT DETAIL','MAY 2026 \u00b7 ALL AMOUNTS IN PESOS (\u20b1)','MAY 2026');
+   sHdr(s,'PRODUCTION COST \u2014 PLANT DETAIL',costM+' 2026 \u00b7 ALL AMOUNTS IN PESOS (\u20b1)',costM+' 2026');
    var hRow=[th('PLANT','left'),th('Volume kg'),th('Rental/Amor'),th('Spares'),th('Mfg Direct'),
      th('Diesel'),th('Elec.Mach.'),th('Agency MP'),th('Other'),th('3rd Party'),
      th('CESS Dep.'),th('SP Dep.'),th('Insur.'),th('Water'),th('Thread'),th('Total Cost'),th('\u20b1/kg')];
@@ -856,7 +869,7 @@ async function buildMonthlyReportPptx(p){
    PC.forEach(function(r,i){
      var bg=i%2===0?'0E2040':'0A1628';
      var isNat=r.plant==='NATIONAL';
-     var fill=isNat?'0D3060':bg, txtc=isNat?'B0CCEC':WHITE;
+     var fill=isNat?'0D3060':bg,txtc=isNat?'B0CCEC':WHITE;
      function fv(v){return v>0?fN(v,0):'\u2014';}
      tData.push([
        td(r.plant,fill,isNat?'4FC3F7':SKY,true,'left'),
@@ -872,23 +885,23 @@ async function buildMonthlyReportPptx(p){
    s.addTable(tData,{x:0.3,y:1.05,w:12.7,
      colW:[1.05,0.88,0.88,0.72,0.8,0.72,0.8,0.8,0.65,0.65,0.65,0.65,0.6,0.6,0.6,0.88,0.58],
      border:{pt:0.35,color:'1A3A5C'},autoPage:false,rowH:0.28,valign:'middle'});
-   addBox(s,4.4,1.1,'Analysis:  NATIONAL weighted \u20b1/kg of \u20b11.66 reflects blended cost across all plants. AC (\u20b11.31/kg) is the most cost-efficient pelleting plant, driven by highest throughput (5.11M kg) diluting the \u20b11.8M rental burden. BUKID (\u20b11.59/kg) benefits from high volume (5.34M kg) despite carrying the heaviest rental cost at \u20b13.02M. ARGAO (\u20b12.32/kg) reflects the severe impact of underutilization \u2014 high fixed rental (\u20b12.24M) spread over only 2.12M kg creates a \u20b10.73/kg premium above the national average. PFMIS (\u20b13.20/kg) is the highest-cost site, driven by fixed rental with very low volume \u2014 a tolling arrangement limits throughput scale. Diesel cost at HOREB (\u20b11.05M) and BUKID (\u20b11.49M) are the largest fuel components; energy conservation programs at these two sites would yield the highest national cost reduction impact.');
-   s.addText('VPI Operations  \u00b7  Plant Cost Detail \u2014 MAY 2026',{x:0.5,y:7.22,w:12.33,h:0.22,fontFace:'Calibri',fontSize:8.5,color:'607D8B',margin:0});}
+   addBox(s,4.4,1.1,'Analysis ('+costM+' 2026):  NATIONAL weighted \u20b1/kg of \u20b11.66 reflects blended cost. AC (\u20b11.31/kg) is the most cost-efficient plant, driven by highest throughput (5.11M kg) diluting the \u20b11.8M rental burden. BUKID (\u20b11.59/kg) benefits from high volume despite the heaviest rental at \u20b13.02M. ARGAO (\u20b12.32/kg) reflects severe underutilization impact \u2014 \u20b12.24M rental spread over only 2.12M kg creates a \u20b10.73/kg premium above national average. PFMIS (\u20b13.20/kg) is highest-cost due to fixed rental with very low volume (tolling arrangement). Diesel at HOREB (\u20b11.05M) and BUKID (\u20b11.49M) are the largest fuel components \u2014 energy conservation here would yield the highest cost reduction impact nationally.');
+   s.addText('VPI Operations  \u00b7  Plant Cost Detail \u2014 '+costM+' 2026',{x:0.5,y:7.22,w:12.33,h:0.22,fontFace:'Calibri',fontSize:8.5,color:'607D8B',margin:0});}
 
-  // ── SLIDE 7 — DOWNTIME PARETO ───────────────────────────
+  // SLIDE 7 — DOWNTIME PARETO (latestFullM)
   {var s=pres.addSlide(); addBg(s);
-   sHdr(s,'DOWNTIME ANALYSIS','MAY 2026 \u00b7 NATIONAL \u2014 UDT CATEGORY PARETO','MAY 2026');
+   sHdr(s,'DOWNTIME ANALYSIS',latestFullM+' 2026 \u00b7 NATIONAL \u2014 UDT CATEGORY PARETO',latestFullM+' 2026');
    var dtCards=[
-     {l:'SCHED. DT',v:(MAYN.sdt||0).toFixed(1)+' hrs',col:LGRAY},
-     {l:'UNSCHED. DT',v:(MAYN.udt||0).toFixed(1)+' hrs',col:(MAYN.udt||0)>200?RED:AMBER},
-     {l:'MECHANICAL',v:(MAYN.mech||0).toFixed(1)+' hrs',col:RED},
-     {l:'WAREHOUSE',v:(MAYN.warehouse||0).toFixed(1)+' hrs',col:AMBER},
-     {l:'CHANGE DIE',v:(MAYN.changeDie||0).toFixed(1)+' hrs',col:AMBER},
-     {l:'CHANGE OVER',v:(MAYN.changeOver||0).toFixed(1)+' hrs',col:AMBER},
-     {l:'PROCESS',v:(MAYN.process||0).toFixed(1)+' hrs',col:AMBER},
-     {l:'ELECTRICAL',v:(MAYN.electrical||0).toFixed(1)+' hrs',col:LGRAY},
-     {l:'CHANGE SCREEN',v:(MAYN.changeScreen||0).toFixed(1)+' hrs',col:LGRAY},
-     {l:'RAW MATERIALS',v:(MAYN.rawMat||0).toFixed(1)+' hrs',col:LGRAY},
+     {l:'SCHED. DT',v:(CURRFULL.sdt||0).toFixed(1)+' hrs',col:LGRAY},
+     {l:'UNSCHED. DT',v:(CURRFULL.udt||0).toFixed(1)+' hrs',col:(CURRFULL.udt||0)>200?RED:AMBER},
+     {l:'MECHANICAL',v:(CURRFULL.mech||0).toFixed(1)+' hrs',col:RED},
+     {l:'WAREHOUSE',v:(CURRFULL.warehouse||0).toFixed(1)+' hrs',col:AMBER},
+     {l:'CHANGE DIE',v:(CURRFULL.changeDie||0).toFixed(1)+' hrs',col:AMBER},
+     {l:'CHANGE OVER',v:(CURRFULL.changeOver||0).toFixed(1)+' hrs',col:AMBER},
+     {l:'PROCESS',v:(CURRFULL.process||0).toFixed(1)+' hrs',col:AMBER},
+     {l:'ELECTRICAL',v:(CURRFULL.electrical||0).toFixed(1)+' hrs',col:LGRAY},
+     {l:'CHANGE SCREEN',v:(CURRFULL.changeScreen||0).toFixed(1)+' hrs',col:LGRAY},
+     {l:'RAW MATERIALS',v:(CURRFULL.rawMat||0).toFixed(1)+' hrs',col:LGRAY},
    ];
    var dcW=1.26,dcH=0.78,dcG=0.05,dcY=1.0;
    dtCards.forEach(function(c,i){
@@ -901,7 +914,7 @@ async function buildMonthlyReportPptx(p){
    s.addChart(
      [{type:pres.charts.BAR,data:[{name:'UDT (hrs)',labels:udtCats.map(function(r){return r.cat;}),values:udtHrs}],options:{barDir:'col',chartColors:['B71C1C']}},
       {type:pres.charts.LINE,data:[{name:'Cumulative %',labels:udtCats.map(function(r){return r.cat;}),values:udtCum}],options:{chartColors:[SKY],lineSize:2,lineDataSymbol:'circle',lineDataSymbolSize:5,secondaryValAxis:true,secondaryCatAxis:true}}],
-     {x:0.5,y:1.92,w:7.8,h:3.38,showTitle:true,title:'UDT Pareto by Category \u2014 '+latestM+' 2026 National',titleFontSize:10,titleColor:WHITE,
+     {x:0.5,y:1.92,w:7.8,h:3.38,showTitle:true,title:'UDT Pareto by Category \u2014 '+latestFullM+' 2026 National',titleFontSize:10,titleColor:WHITE,
       showLegend:true,legendPos:'b',legendFontSize:8,legendFontColor:LGRAY,showValue:true,dataLabelFontSize:8.5,dataLabelColor:WHITE,
       catAxisLabelColor:LGRAY,catAxisLabelFontSize:9,
       valAxes:[{showValAxisTitle:true,valAxisTitle:'Hours',valAxisTitleFontSize:8,valAxisTitleColor:LGRAY,valAxisLabelColor:LGRAY,valGridLine:{color:'1A3A5C',size:0.5}},{showValAxisTitle:true,valAxisTitle:'Cumulative %',valAxisTitleFontSize:8,valAxisTitleColor:LGRAY,valAxisLabelColor:LGRAY,valGridLine:{style:'none'},valAxisMaxVal:100}],
@@ -914,15 +927,15 @@ async function buildMonthlyReportPptx(p){
      ptRows.push([td(String(i+1),bg,LGRAY,false,'center'),td(r.cat,bg,cumPct<=80+pct?'90CAF9':'B0CCEC',cumPct<=80+pct,'left'),td(r.hrs.toFixed(1),bg,LRED,true),td(pct.toFixed(1)+'%',bg,WHITE),td(cumPct.toFixed(1)+'%',bg,cumPct>=80?AMBER:LGRN,cumPct>=80)]);
    });
    s.addTable(ptRows,{x:8.63,y:1.92,w:4.2,colW:[0.36,1.55,0.68,0.72,0.72],border:{pt:0.4,color:'1A3A5C'},autoPage:false,rowH:0.33,valign:'middle'});
-   addBox(s,5.42,0.92,'Analysis:  Total UDT for '+latestM+' was '+(MAYN.udt||0).toFixed(1)+' hrs across all national plants. Mechanical failures ('+(MAYN.mech||0).toFixed(1)+' hrs, '+Math.round((MAYN.mech||0)/(MAYN.udt||1)*100)+'%) dominate the downtime profile. '+(top2cats[0]?top2cats[0].cat:'')+' and '+(top2cats[1]?top2cats[1].cat:'')+' together account for '+top2pct.toFixed(0)+'% of all UDT. The 80% cumulative threshold is reached after the 3rd category, meaning focused action on the top 3 categories alone would recover most lost production time. Scheduling preventive maintenance windows for bucket elevators, pellet mill rolls, and ring die replacement during planned downtime would significantly reduce emergency breakdowns.');
-   s.addText('VPI Operations  \u00b7  Downtime Analysis \u2014 '+latestM+' 2026',{x:0.5,y:7.22,w:12.33,h:0.22,fontFace:'Calibri',fontSize:8.5,color:'607D8B',margin:0});}
+   addBox(s,5.42,0.92,'Analysis ('+latestFullM+' 2026):  Total UDT was '+(CURRFULL.udt||0).toFixed(1)+' hrs. Mechanical failures ('+(CURRFULL.mech||0).toFixed(1)+' hrs, '+Math.round((CURRFULL.mech||0)/(CURRFULL.udt||1)*100)+'%) dominate the downtime profile. '+(top2cats[0]?top2cats[0].cat:'')+' and '+(top2cats[1]?top2cats[1].cat:'')+' together account for '+top2pct.toFixed(0)+'% of all UDT. The 80% threshold is crossed after the 3rd category \u2014 focused PM on the top 3 categories would recover most lost production time. Note: '+latestM+' downtime category breakdown will be available after full reporting cycle completion.');
+   s.addText('VPI Operations  \u00b7  Downtime Analysis \u2014 '+latestFullM+' 2026',{x:0.5,y:7.22,w:12.33,h:0.22,fontFace:'Calibri',fontSize:8.5,color:'607D8B',margin:0});}
 
-  // ── SLIDE 8 — TOP 10 UDT + TOP 5 PER SITE ──────────────
+  // SLIDE 8 — TOP 10 UDT + TOP 5 PER SITE (latestFullM)
   {var s=pres.addSlide(); addBg(s);
-   sHdr(s,'DOWNTIME \u2014 CONTRIBUTOR ANALYSIS','MAY 2026 \u00b7 NATIONAL TOP 10 & TOP 5 PER SITE \u2014 SUB-CATEGORY DETAIL','MAY 2026');
+   sHdr(s,'DOWNTIME \u2014 CONTRIBUTOR ANALYSIS',latestFullM+' 2026 \u00b7 NATIONAL TOP 10 & TOP 5 PER SITE',latestFullM+' 2026');
    var nat10Rev=TOP10.slice().reverse();
    s.addChart(pres.charts.BAR,[{name:'UDT (hrs)',labels:nat10Rev.map(function(r){return r.label;}),values:nat10Rev.map(function(r){return r.hrs;})}],{
-     x:0.5,y:1.05,w:7.5,h:5.68,barDir:'bar',showTitle:true,title:'National Top 10 UDT Sub-Categories \u2014 '+latestM+' 2026',titleFontSize:10,titleColor:WHITE,
+     x:0.5,y:1.05,w:7.5,h:5.68,barDir:'bar',showTitle:true,title:'National Top 10 UDT Sub-Categories \u2014 '+latestFullM+' 2026',titleFontSize:10,titleColor:WHITE,
      chartColors:['B71C1C'],showLegend:false,
      catAxisLabelColor:LGRAY,catAxisLabelFontSize:8.5,valAxisLabelColor:LGRAY,valAxisLabelFontSize:9,
      showValue:true,dataLabelPosition:'outEnd',dataLabelColor:WHITE,dataLabelFontSize:9,
@@ -939,10 +952,10 @@ async function buildMonthlyReportPptx(p){
      });
    });
    s.addTable(tRows5,{x:8.25,y:1.05,w:4.7,colW:[0.7,0.3,2.95,0.55],border:{pt:0.4,color:'1A3A5C'},autoPage:false,rowH:0.26,valign:'middle'});
-   addBox(s,5.55,0.9,'Analysis:  The top 10 sub-category contributors totaled '+tot10.toFixed(1)+' hrs in '+latestM+' \u2014 representing the majority of all national UDT. '+TOP10[0].label+' leads at '+TOP10[0].hrs.toFixed(1)+' hrs and PM is critically overdue. HOREB and ARGAO each appear multiple times in the top 10, confirming these two sites require intensive reliability improvement programs. BUKID Mechanical (Pellet Mill) at '+TOP10[2].hrs.toFixed(1)+' hrs is the third-highest contributor \u2014 a pellet mill roll replacement should be scheduled in planned downtime immediately. Staggered die-change windows across AC, HOREB, and BUKID could reduce national Change Die DT by an estimated 25\u201335%.');
-   s.addText('VPI Operations  \u00b7  Downtime Contributor Analysis \u2014 '+latestM+' 2026',{x:0.5,y:7.22,w:12.33,h:0.22,fontFace:'Calibri',fontSize:8.5,color:'607D8B',margin:0});}
+   addBox(s,5.55,0.9,'Analysis ('+latestFullM+' 2026):  Top 10 sub-categories totaled '+tot10.toFixed(1)+' hrs. '+TOP10[0].label+' leads at '+TOP10[0].hrs.toFixed(1)+' hrs \u2014 PM is critically overdue. HOREB and ARGAO each appear multiple times, confirming these two sites require intensive reliability improvement programs. BUKID Pellet Mill at '+TOP10[2].hrs.toFixed(1)+' hrs is the third-highest contributor \u2014 schedule roll replacement in planned downtime immediately. Staggered die-change windows across AC, HOREB, BUKID could reduce Change Die DT by 25\u201335%.');
+   s.addText('VPI Operations  \u00b7  Downtime Contributor Analysis \u2014 '+latestFullM+' 2026',{x:0.5,y:7.22,w:12.33,h:0.22,fontFace:'Calibri',fontSize:8.5,color:'607D8B',margin:0});}
 
-  // ── SLIDE 9 — PRIORITIES & ACTION PLAN ─────────────────
+  // SLIDE 9 — PRIORITIES & ACTION PLAN
   {var s=pres.addSlide();
    s.background={color:NAVY};
    s.addShape(pres.ShapeType.rect,{x:0,y:0,w:13.33,h:0.07,fill:{color:SKY},line:{type:'none'}});
@@ -952,19 +965,20 @@ async function buildMonthlyReportPptx(p){
    s.addShape(pres.ShapeType.rect,{x:0.4,y:0.07,w:0.07,h:7.08,fill:{color:BLUE},line:{type:'none'}});
    s.addText('PRIORITIES & ACTION PLAN',{x:0.65,y:0.18,w:11.5,h:0.55,fontFace:'Cambria',fontSize:32,color:WHITE,bold:true,margin:0});
    s.addShape(pres.ShapeType.rect,{x:0.65,y:0.73,w:11.5,h:0.04,fill:{color:SKY},line:{type:'none'}});
-   s.addText('JUNE 2026 FOCUS AREAS  \u00b7  ACCOUNTABILITY & TARGETS',{x:0.65,y:0.8,w:11.5,h:0.28,fontFace:'Calibri',fontSize:12,color:SKY,charSpacing:0.5,margin:0});
+   var nextM=latestM==='JUNE'?'JULY':latestM==='MAY'?'JUNE':'NEXT MONTH';
+   s.addText(nextM+' 2026 FOCUS AREAS  \u00b7  ACCOUNTABILITY & TARGETS',{x:0.65,y:0.8,w:11.5,h:0.28,fontFace:'Calibri',fontSize:12,color:SKY,charSpacing:0.5,margin:0});
    var sumCards=[
-     {l:'YTD OUTPUT',v:fN(Math.round(ytdOut),0)+' MT',sub:'vs plan \u2014 supply confirmed',col:LGRN},
-     {l:'MAY OEE',v:(MAYN.oee||0).toFixed(1)+'%',sub:(MAYN.udt||0).toFixed(0)+' hrs UDT | SDT '+(MAYN.sdt||0).toFixed(0)+' hrs',col:(MAYN.oee||0)>=85?LGRN:AMBER},
-     {l:'COST/TON (MAY)',v:'\u20b1'+fN(Math.round(ct),0),sub:'Total '+fM(tc),col:GOLD},
+     {l:'YTD OUTPUT',v:fN(Math.round(ytdOut),0)+' MT',sub:'Jan\u2013'+latestM.charAt(0)+latestM.slice(1).toLowerCase()+' 2026',col:LGRN},
+     {l:latestM+' OEE',v:(CURR.oee||0).toFixed(1)+'%',sub:(CURR.udt||0).toFixed(0)+' hrs UDT | CapUtil '+(CURR.capUtil||0).toFixed(1)+'%',col:(CURR.oee||0)>=85?LGRN:AMBER},
+     {l:costM+' COST/TON',v:'\u20b1'+fN(Math.round(ct),0),sub:'Total '+fM(tc),col:GOLD},
      {l:'AVG REJECTION',v:avgRej.toFixed(2)+'%',sub:'Within 1% threshold YTD',col:LGRN},
      {l:'AVG POWER',v:avgKwh.toFixed(2)+' kWh/t',sub:'Within 35 kWh/ton limit',col:avgKwh<=35?LGRN:AMBER},
-     {l:'RM VARIANCE',v:(mayRmv>=0?'+':'')+mayRmv.toFixed(2)+'%',sub:'Material yield monitoring active',col:mayRmv>=0?LGRN:AMBER},
+     {l:latestM+' RM VARIANCE',v:(mayRmv>=0?'+':'')+mayRmv.toFixed(2)+'%',sub:'Material yield monitoring',col:mayRmv>=0?LGRN:AMBER},
    ];
    var bw=3.82,bh=1.08,bgap=0.18,bx0=0.62;
    sumCards.forEach(function(c,i){
      var row=Math.floor(i/3),col=i%3;
-     var x=bx0+col*(bw+bgap), y=row===0?1.18:2.38;
+     var x=bx0+col*(bw+bgap),y=row===0?1.18:2.38;
      s.addShape(pres.ShapeType.roundRect,{x:x,y:y,w:bw,h:bh,rectRadius:0.1,fill:{color:'091B30'},line:{pt:1.4,color:c.col}});
      s.addShape(pres.ShapeType.rect,{x:x,y:y,w:bw,h:0.05,fill:{color:c.col},line:{type:'none'}});
      s.addText(c.l,{x:x+0.18,y:y+0.08,w:bw-0.36,h:0.22,fontFace:'Calibri',fontSize:8,color:c.col,bold:true,margin:0});
@@ -972,13 +986,13 @@ async function buildMonthlyReportPptx(p){
      s.addText(c.sub,{x:x+0.18,y:y+0.76,w:bw-0.36,h:0.22,fontFace:'Calibri',fontSize:8,color:'7FA8CC',margin:0});
    });
    s.addShape(pres.ShapeType.rect,{x:0.62,y:3.58,w:12.0,h:0.36,fill:{color:BLUE},line:{type:'none'}});
-   s.addText('\u25b6  PRIORITY ACTION PLAN \u2014 JUNE 2026',{x:0.82,y:3.58,w:11.6,h:0.36,fontFace:'Calibri',fontSize:11,color:WHITE,bold:true,valign:'middle',charSpacing:0.5,margin:0});
+   s.addText('\u25b6  PRIORITY ACTION PLAN \u2014 '+nextM+' 2026',{x:0.82,y:3.58,w:11.6,h:0.36,fontFace:'Calibri',fontSize:11,color:WHITE,bold:true,valign:'middle',charSpacing:0.5,margin:0});
    var priorities=[
-     {txt:'\uD83D\uDD34  MECHANICAL PM ESCALATION: HOREB Bucket Elevator ('+TOP10[0].hrs.toFixed(1)+' hrs) and BUKID Pellet Mill ('+TOP10[2].hrs.toFixed(1)+' hrs) are the top national downtime contributors. Site Managers must complete PM within 2 weeks. Target: ZERO recurrence of same failure mode in June.',col:'7F0000'},
-     {txt:'\uD83D\uDFE0  ARGAO RECOVERY PLAN DUE: Utilization 57.5%, OEE 69.3%, Rejection 1.12%, Cost \u20b12.32/kg. Site Manager to submit formal June recovery plan: schedule ramp-up, die inspection, pellet mill maintenance, Change Over reduction to below 15 hrs. Review at next COMEX.',col:RED},
-     {txt:'\uD83D\uDFE1  DIE LIFECYCLE PROGRAM: Change Die and Change Over account for 55+ hrs of national UDT monthly. Implement a national die lifecycle tracking system \u2014 schedule replacements proactively during planned DT windows. Target: 30% reduction in unplanned die-related downtime by July.',col:AMBER},
-     {txt:'\uD83D\uDFE2  QUALITY GATE MAINTAIN: National rejection rate avg '+avgRej.toFixed(2)+'% within 1% threshold YTD. SOUTH (2.32%) and ARGAO (1.12%) must submit root cause reports and monthly corrective action updates. No relaxation of quality gate despite volume pressure.',col:GREEN},
-     {txt:'\uD83D\uDD35  COST OPTIMIZATION H2 2026: MAY cost of \u20b1'+fN(Math.round(ct),0)+'/ton is the YTD low. Target \u20b11,650/ton for June\u2013August: (1) maintain AC/BUKID output, (2) reduce agency manpower at under-utilized sites, (3) power factor correction at HOREB, (4) diesel audit at BUKID.',col:SKY},
+     {txt:'\uD83D\uDD34  MECHANICAL PM ESCALATION: '+TOP10[0].label+' ('+TOP10[0].hrs.toFixed(1)+' hrs) and '+TOP10[2].label.split('\u2013')[0].trim()+' Pellet Mill ('+TOP10[2].hrs.toFixed(1)+' hrs) are the top national DT contributors from '+latestFullM+'. Site Managers must complete PM before end of '+nextM+'. Target: ZERO recurrence of same failure mode.',col:'7F0000'},
+     {txt:'\uD83D\uDFE0  ARGAO RECOVERY PLAN: Utilization '+(CURR.capUtil||57.5).toFixed(1)+'%, OEE '+(CURR.oee||69.3).toFixed(1)+'%, Rejection '+((rejSites.find(function(r){return r.name==='ARGAO';})||{rej:1.12}).rej).toFixed(2)+'%. Site Manager to submit formal '+nextM+' recovery plan: volume ramp-up, die inspection, PM completion, and Change Over reduction to below 15 hrs.',col:RED},
+     {txt:'\uD83D\uDFE1  DIE LIFECYCLE PROGRAM: Change Die and Change Over account for 55+ hrs of national UDT monthly ('+latestFullM+' data). Implement national die lifecycle tracking \u2014 schedule replacements proactively during planned DT windows. Target: 30% reduction in unplanned die-related downtime by '+nextM+'.',col:AMBER},
+     {txt:'\uD83D\uDFE2  QUALITY GATE MAINTAIN: Avg rejection rate '+avgRej.toFixed(2)+'% within 1% threshold YTD. SOUTH and ARGAO must submit monthly corrective action updates and root cause reports. No relaxation of quality gate despite volume pressure in '+nextM+'.',col:GREEN},
+     {txt:'\uD83D\uDD35  COST OPTIMIZATION: '+costM+' cost \u20b1'+fN(Math.round(ct),0)+'/ton is the YTD low. Target \u20b11,650/ton for '+nextM+'\u2013Aug: (1) grow AC/BUKID output volume, (2) reduce agency manpower at under-utilized sites, (3) power factor correction at HOREB, (4) diesel consumption audit at BUKID.',col:SKY},
    ];
    priorities.forEach(function(pr,i){
      var y=4.02+i*0.61;
