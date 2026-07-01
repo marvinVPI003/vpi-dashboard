@@ -3104,7 +3104,192 @@ function renderForecast(){
   ct.innerHTML = html;
 }
 
-function renderOEE(){var ct=document.getElementById('content-oee');ct.innerHTML='<div class="no-data">OEE tab — coming soon</div>';}
+function renderOEE(){
+  var ct=document.getElementById('content-oee');
+  ct.innerHTML='<div class="no-data">Loading variance data...</div>';
+
+  // Helper to get a field value trying multiple possible column names
+  function gv(r,keys){
+    for(var i=0;i<keys.length;i++){var v=r[keys[i]];if(v!==undefined&&v!==null&&v!=='')return +v||0;}
+    return 0;
+  }
+  function fmt(v,d){d=d===undefined?2:d;if(!v&&v!==0)return '—';return Number(v).toLocaleString('en-PH',{minimumFractionDigits:d,maximumFractionDigits:d});}
+  function fmtPct(v){if(!v&&v!==0)return '—';var p=Math.abs(v)<2?v*100:v;return (p>=0?'+':'')+p.toFixed(2)+'%';}
+  function fmtPhp(v){if(!v&&v!==0)return '—';return '₱'+Number(v).toLocaleString('en-PH',{minimumFractionDigits:0,maximumFractionDigits:0});}
+  function colorPct(v){var p=Math.abs(v)<2?v*100:v;return p<0?'var(--red)':p>0?'var(--green)':'var(--text2)';}
+
+  var TH='padding:5px 8px;background:var(--navy);color:#fff;font-size:9px;font-weight:700;letter-spacing:.5px;text-align:right;border-bottom:1px solid var(--border);white-space:nowrap;';
+  var THl='padding:5px 8px;background:var(--navy);color:#fff;font-size:9px;font-weight:700;letter-spacing:.5px;text-align:left;border-bottom:1px solid var(--border);white-space:nowrap;';
+  var TD='padding:4px 8px;font-size:9px;border-bottom:1px solid var(--border);text-align:right;';
+  var TDl='padding:4px 8px;font-size:9px;border-bottom:1px solid var(--border);text-align:left;font-weight:700;';
+
+  gasGet('variance').then(function(d){
+    DATA.variance = d;
+    var rows = d.rows||[];
+    var months = d.months||[];
+
+    // Filter to active month (if set) or show all
+    var activeMonths = months;
+
+    // Build scorecard data for NATIONAL — latest month
+    var latestM = months.filter(function(m){
+      return rows.some(function(r){return (r.MONTH||r.Month||'').toUpperCase()===m.toUpperCase()&&(r.Plant||'').toUpperCase()==='NATIONAL'&&gv(r,['Total Input, kg','Total Input'])>0;});
+    }).slice(-1)[0]||months[months.length-1]||'';
+
+    var natRow = rows.find(function(r){return (r.Plant||'').toUpperCase()==='NATIONAL'&&(r.MONTH||r.Month||'').toUpperCase()===(latestM||'').toUpperCase();})||{};
+
+    var totalInput   = gv(natRow,['Total Input, kg','Total Input']);
+    var varQty       = gv(natRow,['RM Variance, qty','RM Variance qty','RM Variance, mt']);
+    var varPct       = gv(natRow,['RM Variance, %','RM Variance %']); if(Math.abs(varPct)<2&&varPct!==0)varPct*=100;
+    var varPhp       = gv(natRow,['RM Variance, Php','RM Variance Php','RM Variance, PHP']);
+    var absVarQty    = gv(natRow,['ABS RM Variance, qty','ABS RM Variance qty']);
+    var absVarPct    = gv(natRow,['ABS RM Variance, %','ABS RM Variance %']); if(Math.abs(absVarPct)<2&&absVarPct!==0)absVarPct*=100;
+    var wsQty        = gv(natRow,['RM Variance (w/o used sacks), qty','RM Variance (w/o used sacks) qty']);
+    var wsPct        = gv(natRow,['RM Variance (w/o used sacks), %','RM Variance (w/o used sacks) %']); if(Math.abs(wsPct)<2&&wsPct!==0)wsPct*=100;
+    var wsPhp        = gv(natRow,['RM Variance (w/o used sacks), Php','RM Variance (w/o used sacks) Php','RM Variance (w/o used sacks), PHP']);
+
+    // Scorecards
+    function sc(label,val,col,sub){
+      return '<div style="background:var(--bg1);border:1px solid var(--border);border-top:3px solid '+col+';border-radius:6px;padding:10px 14px;min-width:0">'
+        +'<div style="font-size:9px;font-weight:700;color:var(--text3);letter-spacing:.5px;margin-bottom:4px">'+label+'</div>'
+        +'<div style="font-size:22px;font-weight:700;color:'+col+';font-family:Cambria,serif;line-height:1.1">'+val+'</div>'
+        +(sub?'<div style="font-size:9px;color:var(--text3);margin-top:3px">'+sub+'</div>':'')
+        +'</div>';
+    }
+
+    var pctCol = varPct<0?'var(--red)':'var(--green)';
+    var wsPctCol = wsPct<0?'var(--red)':'var(--green)';
+
+    var scoreCards = '<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:14px">'
+      + sc('TOTAL INPUT (kg)',fmt(totalInput,0),'var(--blue)',latestM+' · NATIONAL')
+      + sc('RM VARIANCE %',(varPct>=0?'+':'')+varPct.toFixed(2)+'%',pctCol,'vs plan · '+latestM)
+      + sc('RM VARIANCE (Php)',fmtPhp(varPhp),pctCol,'Monetary impact · '+latestM)
+      + sc('ABS RM VARIANCE %',absVarPct.toFixed(2)+'%','var(--amber)','Absolute deviation')
+      + sc('RM VAR % (w/o Sacks)',(wsPct>=0?'+':'')+wsPct.toFixed(2)+'%',wsPctCol,'Excl. used sacks · '+latestM)
+      + '</div>';
+
+    // Month filter pills
+    var pills = '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">'
+      + months.map(function(m){
+          var short=m.charAt(0)+m.slice(1,3).toLowerCase();
+          var active=m===latestM;
+          return '<button onclick="filterVarianceMonth(\''+m+'\')" id="vpill-'+m+'" style="padding:3px 10px;border-radius:12px;border:1px solid '+(active?'var(--blue)':'var(--border)')+';background:'+(active?'var(--blue)':'transparent')+';color:'+(active?'#fff':'var(--text2)')+';font-size:9px;cursor:pointer">'+short+'</button>';
+        }).join('')
+      + '<button onclick="filterVarianceMonth(\'ALL\')" id="vpill-ALL" style="padding:3px 10px;border-radius:12px;border:1px solid var(--border);background:transparent;color:var(--text2);font-size:9px;cursor:pointer">ALL</button>'
+      + '</div>';
+
+    // Build table — show latestM or all months
+    function buildTable(filterM){
+      var tableRows = rows.filter(function(r){
+        if(!r.Plant) return false;
+        if(filterM&&filterM!=='ALL') return (r.MONTH||r.Month||'').toUpperCase()===filterM.toUpperCase();
+        return true;
+      });
+
+      // Sort: NATIONAL last, sites alphabetical
+      tableRows.sort(function(a,b){
+        var pa=(a.Plant||'').toUpperCase(), pb=(b.Plant||'').toUpperCase();
+        var ma=(a.MONTH||a.Month||''), mb=(b.MONTH||b.Month||'');
+        if(pa==='NATIONAL'&&pb!=='NATIONAL') return 1;
+        if(pb==='NATIONAL'&&pa!=='NATIONAL') return -1;
+        if(pa!==pb) return pa<pb?-1:1;
+        return months.indexOf(ma)-months.indexOf(mb);
+      });
+
+      var html = '<div style="overflow-x:auto">'
+        +'<table style="width:100%;border-collapse:collapse;font-size:9px">'
+        +'<thead><tr>'
+        +'<th style="'+THl+'">PLANT</th>'
+        +'<th style="'+THl+'">MONTH</th>'
+        +'<th style="'+TH+'">Total Input (kg)</th>'
+        +'<th style="'+TH+'">RM Var Qty</th>'
+        +'<th style="'+TH+'">RM Var %</th>'
+        +'<th style="'+TH+'">RM Var (₱)</th>'
+        +'<th style="'+TH+'">ABS Var Qty</th>'
+        +'<th style="'+TH+'">ABS Var %</th>'
+        +'<th style="'+TH+'">Var w/o Sacks Qty</th>'
+        +'<th style="'+TH+'">Var w/o Sacks %</th>'
+        +'<th style="'+TH+'">Var w/o Sacks (₱)</th>'
+        +'</tr></thead><tbody>';
+
+      tableRows.forEach(function(r,i){
+        var plant=(r.Plant||'').toUpperCase();
+        var month=r.MONTH||r.Month||'';
+        var isNat=plant==='NATIONAL';
+        var bg=isNat?'background:var(--navy);font-weight:700':'background:'+(i%2===0?'var(--bg1)':'var(--bg2)');
+
+        var ti   = gv(r,['Total Input, kg','Total Input']);
+        var vq   = gv(r,['RM Variance, qty','RM Variance qty','RM Variance, mt']);
+        var vp   = gv(r,['RM Variance, %','RM Variance %']); if(Math.abs(vp)<2&&vp!==0)vp*=100;
+        var vph  = gv(r,['RM Variance, Php','RM Variance Php','RM Variance, PHP']);
+        var avq  = gv(r,['ABS RM Variance, qty','ABS RM Variance qty']);
+        var avp  = gv(r,['ABS RM Variance, %','ABS RM Variance %']); if(Math.abs(avp)<2&&avp!==0)avp*=100;
+        var wsq  = gv(r,['RM Variance (w/o used sacks), qty','RM Variance (w/o used sacks) qty']);
+        var wspc = gv(r,['RM Variance (w/o used sacks), %','RM Variance (w/o used sacks) %']); if(Math.abs(wspc)<2&&wspc!==0)wspc*=100;
+        var wsph = gv(r,['RM Variance (w/o used sacks), Php','RM Variance (w/o used sacks) Php','RM Variance (w/o used sacks), PHP']);
+
+        var vpc=colorPct(vp), wspc2=colorPct(wspc);
+
+        html+='<tr style="'+bg+'">'
+          +'<td style="'+TDl+(isNat?'color:var(--sky)':'')+'">'+(isNat?'🌐 ':'')+plant+'</td>'
+          +'<td style="'+TDl+'color:var(--text2)">'+month+'</td>'
+          +'<td style="'+TD+'">'+fmt(ti,0)+'</td>'
+          +'<td style="'+TD+'">'+fmt(vq,2)+'</td>'
+          +'<td style="'+TD+'color:'+vpc+';font-weight:700">'+(vp!==0?(vp>=0?'+':'')+vp.toFixed(2)+'%':'—')+'</td>'
+          +'<td style="'+TD+'color:'+vpc+'">'+(vph?fmtPhp(vph):'—')+'</td>'
+          +'<td style="'+TD+'">'+fmt(avq,2)+'</td>'
+          +'<td style="'+TD+'color:var(--amber);font-weight:700">'+(avp!==0?avp.toFixed(2)+'%':'—')+'</td>'
+          +'<td style="'+TD+'">'+fmt(wsq,2)+'</td>'
+          +'<td style="'+TD+'color:'+wspc2+';font-weight:700">'+(wspc!==0?(wspc>=0?'+':'')+wspc.toFixed(2)+'%':'—')+'</td>'
+          +'<td style="'+TD+'color:'+wspc2+'">'+(wsph?fmtPhp(wsph):'—')+'</td>'
+          +'</tr>';
+      });
+
+      html+='</tbody></table></div>';
+      return html;
+    }
+
+    // Store rows for filter function
+    window._varianceData = {rows:rows, months:months};
+
+    var html='<div style="padding:12px">'
+      +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">'
+      +'<div><div style="font-size:18px;font-weight:700;color:var(--text1)">RM VARIANCE ANALYSIS</div>'
+      +'<div style="font-size:10px;color:var(--text3);margin-top:2px">Source: MR Monthly · Columns AQ, CQ–CZ</div></div>'
+      +'<div style="font-size:10px;color:var(--sky);font-weight:700">'+latestM+' 2026 · NATIONAL</div>'
+      +'</div>'
+      + scoreCards
+      + pills
+      +'<div id="variance-table-wrap">'
+      + buildTable(latestM)
+      +'</div></div>';
+
+    ct.innerHTML = html;
+
+    // Attach filter function
+    window.filterVarianceMonth = function(m){
+      // Update active pill
+      document.querySelectorAll('[id^="vpill-"]').forEach(function(b){
+        var active=(b.id==='vpill-'+m);
+        b.style.background=active?'var(--blue)':'transparent';
+        b.style.borderColor=active?'var(--blue)':'var(--border)';
+        b.style.color=active?'#fff':'var(--text2)';
+      });
+      var vd=window._varianceData;
+      if(!vd)return;
+      document.getElementById('variance-table-wrap').innerHTML=buildTable(m);
+    };
+
+  }).catch(function(e){
+    // Fallback: try to read from cached monthly data with limited variance fields
+    ct.innerHTML='<div style="padding:20px">'
+      +'<div style="color:var(--red);font-weight:700;margin-bottom:8px">⚠ Could not load variance tab from GAS: '+e.message+'</div>'
+      +'<div style="color:var(--text3);font-size:11px">The GAS script needs to be updated and redeployed with the getVariance() function.<br>'
+      +'Once deployed, click "Refresh" to reload this tab.</div>'
+      +'<button onclick="renderOEE()" style="margin-top:12px;padding:6px 14px;border:1px solid var(--blue);border-radius:4px;background:transparent;color:var(--blue);cursor:pointer;font-size:11px">↻ Retry</button>'
+      +'</div>';
+  });
+}
 function renderCostAnalytics(){var ct=document.getElementById('content-cost_analytics');ct.innerHTML='<div class="no-data">Cost Analytics tab</div>';}
 function renderQualityEnergy(){var ct=document.getElementById('content-quality_energy');ct.innerHTML='<div class="no-data">Quality & Energy tab</div>';}
 
