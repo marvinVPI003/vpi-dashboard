@@ -1878,6 +1878,8 @@ function renderDowntime(){
   var dtWrap=document.getElementById('dt-data-wrap');
 
   // ── STEP 1: Scorecard from MR Monthly ────────────────────
+  // Always re-fetch monthly to get latest % computed values
+  DATA.monthly=null;
   if(!DATA.monthly){
     ct.innerHTML='<div class="no-data">⟳ Loading...</div>';
     gasGet('monthly').then(function(d){DATA.monthly=d;renderDowntime();})
