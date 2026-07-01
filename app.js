@@ -1878,8 +1878,6 @@ function renderDowntime(){
   var dtWrap=document.getElementById('dt-data-wrap');
 
   // ── STEP 1: Scorecard from MR Monthly ────────────────────
-  // Always re-fetch monthly to get latest % computed values
-  DATA.monthly=null;
   if(!DATA.monthly){
     ct.innerHTML='<div class="no-data">⟳ Loading...</div>';
     gasGet('monthly').then(function(d){DATA.monthly=d;renderDowntime();})
@@ -1906,28 +1904,6 @@ function renderDowntime(){
   var dr=activeSite==='NATIONAL'
     ?mr.filter(function(r){return (r.Plant||'').toUpperCase()==='NATIONAL';})
     :mr.filter(function(r){return (r.Plant||'').toUpperCase()===activeSite;});
-
-  // Compute % from hr values if missing
-  dr.forEach(function(r){
-    var wh=+(r['Working Hours']||r['Working Hrs']||0);
-    var cal=+(r['CALENDAR DA']||r['Calendar Days']||0);
-    if(!wh&&cal) wh=cal*24;
-    if(!wh) wh=720;
-    [['Mechanical','Mechanical, hr'],['Change Over Downtime','Change Over Downtime, hr'],
-     ['Change Over','Change Over, hr'],['Warehouse','Warehouse, hr'],
-     ['Process','Process, hr'],['Electrical','Electrical, hr'],
-     ['Change Die','Change Die, hr'],['Change Screen','Change Screen, hr'],
-     ['Raw Materials','Raw Materials, hr'],['Equipment Downtime','Equipment Downtime, hr'],
-     ['Equipment Down Time','Equipment Down Time, hr'],
-     ['Power Failure','Power Failure, hr'],['PLC','PLC, hr']
-    ].forEach(function(pair){
-      var pk=pair[0]+', %',hk=pair[1];
-      if((!r[pk]||r[pk]===0)&&r[hk]&&wh>0) r[pk]=+(r[hk]/wh*100).toFixed(3);
-    });
-    var udt=+(r['Unscheduled Down Time, hr']||0);
-    if((!r['Unscheduled Down Time, %']||r['Unscheduled Down Time, %']===0)&&udt&&wh>0)
-      r['Unscheduled Down Time, %']=+(udt/wh*100).toFixed(3);
-  });
 
   function sh(f1,f2){return dr.reduce(function(a,r){return a+gf(r,f1,f2||f1);},0);}
   function ap(f1){var v=dr.reduce(function(a,r){return a+gf(r,f1);},0)/Math.max(dr.length,1);return v>1?v:v*100;}
