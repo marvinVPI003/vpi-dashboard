@@ -2871,10 +2871,15 @@ function renderCostAnalytics(){
   function fC(v){if(v===null||v===undefined)return '\u2014';return '\u20b1'+fN(v,2);}
 
   gasGet('mcos_daily',{site:'',week:''}).then(function(d){
+    // If GAS not redeployed, it returns tab:'weekly' not 'mcos_daily'
+    if(!d||d.tab!=='mcos_daily'){
+      ct.innerHTML='<div class="no-data" style="color:var(--amber)">⚠ GAS not yet deployed with getMCOSDaily(). In GAS: Save → Deploy → <b>New version</b> → Deploy. Then refresh.</div>';
+      return;
+    }
     var rows=d.rows||[];
     var weeks=d.weeks||[];
     var months=d.months||[];
-    if(!rows.length){ct.innerHTML='<div class="no-data">No MCOS daily data \u2014 redeploy GAS with getMCOSDaily()</div>';return;}
+    if(!rows.length){ct.innerHTML='<div class="no-data">No MCOS daily data in sheet</div>';return;}
 
     // State
     var activeView='weekly'; // 'weekly' or 'monthly'
