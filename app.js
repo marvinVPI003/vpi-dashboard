@@ -2642,9 +2642,9 @@ function renderOEE(){
   var SORD=['AC','PFMIS','HOREB','BUKID','ARGAO','CCPC','SOUTH','NATIONAL'];
   function nv(v){if(v===null||v===undefined||v==='')return null;var n=parseFloat(String(v).replace(/,/g,'').replace(/%/g,'').trim());return isNaN(n)?null:n;}
   function fN(v,d){if(v===null||v===undefined)return '\u2014';d=d===undefined?2:d;return Number(v).toLocaleString('en-PH',{minimumFractionDigits:d,maximumFractionDigits:d});}
-  function fPct(v){if(v===null||v===undefined)return '\u2014';return (v>=0?'+':'')+v.toFixed(2)+'%';}
+  function fPct(v){if(v===null||v===undefined)return '\u2014';var p=Math.abs(v)<1?v*100:v;return (p>=0?'+':'')+p.toFixed(2)+'%';}
   function fPHP(v){if(v===null||v===undefined)return '\u2014';return '\u20b1'+Number(v).toLocaleString('en-PH',{minimumFractionDigits:0,maximumFractionDigits:0});}
-  function pc(v){if(v===null||v===undefined)return 'var(--text2)';return v<0?'var(--red)':'var(--green)';}
+  function pc(v){if(v===null||v===undefined)return 'var(--text2)';var p=Math.abs(v)<1?v*100:v;return p<0?'var(--red)':'var(--green)';}
   gasGet('variance',{site:'',week:''}).then(function(d){
     var rows=d.rows||[];
     var months=d.months||[];
@@ -2667,7 +2667,7 @@ function renderOEE(){
         +sc('TOTAL INPUT (mt)',fN(nv(r['Total Plant Input, mt']),1),'','var(--blue)')
         +sc('RM VARIANCE %',fPct(vp),fN(nv(r['RM Variance, Qty']),2)+' mt',pc(vp))
         +sc('RM VARIANCE (\u20b1)',fPHP(nv(r['RM Variance, Php'])),'monetary impact',pc(vp))
-        +sc('ABS VARIANCE %',(ap!==null?Math.abs(ap).toFixed(2)+'%':'\u2014'),fN(nv(r['ABS RM Variance, Qty']),2)+' mt','var(--amber)')
+        +sc('ABS VARIANCE %',(ap!==null?(Math.abs(ap)<1?ap*100:ap).toFixed(2)+'%':'\u2014'),fN(nv(r['ABS RM Variance, Qty']),2)+' mt','var(--amber)')
         +sc('VAR % w/o SACKS',fPct(wp),fPHP(nv(r['RM Variance (w/o used sacks), Php'])),pc(wp))
         +'</div>';
     }
@@ -2718,7 +2718,7 @@ function renderOEE(){
           +'<td style="'+TD+';font-weight:700;color:'+pc(vp)+'">'+fPct(vp)+'</td>'
           +'<td style="'+TD+';color:'+pc(vp)+'">'+fPHP(nv(r['RM Variance, Php']))+'</td>'
           +'<td style="'+TD+'">'+fN(nv(r['ABS RM Variance, Qty']),2)+'</td>'
-          +'<td style="'+TD+';color:var(--amber);font-weight:700">'+(ap!==null?Math.abs(ap).toFixed(2)+'%':'\u2014')+'</td>'
+          +'<td style="'+TD+';color:var(--amber);font-weight:700">'+(ap!==null?(Math.abs(ap)<1?ap*100:ap).toFixed(2)+'%':'\u2014')+'</td>'
           +'<td style="'+TD+'">'+fN(nv(r['RM Variance (w/o used sacks), Qty']),2)+'</td>'
           +'<td style="'+TD+';font-weight:700;color:'+pc(wp)+'">'+fPct(wp)+'</td>'
           +'<td style="'+TD+';color:'+pc(wp)+'">'+fPHP(nv(r['RM Variance (w/o used sacks), Php']))+'</td>'
