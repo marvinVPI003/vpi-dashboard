@@ -2635,7 +2635,122 @@ function renderForecast(){
   ct.innerHTML = html;
 }
 
-function renderOEE(){var ct=document.getElementById('content-oee');ct.innerHTML='<div class="no-data">OEE tab — coming soon</div>';}
+function renderOEE(){
+  var ct=document.getElementById('content-oee');
+  ct.innerHTML='<div class="no-data">⟳ Loading...</div>';
+  var MORD=['JANUARY','FEBRUARY','MARCH','APRIL','MAY','JUNE','JULY','AUGUST','SEPTEMBER','OCTOBER','NOVEMBER','DECEMBER'];
+  var SORD=['AC','PFMIS','HOREB','BUKID','ARGAO','CCPC','SOUTH','NATIONAL'];
+  function nv(v){if(v===null||v===undefined||v==='')return null;var n=parseFloat(String(v).replace(/,/g,'').replace(/%/g,'').trim());return isNaN(n)?null:n;}
+  function fN(v,d){if(v===null||v===undefined)return '\u2014';d=d===undefined?2:d;return Number(v).toLocaleString('en-PH',{minimumFractionDigits:d,maximumFractionDigits:d});}
+  function fPct(v){if(v===null||v===undefined)return '\u2014';return (v>=0?'+':'')+v.toFixed(2)+'%';}
+  function fPHP(v){if(v===null||v===undefined)return '\u2014';return '\u20b1'+Number(v).toLocaleString('en-PH',{minimumFractionDigits:0,maximumFractionDigits:0});}
+  function pc(v){if(v===null||v===undefined)return 'var(--text2)';return v<0?'var(--red)':'var(--green)';}
+  gasGet('variance',{site:'',week:''}).then(function(d){
+    var rows=d.rows||[];
+    var months=d.months||[];
+    if(!rows.length){ct.innerHTML='<div class="no-data">No variance data — redeploy GAS with getVariance()</div>';return;}
+    var activeM=months[months.length-1]||'';
+    var activeS='NATIONAL';
+    var sites=[];
+    SORD.forEach(function(s){if(rows.some(function(r){return (r.Plant||'').toUpperCase()===s;}))sites.push(s);});
+    function getRow(s,m){return rows.find(function(r){return (r.Plant||'').toUpperCase()===s.toUpperCase()&&String(r.MONTH||'').trim().toUpperCase()===m.toUpperCase();})||null;}
+    function sc(lbl,val,sub,col){
+      return '<div style="background:var(--bg1);border:1px solid var(--border);border-top:3px solid '+col+';border-radius:6px;padding:10px 12px;min-width:0">'
+        +'<div style="font-size:8px;font-weight:700;color:var(--text3);letter-spacing:.5px;margin-bottom:4px">'+lbl+'</div>'
+        +'<div style="font-size:18px;font-weight:700;color:'+col+';font-family:Cambria,serif">'+val+'</div>'
+        +(sub?'<div style="font-size:8px;color:var(--text3);margin-top:2px">'+sub+'</div>':'')+'</div>';
+    }
+    function buildSC(r){
+      if(!r)return '<div style="color:var(--text3);font-size:10px;padding:8px">No data</div>';
+      var vp=nv(r['RM Variance, %']),wp=nv(r['RM Variance (w/o used sacks), %']),ap=nv(r['ABS RM Variance, %']);
+      return '<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px">'
+        +sc('TOTAL INPUT (mt)',fN(nv(r['Total Plant Input, mt']),1),'','var(--blue)')
+        +sc('RM VARIANCE %',fPct(vp),fN(nv(r['RM Variance, Qty']),2)+' mt',pc(vp))
+        +sc('RM VARIANCE (\u20b1)',fPHP(nv(r['RM Variance, Php'])),'monetary impact',pc(vp))
+        +sc('ABS VARIANCE %',(ap!==null?Math.abs(ap).toFixed(2)+'%':'\u2014'),fN(nv(r['ABS RM Variance, Qty']),2)+' mt','var(--amber)')
+        +sc('VAR % w/o SACKS',fPct(wp),fPHP(nv(r['RM Variance (w/o used sacks), Php'])),pc(wp))
+        +'</div>';
+    }
+    function pill(id,label,active,onclick){
+      return '<button id="'+id+'" onclick="'+onclick+'" style="padding:3px 11px;border-radius:12px;border:1px solid '+(active?'var(--blue)':'var(--border)')+';background:'+(active?'var(--blue)':'transparent')+';color:'+(active?'#fff':'var(--text2)')+';font-size:9px;cursor:pointer;font-weight:'+(active?700:400)+'">'+label+'</button>';
+    }
+    function buildSitePills(){
+      return sites.map(function(s){return pill('vs-'+s,s,s===activeS,"window._vs('"+s+"')");}).join(' ');
+    }
+    function buildMonthPills(){
+      var p=months.map(function(m){var sh=m.charAt(0)+m.slice(1,3).toLowerCase();return pill('vm-'+m,sh,m===activeM,"window._vm('"+m+"')");}).join(' ');
+      p+=' '+pill('vm-ALL','ALL',activeM==='ALL',"window._vm('ALL')");
+      return p;
+    }
+    var TH='padding:5px 8px;background:var(--navy);color:#fff;font-size:8.5px;font-weight:700;text-align:right;border-bottom:2px solid var(--border);white-space:nowrap;';
+    var THl=TH+'text-align:left;';
+    var TD='padding:4px 8px;font-size:8.5px;border-bottom:1px solid var(--border);text-align:right;white-space:nowrap;';
+    var TDl=TD+'text-align:left;font-weight:700;';
+    function buildTable(fm){
+      var flt=rows.filter(function(r){
+        if(!r.Plant)return false;
+        if(fm&&fm!=='ALL')return String(r.MONTH||'').trim().toUpperCase()===fm.toUpperCase();
+        return true;
+      });
+      flt.sort(function(a,b){
+        var ma=MORD.indexOf(String(a.MONTH||'').trim().toUpperCase()),mb=MORD.indexOf(String(b.MONTH||'').trim().toUpperCase());
+        if(ma!==mb)return ma-mb;
+        var ia=SORD.indexOf((a.Plant||'').toUpperCase()),ib=SORD.indexOf((b.Plant||'').toUpperCase());
+        return (ia<0?99:ia)-(ib<0?99:ib);
+      });
+      if(!flt.length)return '<div style="color:var(--text3);padding:20px;text-align:center">No data for selected month</div>';
+      var h='<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse"><thead><tr>'
+        +'<th style="'+THl+'">PLANT</th><th style="'+THl+'">MONTH</th>'
+        +'<th style="'+TH+'">Total Input (mt)</th>'
+        +'<th style="'+TH+'">RM Var Qty</th><th style="'+TH+'">RM Var %</th><th style="'+TH+'">RM Var (\u20b1)</th>'
+        +'<th style="'+TH+'">ABS Qty</th><th style="'+TH+'">ABS %</th>'
+        +'<th style="'+TH+'">w/o Sacks Qty</th><th style="'+TH+'">w/o Sacks %</th><th style="'+TH+'">w/o Sacks (\u20b1)</th>'
+        +'</tr></thead><tbody>';
+      flt.forEach(function(r,i){
+        var pl=(r.Plant||'').toUpperCase(),isN=pl==='NATIONAL';
+        var bg=isN?'var(--navy)':(i%2===0?'var(--bg1)':'var(--bg2)');
+        var vp=nv(r['RM Variance, %']),wp=nv(r['RM Variance (w/o used sacks), %']),ap=nv(r['ABS RM Variance, %']);
+        h+='<tr style="background:'+bg+'">'
+          +'<td style="'+TDl+'color:'+(isN?'var(--sky)':'var(--blue)')+'">'+pl+'</td>'
+          +'<td style="'+TDl+'color:var(--text2)">'+String(r.MONTH||'')+'</td>'
+          +'<td style="'+TD+'">'+fN(nv(r['Total Plant Input, mt']),1)+'</td>'
+          +'<td style="'+TD+'">'+fN(nv(r['RM Variance, Qty']),2)+'</td>'
+          +'<td style="'+TD+';font-weight:700;color:'+pc(vp)+'">'+fPct(vp)+'</td>'
+          +'<td style="'+TD+';color:'+pc(vp)+'">'+fPHP(nv(r['RM Variance, Php']))+'</td>'
+          +'<td style="'+TD+'">'+fN(nv(r['ABS RM Variance, Qty']),2)+'</td>'
+          +'<td style="'+TD+';color:var(--amber);font-weight:700">'+(ap!==null?Math.abs(ap).toFixed(2)+'%':'\u2014')+'</td>'
+          +'<td style="'+TD+'">'+fN(nv(r['RM Variance (w/o used sacks), Qty']),2)+'</td>'
+          +'<td style="'+TD+';font-weight:700;color:'+pc(wp)+'">'+fPct(wp)+'</td>'
+          +'<td style="'+TD+';color:'+pc(wp)+'">'+fPHP(nv(r['RM Variance (w/o used sacks), Php']))+'</td>'
+          +'</tr>';
+      });
+      return h+'</tbody></table></div>';
+    }
+    function updatePills(){
+      sites.forEach(function(s){var b=document.getElementById('vs-'+s);if(!b)return;var a=s===activeS;b.style.background=a?'var(--blue)':'transparent';b.style.borderColor=a?'var(--blue)':'var(--border)';b.style.color=a?'#fff':'var(--text2)';b.style.fontWeight=a?700:400;});
+      months.forEach(function(m){var b=document.getElementById('vm-'+m);if(!b)return;var a=m===activeM;b.style.background=a?'var(--blue)':'transparent';b.style.borderColor=a?'var(--blue)':'var(--border)';b.style.color=a?'#fff':'var(--text2)';b.style.fontWeight=a?700:400;});
+      var ba=document.getElementById('vm-ALL');if(ba){var a=activeM==='ALL';ba.style.background=a?'var(--blue)':'transparent';ba.style.borderColor=a?'var(--blue)':'var(--border)';ba.style.color=a?'#fff':'var(--text2)';}
+    }
+    function refresh(){
+      var m=activeM==='ALL'?months[months.length-1]:activeM;
+      document.getElementById('oee-sc').innerHTML=buildSC(getRow(activeS,m));
+      document.getElementById('oee-tbl').innerHTML=buildTable(activeM);
+      updatePills();
+    }
+    window._vs=function(s){activeS=s;refresh();};
+    window._vm=function(m){activeM=m;refresh();};
+    ct.innerHTML='<div style="padding:12px">'
+      +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">'
+      +'<div style="font-size:18px;font-weight:700;color:var(--text1)">RM VARIANCE ANALYSIS</div>'
+      +'<div style="font-size:10px;color:var(--sky);font-weight:700">'+activeM+' 2026 \u00b7 '+activeS+'</div>'
+      +'</div>'
+      +'<div style="margin-bottom:8px"><span style="font-size:9px;color:var(--text3);font-weight:700;letter-spacing:.5px;margin-right:8px">SITE</span>'+buildSitePills()+'</div>'
+      +'<div id="oee-sc" style="margin-bottom:12px">'+buildSC(getRow(activeS,activeM))+'</div>'
+      +'<div style="margin-bottom:8px"><span style="font-size:9px;color:var(--text3);font-weight:700;letter-spacing:.5px;margin-right:8px">MONTH</span>'+buildMonthPills()+'</div>'
+      +'<div id="oee-tbl">'+buildTable(activeM)+'</div>'
+      +'</div>';
+  }).catch(function(e){ct.innerHTML='<div class="no-data" style="color:var(--red)">Error: '+e.message+'</div>';});
+}
 function renderCostAnalytics(){var ct=document.getElementById('content-cost_analytics');ct.innerHTML='<div class="no-data">Cost Analytics tab</div>';}
 function renderQualityEnergy(){var ct=document.getElementById('content-quality_energy');ct.innerHTML='<div class="no-data">Quality & Energy tab</div>';}
 
