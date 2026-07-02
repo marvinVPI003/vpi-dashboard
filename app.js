@@ -2756,7 +2756,80 @@ function renderOEE(){
       var m=activeM==='ALL'?months[months.length-1]:activeM;
       document.getElementById('oee-sc').innerHTML=buildSC(getRow(activeS,m));
       document.getElementById('oee-tbl').innerHTML=buildTable(activeM);
+      var och=document.getElementById('oee-ch');if(och)och.innerHTML=buildCharts(activeM);
+      var oan=document.getElementById('oee-an');if(oan)oan.innerHTML=buildAnalysis(activeM);
+      setTimeout(initVarCharts,100);
       updatePills();
+    }
+function buildCharts(fm){
+      var m=fm==='ALL'?months[months.length-1]:fm;
+      var cS=sites.filter(function(s){return s!=='NATIONAL';});
+      var sQ=[],sP=[],vQ=[],vP=[];
+      cS.forEach(function(s){
+        var r=getRow(s,m)||{};
+        var sh=nv(r['Total Shrinkage, mt'])||0;
+        var gl=nv(r['Process Gain-Loss, %'])||0;var gld=+(Math.abs(gl)<1?gl*100:gl).toFixed(3);
+        var vq=nv(r['RM Variance, Qty'])||0;
+        var vp=nv(r['RM Variance, %'])||0;var vpd=+(Math.abs(vp)<1?vp*100:vp).toFixed(3);
+        sQ.push(sh);sP.push(gld);vQ.push(vq);vP.push(vpd);
+      });
+      window._vchD={labels:cS,sQ:sQ,sP:sP,vQ:vQ,vP:vP};
+      return '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:20px">'
+        +'<div style="background:var(--bg1);border:1px solid var(--border);border-radius:8px;padding:12px">'
+        +'<div style="font-size:11px;font-weight:700;color:var(--text1);margin-bottom:8px">SHRINKAGE \u2014 Qty (bars) \u00b7 Process G/L% (line) \u00b7 '+m+'</div>'
+        +'<canvas id="vch-sh" style="max-height:200px"></canvas></div>'
+        +'<div style="background:var(--bg1);border:1px solid var(--border);border-radius:8px;padding:12px">'
+        +'<div style="font-size:11px;font-weight:700;color:var(--text1);margin-bottom:8px">RM VARIANCE \u2014 Qty (bars) \u00b7 Variance% (line) \u00b7 '+m+'</div>'
+        +'<canvas id="vch-vr" style="max-height:200px"></canvas></div></div>';
+    }
+    function initVarCharts(){
+      var d=window._vchD;if(!d)return;
+      if(window._vc1){try{window._vc1.destroy();}catch(ex){}}
+      if(window._vc2){try{window._vc2.destroy();}catch(ex){}}
+      var gc='rgba(255,255,255,0.06)',ta={grid:{color:gc},ticks:{color:'#5a6270',font:{size:9}}};
+      var c1=document.getElementById('vch-sh');
+      if(c1)window._vc1=new Chart(c1.getContext('2d'),{type:'bar',data:{labels:d.labels,datasets:[
+        {label:'Shrinkage mt',data:d.sQ,backgroundColor:d.sQ.map(function(v){return v<0?'rgba(183,28,28,0.7)':'rgba(27,94,32,0.7)';}),yAxisID:'y'},
+        {label:'Process G/L %',data:d.sP,type:'line',borderColor:'#F4A300',pointBackgroundColor:'#F4A300',borderWidth:2,pointRadius:4,fill:false,yAxisID:'y1'}
+      ]},options:{responsive:true,plugins:{legend:{labels:{color:'#888',font:{size:9}}}},scales:{x:ta,y:Object.assign({},ta,{title:{display:true,text:'mt',color:'#888',font:{size:8}}}),y1:{position:'right',ticks:{color:'#F4A300',font:{size:9}},grid:{drawOnChartArea:false},title:{display:true,text:'%',color:'#F4A300',font:{size:8}}}}}});
+      var c2=document.getElementById('vch-vr');
+      if(c2)window._vc2=new Chart(c2.getContext('2d'),{type:'bar',data:{labels:d.labels,datasets:[
+        {label:'RM Var qty',data:d.vQ,backgroundColor:d.vQ.map(function(v){return v<0?'rgba(183,28,28,0.7)':'rgba(27,94,32,0.7)';}),yAxisID:'y'},
+        {label:'RM Var %',data:d.vP,type:'line',borderColor:'#2979C8',pointBackgroundColor:'#2979C8',borderWidth:2,pointRadius:4,fill:false,yAxisID:'y1'}
+      ]},options:{responsive:true,plugins:{legend:{labels:{color:'#888',font:{size:9}}}},scales:{x:ta,y:Object.assign({},ta,{title:{display:true,text:'mt',color:'#888',font:{size:8}}}),y1:{position:'right',ticks:{color:'#2979C8',font:{size:9}},grid:{drawOnChartArea:false},title:{display:true,text:'%',color:'#2979C8',font:{size:8}}}}}});
+    }
+    function buildAnalysis(fm){
+      var m=fm==='ALL'?months[months.length-1]:fm;
+      var nat=getRow('NATIONAL',m)||{};
+      var sh=nv(nat['Total Shrinkage, mt'])||0;
+      var ti=nv(nat['Total Plant Input, mt'])||1;
+      var vq=nv(nat['RM Variance, Qty'])||0;
+      var vp=nv(nat['RM Variance, %'])||0;var vpd=Math.abs(vp)<1?vp*100:vp;
+      var wp=nv(nat['RM Variance (w/o used sacks), %'])||0;var wpd=Math.abs(wp)<1?wp*100:wp;
+      var tml=sh+vq;var tmlp=tml/ti*100;
+      var verdict=tmlp<-1.5?'\uD83D\uDD34 CRITICAL \u2014 Total material loss exceeds 1.5% of input. Multi-site investigation required.':
+                  tmlp<-0.5?'\uD83D\uDFE0 ELEVATED \u2014 Material loss above threshold. Action plan required from Site Managers.':
+                  tmlp<0?'\uD83D\uDFE1 MONITOR \u2014 Negative variance within tolerable range. Continue monitoring.':
+                  '\uD83D\uDFE2 FAVORABLE \u2014 Positive or neutral variance. Maintain current controls.';
+      var ins=[];
+      if(Math.abs(sh)>30) ins.push('National shrinkage of '+fN(sh,2)+' mt in '+m+' is significant \u2014 review storage handling, moisture loss, and physical inventory accuracy.');
+      if(vpd<-1) ins.push('RM Variance of '+vpd.toFixed(2)+'% is below the \u22121% alert level \u2014 investigate incoming RM quality, formulation adherence, and SAP posting accuracy.');
+      else if(vpd<0) ins.push('RM Variance of '+vpd.toFixed(2)+'% is within range but negative \u2014 monitor to prevent breach of the \u22121% threshold.');
+      if(wpd<vpd-0.3) ins.push('Gap between gross variance ('+vpd.toFixed(2)+'%) and w/o sacks ('+wpd.toFixed(2)+'%) \u2014 used sack postings need standardization across sites.');
+      if(Math.abs(tmlp)>1) ins.push('Total material loss of '+tmlp.toFixed(2)+'% of input is a meaningful yield gap vs. standard.');
+      if(!ins.length) ins.push('All material loss indicators are within acceptable parameters for '+m+'. No escalation required.');
+      var acts=['Verify SAP RM issuance vs. physical consumption logs for sites with variance > \u22120.5%.',
+        'Conduct surprise physical inventory at top-variance sites to confirm book vs. actual stock.',
+        'Review batching and mixing accuracy \u2014 process gain/loss deviations often indicate weighing errors.',
+        'Standardize used sack weighing and posting across all sites for consistent variance reporting.',
+        'Cross-reference RM variance with rejection data \u2014 high rejection amplifies material loss figures.'];
+      return '<div style="background:var(--bg1);border:1px solid var(--border);border-radius:8px;padding:16px;margin-top:16px">'
+        +'<div style="font-size:12px;font-weight:700;color:var(--text1);margin-bottom:10px">ANALYSIS & RECOMMENDATIONS \u2014 NATIONAL \u00b7 '+m+'</div>'
+        +'<div style="background:var(--bg2);border-radius:6px;padding:10px 14px;margin-bottom:12px;font-size:11px;font-weight:700;color:var(--text1)">'+verdict+'</div>'
+        +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">'
+        +'<div><div style="font-size:9px;font-weight:700;color:var(--sky);margin-bottom:6px;letter-spacing:.5px">KEY INSIGHTS</div><ul style="margin:0;padding-left:16px">'+ins.map(function(i){return '<li style="font-size:10px;color:var(--text2);margin-bottom:5px;line-height:1.5">'+i+'</li>';}).join('')+'</ul></div>'
+        +'<div><div style="font-size:9px;font-weight:700;color:var(--sky);margin-bottom:6px;letter-spacing:.5px">RECOMMENDED ACTIONS</div><ol style="margin:0;padding-left:16px">'+acts.map(function(a){return '<li style="font-size:10px;color:var(--text2);margin-bottom:5px;line-height:1.5">'+a+'</li>';}).join('')+'</ol></div>'
+        +'</div></div>';
     }
     window._vs=function(s){activeS=s;refresh();};
     window._vm=function(m){activeM=m;refresh();};
@@ -2769,7 +2842,10 @@ function renderOEE(){
       +'<div id="oee-sc" style="margin-bottom:12px">'+buildSC(getRow(activeS,activeM))+'</div>'
       +'<div style="margin-bottom:8px"><span style="font-size:9px;color:var(--text3);font-weight:700;letter-spacing:.5px;margin-right:8px">MONTH</span>'+buildMonthPills()+'</div>'
       +'<div id="oee-tbl">'+buildTable(activeM)+'</div>'
+      +'<div id="oee-ch">'+buildCharts(activeM)+'</div>'
+      +'<div id="oee-an">'+buildAnalysis(activeM)+'</div>'
       +'</div>';
+    setTimeout(initVarCharts,100);
   }).catch(function(e){ct.innerHTML='<div class="no-data" style="color:var(--red)">Error: '+e.message+'</div>';});
 }
 function renderCostAnalytics(){var ct=document.getElementById('content-cost_analytics');ct.innerHTML='<div class="no-data">Cost Analytics tab</div>';}
