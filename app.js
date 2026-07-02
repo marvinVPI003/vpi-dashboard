@@ -2879,7 +2879,7 @@ function renderCostAnalytics(){
     var rows=d.rows||[];
     var weeks=d.weeks||[];
     var months=d.months||[];
-    if(!rows.length){ct.innerHTML='<div class="no-data">No MCOS daily data in sheet</div>';return;}
+    if(!rows.length){ct.innerHTML='<div class="no-data">No data in sheet "'+( d.sheetName||'MCOS daily')+'" (totalRows='+( d.totalRows||0)+')<br>Check: sheet tab named exactly "MCOS daily" \u00b7 data starts row 2 \u00b7 Plant in col B</div>';return;}
 
     // State
     var activeView='weekly'; // 'weekly' or 'monthly'
