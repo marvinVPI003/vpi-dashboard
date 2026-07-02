@@ -2855,7 +2855,238 @@ function buildCharts(fm){
     setTimeout(initVarCharts,100);
   }).catch(function(e){ct.innerHTML='<div class="no-data" style="color:var(--red)">Error: '+e.message+'</div>';});
 }
-function renderCostAnalytics(){var ct=document.getElementById('content-cost_analytics');ct.innerHTML='<div class="no-data">Cost Analytics tab</div>';}
+function renderCostAnalytics(){
+  var ct=document.getElementById('content-cost_analytics');
+  ct.innerHTML='<div class="no-data">⟳ Loading cost analytics...</div>';
+
+  var FORMS=['Mini Pellet','Micro Pellet','Pellet','Crumble','Mash'];
+  var FKEYS=['Mini Pellet Mfg Cost per MT','Micro Pellet Mfg Cost per MT','Pellet Mfg Cost per MT','Crumble Mfg Cost per MT','Mash Mfg Cost per MT'];
+  var FSHORT=['Mini Pellet','Micro Pellet','Pellet','Crumble','Mash'];
+  var FCOLS=['#2979C8','#00BCD4','#4CAF50','#F4A300','#9C27B0'];
+  var SITES=['AC','PFMIS','HOREB','BUKID','ARGAO','CCPC','SOUTH','NATIONAL'];
+  var MONTH_ORD=['JANUARY','FEBRUARY','MARCH','APRIL','MAY','JUNE','JULY','AUGUST','SEPTEMBER','OCTOBER','NOVEMBER','DECEMBER'];
+
+  function nv(v){if(v===null||v===undefined||v==='')return null;var n=parseFloat(String(v).replace(/,/g,'').trim());return isNaN(n)?null:n;}
+  function fN(v,d){if(v===null||v===undefined)return '\u2014';d=d===undefined?2:d;return Number(v).toLocaleString('en-PH',{minimumFractionDigits:d,maximumFractionDigits:d});}
+  function fC(v){if(v===null||v===undefined)return '\u2014';return '\u20b1'+fN(v,2);}
+
+  gasGet('mcos_daily',{site:'',week:''}).then(function(d){
+    var rows=d.rows||[];
+    var weeks=d.weeks||[];
+    var months=d.months||[];
+    if(!rows.length){ct.innerHTML='<div class="no-data">No MCOS daily data \u2014 redeploy GAS with getMCOSDaily()</div>';return;}
+
+    // State
+    var activeView='weekly'; // 'weekly' or 'monthly'
+    var activeSite='NATIONAL';
+    var activeForm='Pellet';
+
+    // Sites that have data
+    var sitesInData=[];
+    SITES.forEach(function(s){if(rows.some(function(r){return (r.PLANT||'').toUpperCase()===s;}))sitesInData.push(s);});
+
+    // ── Build weekly summary: aggregate by WEEK per plant ──────────────
+    function buildWeekly(){
+      var byWeekSite={};
+      rows.forEach(function(r){
+        var p=(r.PLANT||'').toUpperCase();
+        var w=String(r.WEEK||'').trim();
+        if(!p||!w||p==='NATIONAL') return;
+        var key=w+'|'+p;
+        if(!byWeekSite[key]) byWeekSite[key]={plant:p,week:w,vol:0,counts:{}};
+        var vol=nv(r['Volume,MT'])||0;
+        byWeekSite[key].vol+=vol;
+        FKEYS.forEach(function(fk,fi){
+          var cv=nv(r[fk]);
+          if(cv!==null&&cv>0){
+            if(!byWeekSite[key].counts[fi]) byWeekSite[key].counts[fi]={sum:0,n:0};
+            byWeekSite[key].counts[fi].sum+=cv;
+            byWeekSite[key].counts[fi].n+=1;
+          }
+        });
+      });
+      // Build rows
+      var out=[];
+      Object.values(byWeekSite).forEach(function(obj){
+        var row={plant:obj.plant,week:+obj.week,vol:obj.vol};
+        FKEYS.forEach(function(fk,fi){
+          var c=obj.counts[fi];
+          row['f'+fi]=c&&c.n>0?c.sum/c.n:null;
+        });
+        out.push(row);
+      });
+      out.sort(function(a,b){return a.week-b.week||SITES.indexOf(a.plant)-SITES.indexOf(b.plant);});
+      return out;
+    }
+
+    // ── Build monthly summary: aggregate by MONTH per plant ─────────────
+    function buildMonthly(){
+      var byMonthSite={};
+      rows.forEach(function(r){
+        var p=(r.PLANT||'').toUpperCase();
+        var m=String(r.MONTH||'').trim().toUpperCase();
+        if(!p||!m||p==='NATIONAL') return;
+        var key=m+'|'+p;
+        if(!byMonthSite[key]) byMonthSite[key]={plant:p,month:m,vol:0,counts:{}};
+        var vol=nv(r['Volume,MT'])||0;
+        byMonthSite[key].vol+=vol;
+        FKEYS.forEach(function(fk,fi){
+          var cv=nv(r[fk]);
+          if(cv!==null&&cv>0){
+            if(!byMonthSite[key].counts[fi]) byMonthSite[key].counts[fi]={sum:0,n:0};
+            byMonthSite[key].counts[fi].sum+=cv;
+            byMonthSite[key].counts[fi].n+=1;
+          }
+        });
+      });
+      var out=[];
+      Object.values(byMonthSite).forEach(function(obj){
+        var row={plant:obj.plant,month:obj.month,vol:obj.vol};
+        FKEYS.forEach(function(fk,fi){
+          var c=obj.counts[fi];
+          row['f'+fi]=c&&c.n>0?c.sum/c.n:null;
+        });
+        out.push(row);
+      });
+      out.sort(function(a,b){
+        var ma=MONTH_ORD.indexOf(a.month),mb=MONTH_ORD.indexOf(b.month);
+        if(ma!==mb) return ma-mb;
+        return SITES.indexOf(a.plant)-SITES.indexOf(b.plant);
+      });
+      return out;
+    }
+
+    // ── Table header row ────────────────────────────────────────────────
+    var TH='padding:5px 8px;background:var(--navy);color:#fff;font-size:8.5px;font-weight:700;border-bottom:2px solid var(--border);white-space:nowrap;text-align:right;';
+    var THl=TH+'text-align:left;';
+    var TD='padding:4px 8px;font-size:8.5px;border-bottom:1px solid var(--border);text-align:right;white-space:nowrap;';
+    var TDl=TD+'text-align:left;font-weight:700;';
+
+    function tableHtml(dataRows,periodLabel){
+      var isWeekly=periodLabel==='WEEK';
+      var html='<div style="overflow-x:auto;margin-bottom:20px"><table style="width:100%;border-collapse:collapse"><thead><tr>'
+        +'<th style="'+THl+'">PLANT</th>'
+        +'<th style="'+TH+'">'+periodLabel+'</th>'
+        +'<th style="'+TH+'">VOL (MT)</th>'
+        +'<th style="'+TH+'">MINI PELLET (₱/MT)</th>'
+        +'<th style="'+TH+'">MICRO PELLET (₱/MT)</th>'
+        +'<th style="'+TH+'">PELLET (₱/MT)</th>'
+        +'<th style="'+TH+'">CRUMBLE (₱/MT)</th>'
+        +'<th style="'+TH+'">MASH (₱/MT)</th>'
+        +'</tr></thead><tbody>';
+      dataRows.forEach(function(r,i){
+        var isN=r.plant==='NATIONAL';
+        var bg=isN?'var(--navy)':(i%2===0?'var(--bg1)':'var(--bg2)');
+        var period=isWeekly?'Wk '+r.week:r.month.charAt(0)+r.month.slice(1).toLowerCase();
+        html+='<tr style="background:'+bg+'">'
+          +'<td style="'+TDl+'color:var(--blue)">'+r.plant+'</td>'
+          +'<td style="'+TD+'">'+period+'</td>'
+          +'<td style="'+TD+'">'+fN(r.vol,1)+'</td>'
+          +[0,1,2,3,4].map(function(fi){
+            var v=r['f'+fi];
+            var col=v!==null&&v>0?(v>5000?'var(--red)':v>3000?'var(--amber)':'var(--green)'):'var(--text3)';
+            return '<td style="'+TD+'color:'+col+';font-weight:'+(v&&v>0?700:400)+'">'+fC(v)+'</td>';
+          }).join('')
+          +'</tr>';
+      });
+      return html+'</tbody></table></div>';
+    }
+
+    // ── Chart: line per form for selected site ───────────────────────────
+    function buildChartData(siteRows,isWeekly){
+      var labels=[];
+      var series=FKEYS.map(function(){return [];});
+      var seen={};
+      siteRows.forEach(function(r){
+        var lbl=isWeekly?'Wk'+r.week:(r.month?r.month.charAt(0)+r.month.slice(1,3).toLowerCase():'');
+        if(!seen[lbl]){seen[lbl]=true;labels.push(lbl);}
+      });
+      labels.forEach(function(lbl){
+        var matching=siteRows.filter(function(r){
+          return isWeekly?('Wk'+r.week===lbl):(r.month&&r.month.charAt(0)+r.month.slice(1,3).toLowerCase()===lbl);
+        });
+        FKEYS.forEach(function(fk,fi){
+          var vals=matching.map(function(r){return r['f'+fi];}).filter(function(v){return v!==null&&v>0;});
+          series[fi].push(vals.length?vals.reduce(function(a,b){return a+b;},0)/vals.length:null);
+        });
+      });
+      return {labels:labels,series:series};
+    }
+
+    function pill(id,lbl,act,onclick){
+      return '<button id="'+id+'" onclick="'+onclick+'" style="padding:3px 11px;border-radius:12px;border:1px solid '+(act?'var(--blue)':'var(--border)')+';background:'+(act?'var(--blue)':'transparent')+';color:'+(act?'#fff':'var(--text2)')+';font-size:9px;cursor:pointer;font-weight:'+(act?700:400)+'">'+lbl+'</button>';
+    }
+
+    function renderCA(){
+      var wkData=buildWeekly();
+      var moData=buildMonthly();
+      var isW=activeView==='weekly';
+      var curData=isW?wkData:moData;
+      var siteData=curData.filter(function(r){
+        return activeSite==='NATIONAL'||r.plant===activeSite;
+      });
+      var cd=buildChartData(siteData,isW);
+      window._caChartData=cd;
+
+      var html='<div style="padding:12px">'
+        +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">'
+        +'<div style="font-size:18px;font-weight:700;color:var(--text1)">COST ANALYTICS \u2014 MCOS DAILY</div>'
+        +'<div style="font-size:10px;color:var(--sky);font-weight:700">'+activeSite+' \u00b7 '+( isW?'WEEKLY':'MONTHLY')+'</div></div>'
+        // View toggle
+        +'<div style="display:flex;gap:8px;margin-bottom:10px;align-items:center">'
+        +'<span style="font-size:9px;color:var(--text3);font-weight:700;margin-right:4px">VIEW</span>'
+        +pill('ca-vw-wk','Weekly',isW,"window._caView('weekly')")
+        +pill('ca-vw-mo','Monthly',!isW,"window._caView('monthly')")
+        +'<span style="font-size:9px;color:var(--text3);font-weight:700;margin-left:12px;margin-right:4px">SITE</span>'
+        +sitesInData.map(function(s){return pill('ca-s-'+s,s,s===activeSite,"window._caSite('"+s+"')");}).join(' ')
+        +'</div>'
+        // Chart
+        +'<div style="background:var(--bg1);border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:16px">'
+        +'<div style="font-size:11px;font-weight:700;color:var(--text1);margin-bottom:8px">Manufacturing Cost/MT by Feed Form \u2014 '+activeSite+' ('+( isW?'Weekly':'Monthly')+')</div>'
+        +'<canvas id="ca-chart" style="max-height:220px"></canvas></div>'
+        // Weekly table
+        +'<div style="font-size:10px;font-weight:700;color:var(--sky);margin-bottom:6px;letter-spacing:.5px">WEEKLY COST DETAIL</div>'
+        +tableHtml(wkData,'WEEK')
+        // Monthly table
+        +'<div style="font-size:10px;font-weight:700;color:var(--sky);margin-bottom:6px;letter-spacing:.5px">MONTHLY COST SUMMARY</div>'
+        +tableHtml(moData,'MONTH')
+        +'</div>';
+
+      ct.innerHTML=html;
+
+      // Draw chart
+      setTimeout(function(){
+        var cd=window._caChartData;
+        if(!cd||!cd.labels.length) return;
+        var canvas=document.getElementById('ca-chart');
+        if(!canvas) return;
+        if(window._caChartInst){try{window._caChartInst.destroy();}catch(e){}}
+        var gc='rgba(255,255,255,0.06)';
+        var ta={grid:{color:gc},ticks:{color:'#5a6270',font:{size:9}}};
+        var datasets=FFORMS.map(function(f,fi){
+          return {label:f,data:cd.series[fi],borderColor:FCOLS[fi],backgroundColor:'transparent',
+            borderWidth:2,pointRadius:4,pointBackgroundColor:FCOLS[fi],
+            spanGaps:true,tension:0.3};
+        }).filter(function(ds){return ds.data.some(function(v){return v!==null&&v>0;});});
+        window._caChartInst=new Chart(canvas.getContext('2d'),{
+          type:'line',data:{labels:cd.labels,datasets:datasets},
+          options:{responsive:true,
+            plugins:{legend:{labels:{color:'#888',font:{size:9}}},
+              tooltip:{callbacks:{label:function(ctx){return ctx.dataset.label+': \u20b1'+Number(ctx.raw).toLocaleString('en-PH',{minimumFractionDigits:2,maximumFractionDigits:2});}}}},
+            scales:{x:ta,y:Object.assign({},ta,{title:{display:true,text:'\u20b1 per MT',color:'#888',font:{size:9}}})}}});
+      },80);
+
+      // Handlers
+      window._caView=function(v){activeView=v;renderCA();};
+      window._caSite=function(s){activeSite=s;renderCA();};
+    }
+
+    // Make FORMS and FCOLS accessible inside renderCA
+    var FFORMS=FORMS;
+    renderCA();
+
+  }).catch(function(e){ct.innerHTML='<div class="no-data" style="color:var(--red)">Error: '+e.message+'</div>';});
+}
 function renderQualityEnergy(){var ct=document.getElementById('content-quality_energy');ct.innerHTML='<div class="no-data">Quality & Energy tab</div>';}
 
 // ── START ──────────────────────────────────────────────────
