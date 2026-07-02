@@ -2658,7 +2658,13 @@ function renderOEE(){
   var SITES_ORDER=['AC','PFMIS','HOREB','BUKID','ARGAO','CCPC','SOUTH','NATIONAL'];
   var MONTH_ORDER=['JANUARY','FEBRUARY','MARCH','APRIL','MAY','JUNE','JULY','AUGUST','SEPTEMBER','OCTOBER','NOVEMBER','DECEMBER'];
 
+  // Timeout fallback — if GAS doesn't respond in 15s show error
+  var _varTimeout=setTimeout(function(){
+    ct.innerHTML='<div class="no-data" style="color:var(--red)">⚠ Variance tab timed out — please redeploy GAS with getVariance() and refresh.</div>';
+  },15000);
+
   gasGet('variance').then(function(d){
+    clearTimeout(_varTimeout);
     var rows=d.rows||[];
     var months=d.months||[];
     if(!rows.length){ct.innerHTML='<div class="no-data">No variance data available</div>';return;}
@@ -2845,6 +2851,7 @@ function renderOEE(){
       +'</div>';
 
   }).catch(function(e){
-    ct.innerHTML='<div class="no-data" style="color:var(--red)">Error: '+e.message+'</div>';
+    clearTimeout(_varTimeout);
+    ct.innerHTML='<div class="no-data" style="color:var(--red)">Error loading variance: '+e.message+'<br>Make sure GAS is redeployed with getVariance() function.</div>';
   });
 };
