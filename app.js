@@ -2663,12 +2663,19 @@ function renderOEE(){
     function buildSC(r){
       if(!r)return '<div style="color:var(--text3);font-size:10px;padding:8px">No data</div>';
       var vp=nv(r['RM Variance, %']),wp=nv(r['RM Variance (w/o used sacks), %']),ap=nv(r['ABS RM Variance, %']);
-      return '<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px">'
+      var sh=nv(r['Total Shrinkage, mt']),sv=nv(r['Shrinkage Value (Php)']);
+      var gl=nv(r['Process Gain-Loss, %']);var gld=gl!==null?(Math.abs(gl)<1?gl*100:gl):null;
+      var wq=nv(r['RM Variance (w/o used sacks), Qty']);
+      var shCol=sh!==null?(sh<0?'var(--red)':'var(--green)'):'var(--amber)';
+      var svCol=sv!==null?(sv<0?'var(--red)':'var(--green)'):'var(--amber)';
+      return '<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:8px">'
         +sc('TOTAL INPUT (mt)',fN(nv(r['Total Plant Input, mt']),1),'','var(--blue)')
+        +sc('SHRINKAGE %',(gld!==null?(gld>=0?'+':'')+gld.toFixed(2)+'%':'\u2014'),fN(sh,2)+' mt',shCol)
+        +sc('SHRINKAGE (\u20b1)',fPHP(sv),'',svCol)
         +sc('RM VARIANCE %',fPct(vp),fN(nv(r['RM Variance, Qty']),2)+' mt',pc(vp))
-        +sc('RM VARIANCE (\u20b1)',fPHP(nv(r['RM Variance, Php'])),'monetary impact',pc(vp))
+        +sc('RM VARIANCE (\u20b1)',fPHP(nv(r['RM Variance, Php'])),'',pc(vp))
         +sc('ABS VARIANCE %',(ap!==null?(Math.abs(ap)<1?ap*100:ap).toFixed(2)+'%':'\u2014'),fN(nv(r['ABS RM Variance, Qty']),2)+' mt','var(--amber)')
-        +sc('VAR % w/o SACKS',fPct(wp),fPHP(nv(r['RM Variance (w/o used sacks), Php'])),pc(wp))
+        +sc('VAR % w/o SACKS',fPct(wp),fN(wq,2)+' mt',pc(wp))
         +'</div>';
     }
     function pill(id,label,active,onclick){
