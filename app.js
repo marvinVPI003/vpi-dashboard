@@ -2702,26 +2702,47 @@ function renderOEE(){
       var h='<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse"><thead><tr>'
         +'<th style="'+THl+'">PLANT</th><th style="'+THl+'">MONTH</th>'
         +'<th style="'+TH+'">Total Input (mt)</th>'
+        +'<th style="'+TH+'">Shrinkage (mt)</th>'
+        +'<th style="'+TH+'">Process G/L %</th>'
+        +'<th style="'+TH+'">Shrinkage (\u20b1)</th>'
         +'<th style="'+TH+'">RM Var Qty</th><th style="'+TH+'">RM Var %</th><th style="'+TH+'">RM Var (\u20b1)</th>'
         +'<th style="'+TH+'">ABS Qty</th><th style="'+TH+'">ABS %</th>'
-        +'<th style="'+TH+'">w/o Sacks Qty</th><th style="'+TH+'">w/o Sacks %</th><th style="'+TH+'">w/o Sacks (\u20b1)</th>'
+        +'<th style="'+TH+'">w/o Sacks Qty</th><th style="'+TH+'">w/o Sacks %</th>'
+        +'<th style="'+TH+'">Total Loss Qty</th><th style="'+TH+'">Total Loss %</th>'
         +'</tr></thead><tbody>';
       flt.forEach(function(r,i){
         var pl=(r.Plant||'').toUpperCase(),isN=pl==='NATIONAL';
         var bg=isN?'var(--navy)':(i%2===0?'var(--bg1)':'var(--bg2)');
-        var vp=nv(r['RM Variance, %']),wp=nv(r['RM Variance (w/o used sacks), %']),ap=nv(r['ABS RM Variance, %']);
+        var ti=nv(r['Total Plant Input, mt']);
+        var sh=nv(r['Total Shrinkage, mt']);
+        var gl=nv(r['Process Gain-Loss, %']);var gld=gl!==null?(Math.abs(gl)<1?gl*100:gl):null;
+        var sv=nv(r['Shrinkage Value (Php)']);
+        var vq=nv(r['RM Variance, Qty']);
+        var vp=nv(r['RM Variance, %']);
+        var vph=nv(r['RM Variance, Php']);
+        var aq=nv(r['ABS RM Variance, Qty']);
+        var ap=nv(r['ABS RM Variance, %']);
+        var wq=nv(r['RM Variance (w/o used sacks), Qty']);
+        var wp=nv(r['RM Variance (w/o used sacks), %']);
+        // Computed columns
+        var tmlq=(sh!==null&&vq!==null)?sh+vq:null;
+        var tmlp=(tmlq!==null&&ti&&ti!==0)?tmlq/ti*100:null;
         h+='<tr style="background:'+bg+'">'
           +'<td style="'+TDl+'color:'+(isN?'var(--sky)':'var(--blue)')+'">'+pl+'</td>'
           +'<td style="'+TDl+'color:var(--text2)">'+String(r.MONTH||'')+'</td>'
-          +'<td style="'+TD+'">'+fN(nv(r['Total Plant Input, mt']),1)+'</td>'
-          +'<td style="'+TD+'">'+fN(nv(r['RM Variance, Qty']),2)+'</td>'
+          +'<td style="'+TD+'">'+fN(ti,1)+'</td>'
+          +'<td style="'+TD+';color:'+(sh!==null?(sh<0?'var(--red)':'var(--green)'):'var(--text2)')+'">'+fN(sh,2)+'</td>'
+          +'<td style="'+TD+';color:'+(gld!==null?(gld<0?'var(--red)':'var(--green)'):'var(--text2)')+';font-weight:700">'+(gld!==null?(gld>=0?'+':'')+gld.toFixed(2)+'%':'\u2014')+'</td>'
+          +'<td style="'+TD+';color:'+(sv!==null?(sv<0?'var(--red)':'var(--green)'):'var(--text2)')+'">'+fPHP(sv)+'</td>'
+          +'<td style="'+TD+'">'+fN(vq,2)+'</td>'
           +'<td style="'+TD+';font-weight:700;color:'+pc(vp)+'">'+fPct(vp)+'</td>'
-          +'<td style="'+TD+';color:'+pc(vp)+'">'+fPHP(nv(r['RM Variance, Php']))+'</td>'
-          +'<td style="'+TD+'">'+fN(nv(r['ABS RM Variance, Qty']),2)+'</td>'
+          +'<td style="'+TD+';color:'+pc(vp)+'">'+fPHP(vph)+'</td>'
+          +'<td style="'+TD+'">'+fN(aq,2)+'</td>'
           +'<td style="'+TD+';color:var(--amber);font-weight:700">'+(ap!==null?(Math.abs(ap)<1?ap*100:ap).toFixed(2)+'%':'\u2014')+'</td>'
-          +'<td style="'+TD+'">'+fN(nv(r['RM Variance (w/o used sacks), Qty']),2)+'</td>'
+          +'<td style="'+TD+'">'+fN(wq,2)+'</td>'
           +'<td style="'+TD+';font-weight:700;color:'+pc(wp)+'">'+fPct(wp)+'</td>'
-          +'<td style="'+TD+';color:'+pc(wp)+'">'+fPHP(nv(r['RM Variance (w/o used sacks), Php']))+'</td>'
+          +'<td style="'+TD+';font-weight:700;color:'+(tmlq!==null?(tmlq<0?'var(--red)':'var(--green)'):'var(--text2)')+'">'+fN(tmlq,2)+'</td>'
+          +'<td style="'+TD+';font-weight:700;color:'+(tmlp!==null?(tmlp<0?'var(--red)':'var(--green)'):'var(--text2)')+'">'+(tmlp!==null?(tmlp>=0?'+':'')+tmlp.toFixed(2)+'%':'\u2014')+'</td>'
           +'</tr>';
       });
       return h+'</tbody></table></div>';
